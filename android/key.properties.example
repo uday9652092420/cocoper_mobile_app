@@ -1,0 +1,4 @@
+storeFile=/absolute/path/to/cocoper-upload.jks
+storePassword=REPLACE_WITH_LOCAL_SECRET
+keyPassword=REPLACE_WITH_LOCAL_SECRET
+keyAlias=cocoper

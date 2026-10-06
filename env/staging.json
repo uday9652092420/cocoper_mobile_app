@@ -1,0 +1,5 @@
+{
+  "APP_NAME": "COCOPER",
+  "IS_PRODUCTION": false,
+  "API_BASE_URL": "https://uat.cocoper.com/api/"
+}
