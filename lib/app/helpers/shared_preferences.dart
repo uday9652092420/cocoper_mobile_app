@@ -28,6 +28,8 @@ class SharedPrefsHelper {
   static const String fullName = 'fullName';
   static const String userRole = 'userRole';
   static const String organizationId = 'organizationId';
+  static const String organizationName = 'organizationName';
+  static const String selectedBranchId = 'selectedBranchId';
   static const String rememberMe = 'rememberMe';
 
   // ============================================================

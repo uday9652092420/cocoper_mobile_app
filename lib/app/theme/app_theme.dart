@@ -22,10 +22,12 @@ class AppColors {
 
   // static const Color textPrimaryLight = Color(0xFFA32C2C); // primary color
   // static const Color textSecondaryLight = Color(0xFFF66834); // secondary color
-  static const Color textDefaultLight = Color(0xFF000000); // black
-  static const Color textWhiteLight = Color(0xFFFFFFFF); // black
-  static const Color textLightBlueLight = Color(0xFF343645);
-  static const Color textLightGrayLight = Color(0xFF6E6F71);
+  static const Color textDefaultLight = Color(0xFF14342B); // unified dark text
+  static const Color textWhiteLight = Color(0xFFFFFFFF); // white
+  static const Color textLightBlueLight =
+      Color(0xFF14342B); // unified dark text
+  static const Color textLightGrayLight =
+      Color(0xFF14342B); // unified dark text
   static const Color textGreenLight = Color(0xFF269E82);
 
   static const Color errorLight = Color(0xFFF44336);

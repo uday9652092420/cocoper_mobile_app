@@ -1,7 +1,7 @@
-import 'package:cocoper_mobile/app/views/dashboard/page1_view.dart';
-import 'package:cocoper_mobile/app/views/dashboard/page2_view.dart';
-import 'package:cocoper_mobile/app/views/dashboard/page3_view.dart';
-import 'package:cocoper_mobile/app/views/dashboard/page4_view.dart';
+import 'package:cocoper_mobile/app/views/dashboard/home_view.dart';
+import 'package:cocoper_mobile/app/views/dashboard/operations_view.dart';
+import 'package:cocoper_mobile/app/views/dashboard/profile_view.dart';
+import 'package:cocoper_mobile/app/views/dashboard/statements_view.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -12,10 +12,10 @@ class DashboardView extends GetView<DashboardController> {
   DashboardView({super.key});
 
   final List<Widget> _pages = [
-    const Page1View(),
-    const Page2View(),
-    const Page3View(),
-    const Page4View(),
+    const HomeView(),
+    const OperationsView(),
+    const StatementsView(),
+    ProfileView(),
   ];
 
   @override

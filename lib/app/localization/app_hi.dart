@@ -9,5 +9,9 @@ const Map<String, String> hiIN = {
   "dashboard": "डैशबोर्ड",
   "operations": "संचालन",
   "statements": "विवरण",
-  "profile": "प्रोफ़ाइल"
+  "profile": "प्रोफ़ाइल",
+  "active_branch": "सक्रिय शाखा",
+  "role_workspace": "भूमिका कार्यक्षेत्र",
+  "select_branch": "शाखा चुनें",
+  "no_branches": "कोई शाखा असाइन नहीं"
 };

@@ -143,7 +143,7 @@ class LoginPageView extends GetView<LoginController> {
               style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF18252F),
+                color: Color(0xFF14342B),
               ),
             ),
             const SizedBox(height: 7),
@@ -151,7 +151,7 @@ class LoginPageView extends GetView<LoginController> {
               'Sign in with your administrator credentials.',
               style: TextStyle(
                 fontSize: 12,
-                color: Color(0xFF667788),
+                color: Color(0xFF14342B),
               ),
             ),
             const SizedBox(height: 25),
@@ -212,7 +212,7 @@ class LoginPageView extends GetView<LoginController> {
       style: const TextStyle(
         fontSize: 12,
         fontWeight: FontWeight.w600,
-        color: Color(0xFF344454),
+        color: Color(0xFF14342B),
       ),
     );
   }
@@ -228,7 +228,7 @@ class LoginPageView extends GetView<LoginController> {
         prefixIcon: const Icon(
           Icons.mail_outline,
           size: 19,
-          color: Color(0xFF91A0B2),
+          color: Color(0xFF14342B),
         ),
       ),
     );
@@ -249,7 +249,7 @@ class LoginPageView extends GetView<LoginController> {
           prefixIcon: const Icon(
             Icons.lock_outline,
             size: 19,
-            color: Color(0xFF91A0B2),
+            color: Color(0xFF14342B),
           ),
           suffixIcon: IconButton(
             onPressed: controller.togglePasswordVisibility,
@@ -258,7 +258,7 @@ class LoginPageView extends GetView<LoginController> {
                   ? Icons.visibility_outlined
                   : Icons.visibility_off_outlined,
               size: 19,
-              color: const Color(0xFF91A0B2),
+              color: const Color(0xFF14342B),
             ),
           ),
         ),
@@ -286,7 +286,7 @@ class LoginPageView extends GetView<LoginController> {
           'Remember me',
           style: TextStyle(
             fontSize: 12,
-            color: Color(0xFF55636F),
+            color: Color(0xFF14342B),
           ),
         ),
         const Spacer(),
@@ -319,7 +319,7 @@ class LoginPageView extends GetView<LoginController> {
       hintText: hintText,
       hintStyle: const TextStyle(
         fontSize: 12,
-        color: Color(0xFF91A0B2),
+        color: Color(0xFF14342B),
       ),
       prefixIcon: prefixIcon,
       suffixIcon: suffixIcon,

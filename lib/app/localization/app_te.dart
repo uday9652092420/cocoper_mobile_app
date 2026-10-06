@@ -9,5 +9,9 @@ const Map<String, String> teIN = {
   "dashboard": "డాష్‌బోర్డ్",
   "operations": "కార్యకలాపాలు",
   "statements": "స్టేట్‌మెంట్లు",
-  "profile": "ప్రొఫైల్"
+  "profile": "ప్రొఫైల్",
+  "active_branch": "క్రియాశీల శాఖ",
+  "role_workspace": "పాత్ర వర్క్‌స్పేస్",
+  "select_branch": "శాఖను ఎంచుకోండి",
+  "no_branches": "శాఖలు కేటాయించబడలేదు"
 };

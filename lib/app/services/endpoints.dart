@@ -31,6 +31,12 @@ class EndPoints {
   /// }
   static const String login = 'auth/login';
 
+  /// Mobile bootstrap: logged-in user, organization, allocated branches and
+  /// the default branch for the current session.
+  ///
+  /// GET /mobile/bootstrap  (Authorization: Bearer <token>)
+  static const String mobileBootstrap = 'mobile/bootstrap';
+
   // ============================================================
   // DASHBOARD
   // ============================================================

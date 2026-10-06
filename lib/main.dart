@@ -51,30 +51,21 @@ void main() async {
     countryCode = 'US';
   }
 
-  runApp(
-    MyApp(
-      initialLocale: Locale(
-        languageCode,
-        countryCode,
-      ),
-    ),
-  );
+  // Set the initial locale reactively so Get.updateLocale() (used by the
+  // language picker and language-selection screen) can switch the whole app
+  // later. Passing a fixed `locale:` to GetMaterialApp would prevent that.
+  Get.updateLocale(Locale(languageCode, countryCode));
+
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  final Locale initialLocale;
-
-  const MyApp({
-    super.key,
-    required this.initialLocale,
-  });
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return GetMaterialApp(
       title: Environment.appName,
-
-      locale: initialLocale,
 
       fallbackLocale: Localization.fallbackLocale,
 

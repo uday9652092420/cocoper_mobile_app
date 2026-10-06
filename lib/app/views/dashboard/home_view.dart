@@ -2,19 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../controllers/dashboard/dashboard_controller.dart';
+import '../../controllers/dashboard/profile_controller.dart';
 import '../../helpers/secure_store.dart';
 import '../../helpers/shared_preferences.dart';
 import '../../localization/localization.dart';
 import '../../routes/app_routes.dart';
 
 const _kInk = Color(0xFF14342B);
-const _kMuted = Color(0xFF8A9A8F);
+const _kMuted = Color(0xFF14342B);
 const _kLine = Color(0xFFE4EBE4);
 const _kGreen = Color(0xFF2D8135);
 const _kMint = Color(0xFFE7F3E4);
 
-class Page1View extends GetView<DashboardController> {
-  const Page1View({super.key});
+class HomeView extends GetView<DashboardController> {
+  const HomeView({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -81,7 +82,7 @@ class Page1View extends GetView<DashboardController> {
                   'C',
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 18,
+                    fontSize: 19,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -97,7 +98,7 @@ class Page1View extends GetView<DashboardController> {
               Text(
                 'COCOPER',
                 style: TextStyle(
-                  fontSize: 17,
+                  fontSize: 18,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 0.3,
                   color: _kInk,
@@ -105,7 +106,7 @@ class Page1View extends GetView<DashboardController> {
               ),
               Text(
                 'All coconut operations',
-                style: TextStyle(fontSize: 11, color: _kMuted),
+                style: TextStyle(fontSize: 13, color: _kMuted),
               ),
             ],
           ),
@@ -142,7 +143,7 @@ class Page1View extends GetView<DashboardController> {
                 const SizedBox(width: 8),
                 Text(
                   option['name'] ?? '',
-                  style: const TextStyle(fontSize: 13, color: _kInk),
+                  style: const TextStyle(fontSize: 15, color: _kInk),
                 ),
               ],
             ),
@@ -217,28 +218,107 @@ class Page1View extends GetView<DashboardController> {
   }
 
   Widget _buildScopeRow() {
-    return Row(
-      children: [
-        Expanded(
-          child: _scopeCard(
-            icon: Icons.storefront_outlined,
-            iconColor: _kInk,
-            label: 'Active branch',
-            value: 'Bengaluru Main',
-            showCaret: true,
+    final profile = Get.find<ProfileController>();
+
+    return Obx(() {
+      final branches = profile.branches;
+      final selectedId = profile.selectedBranchId.value;
+
+      String branchName = 'select_branch'.tr;
+      for (final b in branches) {
+        final id = b['id']?.toString() ?? '';
+        if (id.isNotEmpty && id == selectedId) {
+          branchName = b['branch_name']?.toString() ?? branchName;
+        }
+      }
+
+      return Row(
+        children: [
+          Expanded(
+            child: _branchScopeCard(
+              branches: branches,
+              selectedId: selectedId,
+              selectedName: branchName,
+            ),
           ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _scopeCard(
-            icon: Icons.workspace_premium_outlined,
-            iconColor: const Color(0xFFE9A23B),
-            label: 'Role workspace',
-            value: 'Finance Manager',
-            showCaret: false,
+          const SizedBox(width: 12),
+          Expanded(
+            child: _scopeCard(
+              icon: Icons.workspace_premium_outlined,
+              iconColor: const Color(0xFFE9A23B),
+              label: 'role_workspace'.tr,
+              value: profile.role.value.isEmpty ? '-' : profile.role.value,
+              showCaret: false,
+            ),
           ),
-        ),
-      ],
+        ],
+      );
+    });
+  }
+
+  Widget _branchScopeCard({
+    required List<Map<String, dynamic>> branches,
+    required String selectedId,
+    required String selectedName,
+  }) {
+    final profile = Get.find<ProfileController>();
+
+    return PopupMenuButton<String>(
+      tooltip: 'active_branch'.tr,
+      onSelected: profile.selectBranch,
+      itemBuilder: (context) {
+        if (branches.isEmpty) {
+          return [
+            PopupMenuItem<String>(
+              value: '',
+              enabled: false,
+              child: Text(
+                'no_branches'.tr,
+                style: const TextStyle(fontSize: 13, color: _kMuted),
+              ),
+            ),
+          ];
+        }
+
+        return [
+          for (final b in branches)
+            PopupMenuItem<String>(
+              value: b['id']?.toString() ?? '',
+              child: Row(
+                children: [
+                  Icon(
+                    (b['id']?.toString() ?? '') == selectedId
+                        ? Icons.check_circle
+                        : Icons.circle_outlined,
+                    size: 16,
+                    color: (b['id']?.toString() ?? '') == selectedId
+                        ? _kGreen
+                        : _kMuted,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      b['branch_name']?.toString() ?? '-',
+                      style: const TextStyle(fontSize: 13, color: _kInk),
+                    ),
+                  ),
+                  if (b['branch_code']?.toString().isNotEmpty ?? false)
+                    Text(
+                      b['branch_code'].toString(),
+                      style: const TextStyle(fontSize: 11, color: _kMuted),
+                    ),
+                ],
+              ),
+            ),
+        ];
+      },
+      child: _scopeCard(
+        icon: Icons.storefront_outlined,
+        iconColor: _kInk,
+        label: 'active_branch'.tr,
+        value: selectedName,
+        showCaret: true,
+      ),
     );
   }
 
@@ -281,14 +361,14 @@ class Page1View extends GetView<DashboardController> {
               children: [
                 Text(
                   label,
-                  style: const TextStyle(fontSize: 9.5, color: _kMuted),
+                  style: const TextStyle(fontSize: 11.5, color: _kMuted),
                 ),
                 Text(
                   value,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 11.5,
+                    fontSize: 13.5,
                     fontWeight: FontWeight.w700,
                     color: _kInk,
                   ),
@@ -331,7 +411,7 @@ class Page1View extends GetView<DashboardController> {
                 Text(
                   'COCOPER INDIA PVT. LTD.',
                   style: TextStyle(
-                    fontSize: 9.5,
+                    fontSize: 11.5,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 1,
                     color: Color(0xFF9FC0AE),
@@ -341,7 +421,7 @@ class Page1View extends GetView<DashboardController> {
                 Text(
                   'Every coconut operation.\nOne simple app.',
                   style: TextStyle(
-                    fontSize: 19,
+                    fontSize: 20,
                     height: 1.15,
                     fontWeight: FontWeight.w800,
                     color: Colors.white,
@@ -352,7 +432,7 @@ class Page1View extends GetView<DashboardController> {
                   'Buy, sell, dispatch, collect and track - all with clear '
                   'guided steps.',
                   style: TextStyle(
-                    fontSize: 10.5,
+                    fontSize: 12.5,
                     height: 1.45,
                     color: Color(0xFFB8D2C4),
                   ),
@@ -402,7 +482,7 @@ class Page1View extends GetView<DashboardController> {
         const Text(
           'Choose login role',
           style: TextStyle(
-            fontSize: 12,
+            fontSize: 14,
             fontWeight: FontWeight.w700,
             color: _kInk,
           ),
@@ -421,7 +501,7 @@ class Page1View extends GetView<DashboardController> {
         const SizedBox(height: 8),
         const Text(
           'Owns vouchers, payments, ledgers and the month-end close.',
-          style: TextStyle(fontSize: 10, color: _kMuted),
+          style: TextStyle(fontSize: 12, color: _kMuted),
         ),
       ],
     );
@@ -447,7 +527,7 @@ class Page1View extends GetView<DashboardController> {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontSize: 9,
+              fontSize: 11,
               height: 1.2,
               fontWeight: FontWeight.w600,
               color: selected ? _kGreen : const Color(0xFF5A6A5F),
@@ -476,7 +556,7 @@ class Page1View extends GetView<DashboardController> {
                 isDense: true,
                 border: InputBorder.none,
                 hintText: 'Search work, customer or voucher',
-                hintStyle: TextStyle(fontSize: 11.5, color: Color(0xFFA3B0A7)),
+                hintStyle: TextStyle(fontSize: 13.5, color: _kInk),
                 contentPadding: EdgeInsets.symmetric(vertical: 14),
               ),
             ),
@@ -575,12 +655,12 @@ class Page1View extends GetView<DashboardController> {
             child: Icon(icon, size: 16, color: color),
           ),
           const SizedBox(height: 10),
-          Text(label, style: const TextStyle(fontSize: 10, color: _kMuted)),
+          Text(label, style: const TextStyle(fontSize: 12, color: _kMuted)),
           const SizedBox(height: 2),
           Text(
             value,
             style: const TextStyle(
-              fontSize: 16,
+              fontSize: 17,
               fontWeight: FontWeight.w800,
               color: _kInk,
             ),
@@ -615,7 +695,7 @@ class Page1View extends GetView<DashboardController> {
         const Text(
           'THE MOST-USED WORK, SIMPLIFIED INTO SHORT STEPS.',
           style: TextStyle(
-            fontSize: 9.5,
+            fontSize: 11.5,
             fontWeight: FontWeight.w700,
             letterSpacing: 0.6,
             color: _kMuted,
@@ -627,7 +707,7 @@ class Page1View extends GetView<DashboardController> {
             Text(
               'Fast transactions',
               style: TextStyle(
-                fontSize: 15,
+                fontSize: 16,
                 fontWeight: FontWeight.w800,
                 color: _kInk,
               ),
@@ -636,7 +716,7 @@ class Page1View extends GetView<DashboardController> {
             Text(
               'See all',
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 13,
                 fontWeight: FontWeight.w700,
                 color: _kGreen,
               ),
@@ -679,7 +759,7 @@ class Page1View extends GetView<DashboardController> {
                 Text(
                   title,
                   style: const TextStyle(
-                    fontSize: 12.5,
+                    fontSize: 14.5,
                     fontWeight: FontWeight.w700,
                     color: _kInk,
                   ),
@@ -687,12 +767,12 @@ class Page1View extends GetView<DashboardController> {
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style: const TextStyle(fontSize: 10.5, color: _kMuted),
+                  style: const TextStyle(fontSize: 12.5, color: _kMuted),
                 ),
               ],
             ),
           ),
-          const Icon(Icons.chevron_right, size: 20, color: Color(0xFFA3B0A7)),
+          const Icon(Icons.chevron_right, size: 20, color: _kInk),
         ],
       ),
     );
