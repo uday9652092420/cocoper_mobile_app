@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../controllers/dashboard/dashboard_controller.dart';
+import '../../routes/app_routes.dart';
 
 const _kInk = Color(0xFF14342B);
 const _kMuted = Color(0xFF14342B);
@@ -18,6 +19,7 @@ class OperationsView extends GetView<DashboardController> {
       icon: Icons.receipt_long_outlined,
       color: Color(0xFF2D8135),
       tint: Color(0xFFE7F3E4),
+      route: Routes.purchaseOrder,
     ),
     _TransactionModule(
       title: 'Purchase Invoice',
@@ -195,6 +197,11 @@ class OperationsView extends GetView<DashboardController> {
     return InkWell(
       borderRadius: BorderRadius.circular(14),
       onTap: () {
+        final route = module.route;
+        if (route != null) {
+          Get.toNamed(route);
+          return;
+        }
         Get.snackbar(
           module.title,
           'This module is coming soon.',
@@ -259,6 +266,7 @@ class _TransactionModule {
   final IconData icon;
   final Color color;
   final Color tint;
+  final String? route;
 
   const _TransactionModule({
     required this.title,
@@ -266,5 +274,6 @@ class _TransactionModule {
     required this.icon,
     required this.color,
     required this.tint,
+    this.route,
   });
 }

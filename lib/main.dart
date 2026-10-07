@@ -11,7 +11,9 @@ import 'app/theme/app_theme.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await SystemChrome.setPreferredOrientations([
+  // Orientation is locked at the platform level (AndroidManifest), so these
+  // window calls run without blocking the first frame.
+  SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
@@ -20,7 +22,7 @@ void main() async {
 
   // Draw behind the status and navigation bars so the UI fills the whole screen
   // (Android 15+ letterboxes apps that are not edge-to-edge).
-  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(

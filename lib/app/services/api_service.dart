@@ -53,6 +53,14 @@ class ApiService {
         SharedPrefsHelper.accessToken,
       );
 
+      final organizationId = await SharedPrefsHelper.getString(
+        SharedPrefsHelper.organizationId,
+      );
+
+      if (organizationId.isNotEmpty) {
+        mergedHeaders['x-organization-id'] = organizationId;
+      }
+
       if (accessToken != null && accessToken.trim().isNotEmpty) {
         mergedHeaders['Authorization'] = 'Bearer ${accessToken.trim()}';
       }

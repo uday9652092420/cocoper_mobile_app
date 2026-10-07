@@ -130,4 +130,13 @@ class EndPoints {
   static const apigetreferencegroupid5 = 'ReferenceValue/getreferencegroupid/5';
 
   static const apigetreferencegroupid3 = 'ReferenceValue/getreferencegroupid/3';
+
+  // ============================================================
+  // PURCHASE ORDER
+  // ============================================================
+
+  static const String purchaseOrders = 'purchase-orders';
+  static const String suppliers = 'suppliers';
+  static const String items = 'items';
+  static const String branches = 'branches';
 }
