@@ -139,4 +139,17 @@ class EndPoints {
   static const String suppliers = 'suppliers';
   static const String items = 'items';
   static const String branches = 'branches';
+
+  // ============================================================
+  // SALES ORDER
+  // ============================================================
+
+  static const String salesOrders = 'sales-orders';
+  static const String customers = 'customers';
+
+  // ============================================================
+  // PURCHASE INVOICE
+  // ============================================================
+
+  static const String purchaseInvoices = 'purchase-invoices';
 }

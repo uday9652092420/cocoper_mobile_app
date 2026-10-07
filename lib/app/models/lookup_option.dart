@@ -15,12 +15,22 @@ class LookupOption {
     }
 
     final map = Map<String, dynamic>.from(value);
-    final id = _string(map['id'] ?? map['ID']);
+    final id = _firstNonEmpty([
+      map['id'],
+      map['ID'],
+      map['_id'],
+      map['itemId'],
+      map['item_id'],
+      map['itemCode'],
+      map['item_code'],
+      map['code'],
+    ]);
 
     final label = _firstNonEmpty([
       map['name'],
-      map['supplier_name'],
+      map['itemName'],
       map['item_name'],
+      map['supplier_name'],
       map['branch_name'],
       map['organization_name'],
       map['company_name'],

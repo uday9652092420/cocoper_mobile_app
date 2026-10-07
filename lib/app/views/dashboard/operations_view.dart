@@ -22,18 +22,20 @@ class OperationsView extends GetView<DashboardController> {
       route: Routes.purchaseOrder,
     ),
     _TransactionModule(
-      title: 'Purchase Invoice',
-      subtitle: 'Record purchase invoices',
-      icon: Icons.description_outlined,
-      color: Color(0xFF0C8CE9),
-      tint: Color(0xFFE3F1FC),
-    ),
-    _TransactionModule(
       title: 'Sales Order',
       subtitle: 'Create and dispatch sales orders',
       icon: Icons.local_shipping_outlined,
       color: Color(0xFFE9A23B),
       tint: Color(0xFFFDF2E2),
+      route: Routes.savedSalesOrders,
+    ),
+    _TransactionModule(
+      title: 'Purchase Invoice',
+      subtitle: 'Record purchase invoices',
+      icon: Icons.description_outlined,
+      color: Color(0xFF0C8CE9),
+      tint: Color(0xFFE3F1FC),
+      route: Routes.purchaseInvoices,
     ),
     _TransactionModule(
       title: 'Direct Sales',
@@ -142,20 +144,10 @@ class OperationsView extends GetView<DashboardController> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: _modules.length,
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                    childAspectRatio: 1.32,
-                  ),
-                  itemBuilder: (context, index) => _buildTile(
-                    _modules[index],
-                  ),
-                ),
+                for (int i = 0; i < _modules.length; i++) ...[
+                  _buildTile(_modules[i]),
+                  if (i != _modules.length - 1) const SizedBox(height: 10),
+                ],
               ],
             ),
           ),
@@ -210,7 +202,7 @@ class OperationsView extends GetView<DashboardController> {
         );
       },
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
@@ -223,35 +215,47 @@ class OperationsView extends GetView<DashboardController> {
             ),
           ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
           children: [
             Container(
-              width: 34,
-              height: 34,
+              width: 42,
+              height: 42,
               decoration: BoxDecoration(
                 color: module.tint,
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(module.icon, size: 19, color: module.color),
+              child: Icon(module.icon, size: 21, color: module.color),
             ),
-            const Spacer(),
-            Text(
-              module.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 14.5,
-                fontWeight: FontWeight.w700,
-                color: _kInk,
+            const SizedBox(width: 13),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    module.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w700,
+                      color: _kInk,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    module.subtitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12, color: _kMuted),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 3),
-            Text(
-              module.subtitle,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 12, color: _kMuted),
+            const SizedBox(width: 10),
+            const Icon(
+              Icons.chevron_right_rounded,
+              size: 22,
+              color: _kMuted,
             ),
           ],
         ),

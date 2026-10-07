@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 
+import '../../controllers/salesorders/sales_order_controller.dart';
 import '../../helpers/flutter_toast.dart';
 import '../../models/purchase_order.dart';
+import '../../models/sales_order_line.dart';
+import '../../routes/app_routes.dart';
 
 const _kInk = Color(0xFF14342B);
 const _kMuted = Color(0xFF5C6B66);
@@ -13,6 +16,11 @@ const _kMint = Color(0xFFE7F3E4);
 const _kFieldFill = Color(0xFFF6F8F6);
 
 /// Sales Order (Conversion) screen, opened from an approved Purchase Order.
+///
+/// Matches the web Sales Order conversion flow: the SO number is generated
+/// client-side, converted lines keep the PO item/quantity locked, sale cost is
+/// pre-filled from purchase cost, actual quantity is kept to 6 decimals and
+/// profit = total sale amount - total purchase amount (frontend only).
 class NewSaleOrderView extends StatefulWidget {
   const NewSaleOrderView({super.key});
 
@@ -21,24 +29,49 @@ class NewSaleOrderView extends StatefulWidget {
 }
 
 class _NewSaleOrderViewState extends State<NewSaleOrderView> {
+  final _controller = Get.find<SalesOrderController>();
+
   final _soNumberController = TextEditingController();
   final _dateController = TextEditingController();
   final _remarksController = TextEditingController();
 
-  String? _customer;
+  String? _customerId;
 
   final List<_SaleLineItem> _lineItems = [];
   double _totalPurchaseAmount = 0;
+
+  PurchaseOrder? _order;
+  String _mode = SalesOrderController.modeTonage;
+
+  // Guards against a feedback loop while Pieces % echoes into Discount.
+  bool _syncingDiscount = false;
 
   @override
   void initState() {
     super.initState();
 
     final order = Get.arguments as PurchaseOrder?;
+    _order = order;
     if (order != null) {
+      _mode = order.mode.trim().isEmpty
+          ? SalesOrderController.modeTonage
+          : order.mode;
       _prefillFromOrder(order);
     } else {
       _dateController.text = DateFormat('dd/MM/yyyy').format(DateTime.now());
+    }
+
+    _init();
+  }
+
+  Future<void> _init() async {
+    await Future.wait([
+      _controller.loadLookups(),
+      _controller.loadSalesOrders(),
+    ]);
+
+    if (_order != null) {
+      _soNumberController.text = await _controller.generateSoNumber();
     }
   }
 
@@ -182,12 +215,27 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
             ),
           ),
           const SizedBox(height: 14),
-          _fieldLabel('Customer'),
+          _fieldLabel('Customer', required: true),
           const SizedBox(height: 6),
-          _buildDropdown(
-            value: _customer,
-            hint: 'Select customer',
-            onChanged: (v) => setState(() => _customer = v),
+          Obx(
+            () => _buildDropdown(
+              value: _customerId,
+              hint: _controller.isLoadingLookups.value
+                  ? 'Loading customers…'
+                  : 'Select customer',
+              items: _controller.customers
+                  .map(
+                    (c) => DropdownMenuItem<String>(
+                      value: c.id,
+                      child: Text(
+                        c.label,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (v) => setState(() => _customerId = v),
+            ),
           ),
           const SizedBox(height: 14),
           _fieldLabel('Remarks'),
@@ -264,7 +312,7 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
                     ),
                     const Spacer(),
                     Text(
-                      '₹${_formatAmount(_totalSaleAmount())}/-',
+                      '₹${_formatMoney(_totalSaleAmount())}/-',
                       style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
@@ -286,7 +334,7 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
                     ),
                     const Spacer(),
                     Text(
-                      '₹${_formatAmount(_profitAmount())}/-',
+                      '₹${_formatMoney(_profitAmount())}/-',
                       style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
@@ -346,22 +394,26 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: ElevatedButton(
-                onPressed: _onSave,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _kGreen,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(vertical: 15),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+              child: Obx(
+                () => ElevatedButton(
+                  onPressed: _controller.isSaving.value ? null : _onSave,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _kGreen,
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: _kGreen.withValues(alpha: 0.6),
+                    disabledForegroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
-                ),
-                child: const Text(
-                  'Save',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
+                  child: Text(
+                    _controller.isSaving.value ? 'Saving…' : 'Save',
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ),
@@ -378,6 +430,9 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
 
   Widget _buildLineItemCard(int index) {
     final item = _lineItems[index];
+    final showPiecesPercentage =
+        _apiMode() == SalesOrderController.modeTonagePercentage;
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -426,48 +481,118 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
           const SizedBox(height: 10),
           _fieldLabel('Item'),
           const SizedBox(height: 6),
-          _buildItemDisplay(item),
+          _buildItemField(item),
           const SizedBox(height: 12),
-          _twoColumnRow(
-            left: _labeledNumField('Qty (Pieces)', item.quantity),
-            right: _labeledNumField('Disc (Pieces)', item.discount),
-          ),
-          const SizedBox(height: 12),
-          _twoColumnRow(
-            left: _labeledNumField('Sale Cost', item.saleCost),
-            right: _labeledNumField('Pieces', item.pieces),
-          ),
-          const SizedBox(height: 12),
-          _twoColumnRow(
-            left: _labeledComputedField(
-              'Actual Qty',
-              _formatAmount(_actualQuantity(item)),
+          if (showPiecesPercentage) ...[
+            _twoColumnRow(
+              left: _labeledQuantityField(item),
+              right: _labeledPiecesPercentageField(item),
             ),
-            right: _labeledComputedField(
+            const SizedBox(height: 12),
+            _twoColumnRow(
+              left: _labeledDiscountField(item),
+              right: _labeledNumField('Sale Cost', item.saleCost),
+            ),
+            const SizedBox(height: 12),
+            _twoColumnRow(
+              left: _labeledNumField('Pieces', item.pieces),
+              right: _labeledComputedField(
+                'Actual Qty',
+                _formatQuantity(_actualQuantity(item)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            _labeledComputedField(
               'Sale Amount',
-              '₹${_formatAmount(_saleAmount(item))}/-',
+              '₹${_formatMoney(_saleAmount(item))}/-',
             ),
-          ),
+          ] else ...[
+            _twoColumnRow(
+              left: _labeledQuantityField(item),
+              right: _labeledDiscountField(item),
+            ),
+            const SizedBox(height: 12),
+            _twoColumnRow(
+              left: _labeledNumField('Sale Cost', item.saleCost),
+              right: _labeledNumField('Pieces', item.pieces),
+            ),
+            const SizedBox(height: 12),
+            _twoColumnRow(
+              left: _labeledComputedField(
+                'Actual Qty',
+                _formatQuantity(_actualQuantity(item)),
+              ),
+              right: _labeledComputedField(
+                'Sale Amount',
+                '₹${_formatMoney(_saleAmount(item))}/-',
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildItemDisplay(_SaleLineItem item) {
-    return Container(
-      width: double.infinity,
-      alignment: Alignment.centerLeft,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: _kLine),
-      ),
-      child: Text(
-        item.itemName.isEmpty ? item.itemId : item.itemName,
-        style: const TextStyle(fontSize: 13, color: _kInk),
+  /// Converted PO lines keep their item locked; manually added lines let the
+  /// user pick an item from the loaded master list.
+  Widget _buildItemField(_SaleLineItem item) {
+    if (item.isConverted) {
+      return Obx(
+        () => Container(
+          width: double.infinity,
+          alignment: Alignment.centerLeft,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
+          decoration: BoxDecoration(
+            color: _kMint.withValues(alpha: 0.35),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: _kLine),
+          ),
+          child: Text(
+            _resolveItemLabel(item),
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: _kInk,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Obx(
+      () => _buildDropdown(
+        value: item.itemId.isEmpty ? null : item.itemId,
+        hint: 'Select item',
+        items: _controller.items
+            .map(
+              (it) => DropdownMenuItem<String>(
+                value: it.id,
+                child: Text(it.label, overflow: TextOverflow.ellipsis),
+              ),
+            )
+            .toList(),
+        onChanged: (v) => setState(
+          () => item.select(v, _itemLabelFromId(v)),
+        ),
       ),
     );
+  }
+
+  /// Resolves a line's display name from its stored name, or by matching its
+  /// id against the loaded items master (PO lines only carry the item id).
+  String _resolveItemLabel(_SaleLineItem item) {
+    if (item.itemName.isNotEmpty) return item.itemName;
+    final resolved = _itemLabelFromId(item.itemId);
+    return resolved.isNotEmpty ? resolved : item.itemId;
+  }
+
+  String _itemLabelFromId(String? id) {
+    if (id == null || id.isEmpty) return '';
+    for (final option in _controller.items) {
+      if (option.id == id) return option.label;
+    }
+    return '';
   }
 
   Widget _twoColumnRow({
@@ -484,6 +609,16 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
     );
   }
 
+  Widget _labeledQuantityField(_SaleLineItem item) {
+    if (item.isConverted) {
+      return _labeledComputedField(
+        _quantityLabel,
+        _formatQuantity(_parse(item.quantity)),
+      );
+    }
+    return _labeledNumField(_quantityLabel, item.quantity);
+  }
+
   Widget _labeledNumField(String label, TextEditingController controller) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -498,6 +633,51 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
           ),
           textAlign: TextAlign.right,
           onChanged: (_) => setState(() {}),
+          style: const TextStyle(fontSize: 13, color: _kInk),
+          decoration: _compactInputDecoration(),
+        ),
+      ],
+    );
+  }
+
+  Widget _labeledDiscountField(_SaleLineItem item) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _fieldLabel(_discountLabel),
+        const SizedBox(height: 6),
+        TextField(
+          controller: item.discount,
+          keyboardType: const TextInputType.numberWithOptions(
+            decimal: true,
+            signed: true,
+          ),
+          textAlign: TextAlign.right,
+          onChanged: (_) {
+            if (_syncingDiscount) return;
+            setState(() {});
+          },
+          style: const TextStyle(fontSize: 13, color: _kInk),
+          decoration: _compactInputDecoration(),
+        ),
+      ],
+    );
+  }
+
+  Widget _labeledPiecesPercentageField(_SaleLineItem item) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _fieldLabel('Pieces %'),
+        const SizedBox(height: 6),
+        TextField(
+          controller: item.piecesPercentage,
+          keyboardType: const TextInputType.numberWithOptions(
+            decimal: true,
+            signed: true,
+          ),
+          textAlign: TextAlign.right,
+          onChanged: (_) => _onPiecesPercentageChanged(item),
           style: const TextStyle(fontSize: 13, color: _kInk),
           decoration: _compactInputDecoration(),
         ),
@@ -653,7 +833,8 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
         isDense: true,
         filled: true,
         fillColor: _kFieldFill,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
           borderSide: const BorderSide(color: _kLine),
@@ -673,6 +854,7 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
   Widget _buildDropdown({
     required String? value,
     required String hint,
+    required List<DropdownMenuItem<String>> items,
     required ValueChanged<String?> onChanged,
   }) {
     return DropdownButtonFormField<String>(
@@ -680,6 +862,7 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
       isExpanded: true,
       hint: Text(
         hint,
+        overflow: TextOverflow.ellipsis,
         style: const TextStyle(fontSize: 14, color: Color(0xFF9AA69F)),
       ),
       icon: const Icon(
@@ -690,7 +873,8 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
         isDense: true,
         filled: true,
         fillColor: _kFieldFill,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
           borderSide: const BorderSide(color: _kLine),
@@ -704,9 +888,7 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
           borderSide: const BorderSide(color: _kGreen, width: 1.2),
         ),
       ),
-      // Customer options are loaded when the Sales Order API integration is
-      // wired up (GET /customers).
-      items: const <DropdownMenuItem<String>>[],
+      items: items,
       onChanged: onChanged,
     );
   }
@@ -715,10 +897,32 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
   // Actions
   // ------------------------------------------------------------
 
-  void _onSave() {
-    // No confirmed Sales Order conversion endpoint exists in the supplied
-    // backend, so Save is a placeholder until the contract is provided.
-    errorToast('Sales order save is coming soon.');
+  Future<void> _onSave() async {
+    if (!_validate()) return;
+
+    final lines = _lineItems.map(_buildLinePayload).toList();
+    final date = _apiDate();
+
+    final order = _order;
+    final success = await _controller.createSalesOrder(
+      soNumber: _soNumberController.text.trim(),
+      date: date,
+      customerId: _customerId?.trim() ?? '',
+      remarks: _remarksController.text.trim(),
+      mode: _apiMode(),
+      sourcePoId: order?.id ?? '',
+      poNumber: order?.poNumber ?? '',
+      lines: lines,
+    );
+
+    if (success && mounted) {
+      // Return to the saved purchase orders list, clearing the edit +
+      // conversion screens from the stack (dashboard stays as the root).
+      Get.offNamedUntil(
+        Routes.purchaseOrder,
+        (route) => route.isFirst,
+      );
+    }
   }
 
   void _pickDate() async {
@@ -744,7 +948,6 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
   // ------------------------------------------------------------
 
   void _prefillFromOrder(PurchaseOrder order) {
-    _soNumberController.text = _deriveSoNumber(order.poNumber);
     _dateController.text = _displayDate(order.date);
     _remarksController.text = 'Converted from ${order.poNumber}';
 
@@ -758,16 +961,13 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
           purchaseAmount: line.purchaseAmount,
           quantity: line.quantity,
           discount: line.discount,
+          piecesPercentage: line.piecesPercentage,
           saleCost: line.purchaseCost,
           pieces: line.pieces,
+          isConverted: true,
         ),
       );
     }
-  }
-
-  String _deriveSoNumber(String poNumber) {
-    if (poNumber.isEmpty) return '';
-    return poNumber.replaceFirst('PO', 'SO');
   }
 
   String _displayDate(String value) {
@@ -776,23 +976,147 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
     return DateFormat('dd/MM/yyyy').format(parsed);
   }
 
+  String _apiDate() {
+    final parsed = DateFormat('dd/MM/yyyy').tryParse(_dateController.text);
+    if (parsed == null) return _dateController.text;
+    return DateFormat('yyyy-MM-dd').format(parsed);
+  }
+
+  String _apiMode() => _mode;
+
+  String get _quantityLabel {
+    return _apiMode() == SalesOrderController.modeLessing
+        ? 'Qty (Pieces)'
+        : 'Qty (Tons)';
+  }
+
+  String get _discountLabel {
+    return _apiMode() == SalesOrderController.modeLessing
+        ? 'Disc (Pieces)'
+        : 'Disc (Kgs)';
+  }
+
   double _parse(TextEditingController c) {
     final value = double.tryParse(c.text.trim());
     return (value == null || !value.isFinite) ? 0 : value;
   }
 
+  double _linePiecesPercentage(_SaleLineItem item) {
+    return _apiMode() == SalesOrderController.modeTonagePercentage
+        ? SalesOrderController.clampNum(_parse(item.piecesPercentage), 0, 100)
+        : 0;
+  }
+
+  void _onPiecesPercentageChanged(_SaleLineItem item) {
+    if (_apiMode() != SalesOrderController.modeTonagePercentage) {
+      setState(() {});
+      return;
+    }
+
+    var percentage = _parse(item.piecesPercentage);
+    final clamped = SalesOrderController.clampNum(percentage, 0, 100);
+    if (clamped != percentage) {
+      item.piecesPercentage.text = _formatNumber(clamped);
+      percentage = clamped;
+    }
+
+    // Echo the calculated value back into Discount (matches web behaviour).
+    final quantity = _parse(item.quantity);
+    final discountValue = SalesOrderController.roundValue(
+      quantity * percentage / 100,
+      0,
+    );
+
+    _syncingDiscount = true;
+    item.discount.text = _formatNumber(discountValue);
+    _syncingDiscount = false;
+
+    setState(() {});
+  }
+
   double _actualQuantity(_SaleLineItem item) {
-    return _parse(item.quantity) - _parse(item.discount);
+    return SalesOrderController.calculateActualQuantity(
+      mode: _apiMode(),
+      quantity: _parse(item.quantity),
+      discount: _parse(item.discount),
+      piecesPercentage: _linePiecesPercentage(item),
+    );
   }
 
   double _saleAmount(_SaleLineItem item) {
-    return _parse(item.saleCost) * _actualQuantity(item);
+    return SalesOrderController.calculateSaleAmount(
+      _parse(item.saleCost),
+      _actualQuantity(item),
+    );
   }
 
-  double _totalSaleAmount() =>
-      _lineItems.fold(0.0, (sum, e) => sum + _saleAmount(e));
+  double _baseCost(_SaleLineItem item) {
+    return SalesOrderController.calculateBaseCost(
+      _saleAmount(item),
+      _parse(item.pieces),
+    );
+  }
 
-  double _profitAmount() => _totalSaleAmount() - _totalPurchaseAmount;
+  double _totalSaleAmount() {
+    return SalesOrderController.calculateTotalAmount(
+      _lineItems.map(_buildLinePayload).toList(),
+    );
+  }
+
+  double _profitAmount() => SalesOrderController.calculateProfit(
+        _totalSaleAmount(),
+        _totalPurchaseAmount,
+      );
+
+  SalesOrderLine _buildLinePayload(_SaleLineItem item) {
+    final quantity = _parse(item.quantity);
+    final discount = _parse(item.discount);
+    final saleCost = _parse(item.saleCost);
+    final pieces = _parse(item.pieces);
+    final piecesPercentage = _linePiecesPercentage(item);
+    final actual = _actualQuantity(item);
+    final saleAmount = _saleAmount(item);
+    final baseCost = _baseCost(item);
+
+    return SalesOrderLine(
+      itemId: item.itemId,
+      itemName: _resolveItemLabel(item),
+      quantity: quantity,
+      discount: discount,
+      piecesPercentage: piecesPercentage,
+      pieces: pieces,
+      baseCost: baseCost,
+      actualQuantity: actual,
+      saleCost: saleCost,
+      saleAmount: saleAmount,
+      amount: saleAmount,
+    );
+  }
+
+  bool _validate() {
+    final soNumber = _soNumberController.text.trim();
+    final customerId = _customerId?.trim() ?? '';
+
+    if (soNumber.isEmpty) {
+      errorToast('Please enter the SO number.');
+      return false;
+    }
+    if (customerId.isEmpty) {
+      errorToast('Please select a customer.');
+      return false;
+    }
+    if (_lineItems.isEmpty) {
+      errorToast('Please add at least one line item.');
+      return false;
+    }
+    for (final item in _lineItems) {
+      if (item.itemId.isEmpty) {
+        errorToast('Please select an item for every line.');
+        return false;
+      }
+    }
+    return true;
+  }
 
   void _removeLineItem(int index) {
     final item = _lineItems.removeAt(index);
@@ -800,20 +1124,27 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
     WidgetsBinding.instance.addPostFrameCallback((_) => item.dispose());
   }
 
-  String _formatAmount(double value) {
-    if (value == value.roundToDouble()) {
-      return value.toInt().toString();
-    }
-    return value.toStringAsFixed(2).replaceFirst(RegExp(r'\.?0+$'), '');
+  String _formatNumber(double value) {
+    if (value == value.roundToDouble()) return value.toInt().toString();
+    var text = value.toStringAsFixed(6);
+    text = text.replaceFirst(RegExp(r'\.?0+$'), '');
+    return text;
   }
+
+  /// Actual quantity: keeps up to 6 decimals, trailing zeros trimmed.
+  String _formatQuantity(double value) => _formatNumber(value);
+
+  String _formatMoney(double value) => value.toStringAsFixed(2);
 }
 
 class _SaleLineItem {
-  final String itemId;
-  final String itemName;
+  String itemId;
+  String itemName;
   final double purchaseAmount;
+  final bool isConverted;
   final TextEditingController quantity;
   final TextEditingController discount;
+  final TextEditingController piecesPercentage;
   final TextEditingController saleCost;
   final TextEditingController pieces;
 
@@ -823,10 +1154,13 @@ class _SaleLineItem {
     required this.purchaseAmount,
     required double quantity,
     required double discount,
+    required double piecesPercentage,
     required double saleCost,
     required double pieces,
+    required this.isConverted,
   })  : quantity = TextEditingController(text: _text(quantity)),
         discount = TextEditingController(text: _text(discount)),
+        piecesPercentage = TextEditingController(text: _text(piecesPercentage)),
         saleCost = TextEditingController(text: _text(saleCost)),
         pieces = TextEditingController(text: _text(pieces));
 
@@ -834,10 +1168,17 @@ class _SaleLineItem {
       : itemId = '',
         itemName = '',
         purchaseAmount = 0,
+        isConverted = false,
         quantity = TextEditingController(),
         discount = TextEditingController(),
+        piecesPercentage = TextEditingController(),
         saleCost = TextEditingController(),
         pieces = TextEditingController();
+
+  void select(String? id, String label) {
+    itemId = id ?? '';
+    itemName = label;
+  }
 
   static String _text(double value) {
     if (value == value.roundToDouble()) return value.toInt().toString();
@@ -847,6 +1188,7 @@ class _SaleLineItem {
   void dispose() {
     quantity.dispose();
     discount.dispose();
+    piecesPercentage.dispose();
     saleCost.dispose();
     pieces.dispose();
   }

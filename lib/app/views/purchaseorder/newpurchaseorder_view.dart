@@ -43,10 +43,6 @@ class _NewPurchaseOrderViewState extends State<NewPurchaseOrderView> {
   // Guards against a feedback loop while Pieces % echoes into Discount (Kgs).
   bool _syncingDiscount = false;
 
-  // Edit-mode action flow: Draft -> Save Changes -> Approve -> Convert.
-  String _currentStatus = 'Draft';
-  bool _hasSavedChanges = false;
-
   final List<_LineItem> _lineItems = [];
 
   @override
@@ -387,55 +383,73 @@ class _NewPurchaseOrderViewState extends State<NewPurchaseOrderView> {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: SafeArea(
         top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Save to keep PO as draft, or approve when final — then convert '
-              'to Sales Order.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 11.5, color: _kMuted),
-            ),
-            const SizedBox(height: 10),
-            if (isEdit)
-              _buildEditAction()
-            else
-              _buildActionButton(
-                label: 'Save',
-                color: _kGreen,
-                onPressed: _onSave,
+        child: isEdit && _isConvertedToSalesOrder
+            ? const Text(
+                'This purchase order has been converted to a Sales Order.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: _kMuted),
+              )
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Save to keep PO as draft, or approve when final — then '
+                    'convert to Sales Order.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 11.5, color: _kMuted),
+                  ),
+                  const SizedBox(height: 10),
+                  if (isEdit)
+                    _buildEditAction()
+                  else
+                    _buildActionButton(
+                      label: 'Save',
+                      color: _kGreen,
+                      onPressed: _onSave,
+                    ),
+                ],
               ),
-          ],
-        ),
       ),
     );
   }
 
+  /// A purchase order that has already been converted to a Sales Order no
+  /// longer needs the save/approve/convert actions.
+  bool get _isConvertedToSalesOrder {
+    final order = widget.order;
+    if (order == null) return false;
+
+    final status = order.status.toLowerCase();
+    final invoiceStatus = order.purchaseOrderInvoiceStatus.toLowerCase();
+
+    return status.contains('convert') ||
+        invoiceStatus.contains('convert') ||
+        status == 'invoiced' ||
+        invoiceStatus == 'invoiced';
+  }
+
   Widget _buildEditAction() {
-    switch (_currentStatus.toLowerCase()) {
-      case 'approved':
-        return _buildActionButton(
-          label: 'Convert to Sales Order',
-          color: const Color(0xFF0E8F86),
-          onPressed: _onConvert,
-        );
-      case 'invoiced':
-        return const SizedBox.shrink();
-      case 'draft':
-      default:
-        if (_hasSavedChanges) {
-          return _buildActionButton(
-            label: 'Approve',
-            color: const Color(0xFF0E8F86),
-            onPressed: _onApprove,
-          );
-        }
-        return _buildActionButton(
+    return Column(
+      children: [
+        _buildActionButton(
           label: 'Save Changes',
           color: _kGreen,
           onPressed: _onSave,
-        );
-    }
+        ),
+        const SizedBox(height: 10),
+        _buildActionButton(
+          label: 'Approve',
+          color: const Color(0xFF0E8F86),
+          onPressed: _onApprove,
+        ),
+        const SizedBox(height: 10),
+        _buildActionButton(
+          label: 'Convert to Sales Order',
+          color: const Color(0xFF0A6E68),
+          onPressed: _onConvert,
+        ),
+      ],
+    );
   }
 
   Widget _buildActionButton({
@@ -1125,13 +1139,6 @@ class _NewPurchaseOrderViewState extends State<NewPurchaseOrderView> {
         remarks: _remarksController.text.trim(),
         lines: lines,
       );
-
-      if (success && mounted) {
-        setState(() {
-          _currentStatus = 'Draft';
-          _hasSavedChanges = true;
-        });
-      }
     } else {
       success = await _controller.createPurchaseOrder(
         poNumber: _poNumberController.text.trim(),
@@ -1157,7 +1164,7 @@ class _NewPurchaseOrderViewState extends State<NewPurchaseOrderView> {
     final lines = _lineItems.map(_buildLinePayload).toList();
     final date = _apiDate();
 
-    final success = await _controller.updatePurchaseOrder(
+    await _controller.updatePurchaseOrder(
       id: order.id,
       status: 'Approved',
       poNumber: _poNumberController.text.trim(),
@@ -1168,13 +1175,6 @@ class _NewPurchaseOrderViewState extends State<NewPurchaseOrderView> {
       remarks: _remarksController.text.trim(),
       lines: lines,
     );
-
-    if (success && mounted) {
-      setState(() {
-        _currentStatus = 'Approved';
-        _hasSavedChanges = true;
-      });
-    }
   }
 
   void _onConvert() {
@@ -1184,10 +1184,6 @@ class _NewPurchaseOrderViewState extends State<NewPurchaseOrderView> {
   }
 
   void _prefillFromOrder(PurchaseOrder order) {
-    _currentStatus =
-        order.status.trim().isEmpty ? 'Draft' : order.status.trim();
-    _hasSavedChanges = false;
-
     _poNumberController.text = order.poNumber;
     _dateController.text = _displayDate(order.date);
     _branch = order.branchId.isEmpty ? null : order.branchId;

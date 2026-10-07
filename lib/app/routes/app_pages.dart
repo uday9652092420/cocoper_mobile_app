@@ -1,12 +1,16 @@
 import 'package:cocoper_mobile/app/bindings/auth/login_binding.dart';
 import 'package:cocoper_mobile/app/bindings/dashboard/dashboard_bindings.dart';
+import 'package:cocoper_mobile/app/bindings/purchaseinvoice/purchase_invoice_binding.dart';
 import 'package:cocoper_mobile/app/bindings/purchaseorder/purchase_order_binding.dart';
+import 'package:cocoper_mobile/app/bindings/salesorders/sales_order_binding.dart';
 import 'package:cocoper_mobile/app/views/auth/login_page_view.dart';
 import 'package:cocoper_mobile/app/views/dashboard/dashboard_view.dart';
 import 'package:cocoper_mobile/app/views/purchaseorder/editpurchaseorder_view.dart';
 import 'package:cocoper_mobile/app/views/purchaseorder/newpurchaseorder_view.dart';
 import 'package:cocoper_mobile/app/views/purchaseorder/purchaseorder_view.dart';
+import 'package:cocoper_mobile/app/views/purchaseinvoice/savedpurchaseinvoices_view.dart';
 import 'package:cocoper_mobile/app/views/salesorders/newsaleorder_view.dart';
+import 'package:cocoper_mobile/app/views/salesorders/savedsalesorders_view.dart';
 import 'package:get/get.dart';
 
 import 'app_routes.dart';
@@ -60,6 +64,19 @@ class AppPages {
     GetPage(
       name: Routes.newSaleOrder,
       page: () => const NewSaleOrderView(),
+      binding: SalesOrderBinding(),
+    ),
+
+    GetPage(
+      name: Routes.savedSalesOrders,
+      page: () => const SavedSalesOrdersView(),
+      binding: SalesOrderBinding(),
+    ),
+
+    GetPage(
+      name: Routes.purchaseInvoices,
+      page: () => const SavedPurchaseInvoicesView(),
+      binding: PurchaseInvoiceBinding(),
     ),
   ];
 }

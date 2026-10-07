@@ -35,10 +35,22 @@ class PurchaseOrderLine {
   });
 
   factory PurchaseOrderLine.fromJson(Map<String, dynamic> json) {
+    final rawItem = json['item'];
+    final item = rawItem is Map
+        ? Map<String, dynamic>.from(rawItem)
+        : const <String, dynamic>{};
+
     return PurchaseOrderLine(
       id: _string(json['id']),
-      itemId: _string(json['itemId'] ?? json['item_id']),
-      itemName: _string(json['itemName'] ?? json['item_name'] ?? json['name']),
+      itemId: _string(json['itemId'] ?? json['item_id'] ?? item['id']),
+      itemName: _string(
+        json['itemName'] ??
+            json['item_name'] ??
+            json['name'] ??
+            item['name'] ??
+            item['itemName'] ??
+            item['item_name'],
+      ),
       quantity: _double(json['quantity']),
       discount: _double(json['discount']),
       piecesPercentage: _double(
