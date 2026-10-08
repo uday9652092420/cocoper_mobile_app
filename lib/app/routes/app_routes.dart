@@ -20,4 +20,10 @@ abstract class Routes {
   static const savedSalesOrders = '/saved_sales_orders_view';
 
   static const purchaseInvoices = '/purchase_invoices_view';
+
+  static const newPurchaseInvoice = '/new_purchase_invoice_view';
+
+  static const editPurchaseInvoice = '/edit_purchase_invoice_view';
+
+  static const purchaseInvoiceDetail = '/purchase_invoice_detail_view';
 }

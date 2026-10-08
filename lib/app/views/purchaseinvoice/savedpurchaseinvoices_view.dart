@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../controllers/purchaseinvoice/purchase_invoice_controller.dart';
+import '../../custome_widgets/custome_confirmation_dialog.dart';
 import '../../models/purchase_invoice.dart';
+import '../../routes/app_routes.dart';
 
 const _kInk = Color(0xFF14342B);
 const _kMuted = Color(0xFF5C6B66);
@@ -268,6 +270,8 @@ class _SavedPurchaseInvoicesViewState extends State<SavedPurchaseInvoicesView> {
   }
 
   Widget _buildInvoiceCard(PurchaseInvoice invoice) {
+    final isDraft = _isDraft(invoice);
+
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
@@ -300,11 +304,9 @@ class _SavedPurchaseInvoicesViewState extends State<SavedPurchaseInvoicesView> {
                   ),
                 ),
               ),
+              _buildPaymentBadge(invoice),
+              const SizedBox(width: 4),
               _buildStatusBadge(invoice.status),
-              if (invoice.paymentReceipt.isNotEmpty) ...[
-                const SizedBox(width: 4),
-                _buildReceiptButton(invoice),
-              ],
             ],
           ),
           if (invoice.supplierName.isNotEmpty) ...[
@@ -345,50 +347,154 @@ class _SavedPurchaseInvoicesViewState extends State<SavedPurchaseInvoicesView> {
               ),
             ],
           ),
+          const SizedBox(height: 10),
+          const Divider(height: 1, color: _kLine),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              _buildAction(
+                Icons.visibility_outlined,
+                'View',
+                _kGreen,
+                () => _openDetail(invoice),
+              ),
+              if (isDraft) ...[
+                const SizedBox(width: 18),
+                _buildAction(
+                  Icons.edit_outlined,
+                  'Edit',
+                  _kGreen,
+                  () => _openEdit(invoice),
+                ),
+                const SizedBox(width: 18),
+                _buildAction(
+                  Icons.check_circle_outline,
+                  'Approve',
+                  const Color(0xFF0E8F86),
+                  () => _confirmApprove(invoice),
+                ),
+                const SizedBox(width: 18),
+                _buildAction(
+                  Icons.delete_outline,
+                  'Delete',
+                  const Color(0xFFB3261E),
+                  () => _confirmDelete(invoice),
+                ),
+              ],
+            ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildReceiptButton(PurchaseInvoice invoice) {
-    return InkWell(
-      onTap: () => Get.snackbar(
-        'Payment Receipt',
-        'Receipt for ${invoice.invoiceNumber} is coming soon.',
-        snackPosition: SnackPosition.BOTTOM,
-        margin: const EdgeInsets.all(16),
+  bool _isDraft(PurchaseInvoice invoice) {
+    return invoice.status.trim().isEmpty ||
+        invoice.status.toLowerCase() == 'draft';
+  }
+
+  Widget _buildPaymentBadge(PurchaseInvoice invoice) {
+    final received = invoice.supplierPaymentReceiptStatus;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: received ? const Color(0xFFE7F3E4) : const Color(0xFFFDF2E2),
+        borderRadius: BorderRadius.circular(20),
       ),
-      borderRadius: BorderRadius.circular(8),
-      child: const Padding(
-        padding: EdgeInsets.all(4),
-        child: Icon(
-          Icons.receipt_long_outlined,
-          size: 18,
-          color: _kGreen,
+      child: Text(
+        received ? 'Received' : 'Pending',
+        style: TextStyle(
+          fontSize: 11.5,
+          fontWeight: FontWeight.w700,
+          color: received ? const Color(0xFF2D8135) : const Color(0xFFE9A23B),
         ),
       ),
     );
   }
 
+  Widget _buildAction(
+    IconData icon,
+    String label,
+    Color color,
+    VoidCallback onTap,
+  ) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: color),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _openDetail(PurchaseInvoice invoice) {
+    Get.toNamed(Routes.purchaseInvoiceDetail, arguments: invoice);
+  }
+
+  void _openEdit(PurchaseInvoice invoice) {
+    Get.toNamed(Routes.editPurchaseInvoice, arguments: invoice);
+  }
+
+  void _confirmDelete(PurchaseInvoice invoice) {
+    Get.dialog(
+      CustomConfirmationDialog(
+        header: 'Delete Purchase Invoice',
+        body: 'Are you sure you want to delete ${invoice.invoiceNumber}?',
+        yesText: 'Delete',
+        noText: 'Cancel',
+        onYes: () {
+          Get.back();
+          _controller.deletePurchaseInvoice(invoice.id);
+        },
+      ),
+    );
+  }
+
+  void _confirmApprove(PurchaseInvoice invoice) {
+    Get.dialog(
+      CustomConfirmationDialog(
+        header: 'Approve Purchase Invoice',
+        body: 'Are you sure you want to approve ${invoice.invoiceNumber}?',
+        yesText: 'Approve',
+        noText: 'Cancel',
+        onYes: () {
+          Get.back();
+          _controller.approvePurchaseInvoice(invoice.id);
+        },
+      ),
+    );
+  }
+
   Widget _buildStatusBadge(String status) {
-    if (status.isEmpty) return const SizedBox.shrink();
+    final text = status.trim().isEmpty ? 'Draft' : status;
 
     Color color;
     Color tint;
 
-    switch (status.toLowerCase()) {
-      case 'paid':
+    switch (text.toLowerCase()) {
       case 'approved':
         color = const Color(0xFF2D8135);
         tint = const Color(0xFFE7F3E4);
         break;
-      case 'pending':
+      case 'draft':
+      default:
         color = const Color(0xFFE9A23B);
         tint = const Color(0xFFFDF2E2);
-        break;
-      default:
-        color = const Color(0xFF0C8CE9);
-        tint = const Color(0xFFE3F1FC);
     }
 
     return Container(
@@ -398,7 +504,7 @@ class _SavedPurchaseInvoicesViewState extends State<SavedPurchaseInvoicesView> {
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
-        status,
+        text,
         style: TextStyle(
           fontSize: 11.5,
           fontWeight: FontWeight.w700,
@@ -507,12 +613,7 @@ class _SavedPurchaseInvoicesViewState extends State<SavedPurchaseInvoicesView> {
   }
 
   void _onNewPurchaseInvoice() {
-    Get.snackbar(
-      'New Purchase Invoice',
-      'This module is coming soon.',
-      snackPosition: SnackPosition.BOTTOM,
-      margin: const EdgeInsets.all(16),
-    );
+    Get.toNamed(Routes.newPurchaseInvoice);
   }
 
   String _formatDisplayDate(String value) {
