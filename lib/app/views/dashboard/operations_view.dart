@@ -43,6 +43,7 @@ class OperationsView extends GetView<DashboardController> {
       icon: Icons.point_of_sale_outlined,
       color: Color(0xFF0E8F86),
       tint: Color(0xFFE2F2F1),
+      route: Routes.savedDirectSales,
     ),
     _TransactionModule(
       title: 'Loading & Dispatch',

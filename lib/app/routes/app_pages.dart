@@ -1,10 +1,12 @@
 import 'package:cocoper_mobile/app/bindings/auth/login_binding.dart';
 import 'package:cocoper_mobile/app/bindings/dashboard/dashboard_bindings.dart';
+import 'package:cocoper_mobile/app/bindings/directsales/direct_sales_binding.dart';
 import 'package:cocoper_mobile/app/bindings/purchaseinvoice/purchase_invoice_binding.dart';
 import 'package:cocoper_mobile/app/bindings/purchaseorder/purchase_order_binding.dart';
 import 'package:cocoper_mobile/app/bindings/salesorders/sales_order_binding.dart';
 import 'package:cocoper_mobile/app/views/auth/login_page_view.dart';
 import 'package:cocoper_mobile/app/views/dashboard/dashboard_view.dart';
+import 'package:cocoper_mobile/app/views/directsales/savedsales_view.dart';
 import 'package:cocoper_mobile/app/views/purchaseorder/editpurchaseorder_view.dart';
 import 'package:cocoper_mobile/app/views/purchaseorder/newpurchaseorder_view.dart';
 import 'package:cocoper_mobile/app/views/purchaseorder/purchaseorder_view.dart';
@@ -15,13 +17,14 @@ import 'package:cocoper_mobile/app/views/purchaseinvoice/savedpurchaseinvoices_v
 import 'package:cocoper_mobile/app/views/salesorders/newsaleorder_view.dart';
 import 'package:cocoper_mobile/app/views/salesorders/savedsalesorders_view.dart';
 import 'package:get/get.dart';
+import 'package:cocoper_mobile/app/views/directsales/new_direct_sale_view.dart';
 
 import 'app_routes.dart';
 
 class AppPages {
   static const initialPage = Routes.loginPage;
 
-  static final routes = <GetPage>[
+  static final routes = <GetPage<dynamic>>[
     // ============================================================
     // LOGIN
     // ============================================================
@@ -80,6 +83,17 @@ class AppPages {
       name: Routes.purchaseInvoices,
       page: () => const SavedPurchaseInvoicesView(),
       binding: PurchaseInvoiceBinding(),
+    ),
+
+    GetPage(
+      name: Routes.savedDirectSales,
+      page: () => const SavedSalesView(),
+      binding: DirectSalesBinding(),
+    ),
+    GetPage(
+      name: Routes.newDirectSale,
+      page: () => const NewDirectSaleView(),
+      binding: DirectSalesBinding(),
     ),
 
     GetPage(

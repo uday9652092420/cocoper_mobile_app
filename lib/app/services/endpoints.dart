@@ -148,6 +148,13 @@ class EndPoints {
   static const String customers = 'customers';
 
   // ============================================================
+  // DIRECT SALES
+  // ============================================================
+
+  static const String directSales = 'direct-sales';
+  static const String gunnyBags = 'gunny-bags';
+
+  // ============================================================
   // PURCHASE INVOICE
   // ============================================================
 

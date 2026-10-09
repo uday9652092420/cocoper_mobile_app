@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -8,7 +10,7 @@ import 'app/localization/localization.dart';
 import 'app/routes/app_pages.dart';
 import 'app/theme/app_theme.dart';
 
-void main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Orientation is locked at the platform level (AndroidManifest), so these
@@ -17,8 +19,6 @@ void main() async {
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
-
-  await SharedPrefsHelper.init();
 
   // Draw behind the status and navigation bars so the UI fills the whole screen
   // (Android 15+ letterboxes apps that are not edge-to-edge).
@@ -35,30 +35,35 @@ void main() async {
     ),
   );
 
-  String languageCode = await SharedPrefsHelper.getString(
-    SharedPrefsHelper.languageCode,
-    defaultValue: 'en',
-  );
-
-  if (languageCode.isEmpty) {
-    languageCode = 'en';
-  }
-
-  String countryCode = await SharedPrefsHelper.getString(
-    SharedPrefsHelper.countryCode,
-    defaultValue: 'US',
-  );
-
-  if (countryCode.isEmpty) {
-    countryCode = 'US';
-  }
-
-  // Set the initial locale reactively so Get.updateLocale() (used by the
-  // language picker and language-selection screen) can switch the whole app
-  // later. Passing a fixed `locale:` to GetMaterialApp would prevent that.
-  Get.updateLocale(Locale(languageCode, countryCode));
-
   runApp(const MyApp());
+
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    unawaited(_restoreSavedLocale());
+  });
+}
+
+Future<void> _restoreSavedLocale() async {
+  try {
+    await SharedPrefsHelper.init();
+    final localeValues = await Future.wait([
+      SharedPrefsHelper.getString(
+        SharedPrefsHelper.languageCode,
+        defaultValue: 'en',
+      ),
+      SharedPrefsHelper.getString(
+        SharedPrefsHelper.countryCode,
+        defaultValue: 'US',
+      ),
+    ]);
+
+    final languageCode = localeValues[0].isEmpty ? 'en' : localeValues[0];
+    final countryCode = localeValues[1].isEmpty ? 'US' : localeValues[1];
+
+    // Keep locale changes reactive without delaying the initial route.
+    Get.updateLocale(Locale(languageCode, countryCode));
+  } catch (error) {
+    debugPrint('Unable to restore saved locale: $error');
+  }
 }
 
 class MyApp extends StatelessWidget {
