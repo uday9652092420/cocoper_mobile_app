@@ -27,9 +27,15 @@ class ApiService {
   static final Dio dio = Dio(
     BaseOptions(
       baseUrl: Environment.baseUrl,
-      connectTimeout: const Duration(seconds: 15),
-      sendTimeout: const Duration(seconds: 15),
-      receiveTimeout: const Duration(seconds: 15),
+      connectTimeout: isProduction
+          ? const Duration(seconds: 15)
+          : const Duration(seconds: 8),
+      sendTimeout: isProduction
+          ? const Duration(seconds: 15)
+          : const Duration(seconds: 8),
+      receiveTimeout: isProduction
+          ? const Duration(seconds: 15)
+          : const Duration(seconds: 8),
       headers: commonHeaders,
       responseType: ResponseType.json,
     ),
@@ -85,7 +91,7 @@ class ApiService {
     isInternetDialouge = true;
 
     try {
-      await Get.dialog(
+      await Get.dialog<void>(
         const NoInternetConnection(),
         barrierColor: const Color(0xFF000000).withValues(
           alpha: 0.7,
@@ -200,7 +206,7 @@ Response: ${error.response?.data}
   // POST
   // ============================================================
 
-  static Future<Response?> post(
+  static Future<Response<dynamic>?> post(
     String endpoint,
     dynamic body, {
     Map<String, String>? headers,
@@ -224,7 +230,7 @@ Response: ${error.response?.data}
         requireAuthToken: requireAuthToken,
       );
 
-      final response = await dio.post(
+      final response = await dio.post<dynamic>(
         endpoint,
         data: body,
         options: Options(
@@ -267,7 +273,7 @@ Response: ${error.response?.data}
   // GET
   // ============================================================
 
-  static Future<Response?> get(
+  static Future<Response<dynamic>?> get(
     String endpoint, {
     Map<String, dynamic>? queryParameters,
     Map<String, String>? headers,
@@ -291,7 +297,7 @@ Response: ${error.response?.data}
         requireAuthToken: requireAuthToken,
       );
 
-      final response = await dio.get(
+      final response = await dio.get<dynamic>(
         endpoint,
         queryParameters: queryParameters,
         options: Options(
@@ -334,7 +340,7 @@ Response: ${error.response?.data}
   // PUT
   // ============================================================
 
-  static Future<Response?> put(
+  static Future<Response<dynamic>?> put(
     String endpoint,
     Map<String, dynamic> body, {
     Map<String, String>? headers,
@@ -358,7 +364,7 @@ Response: ${error.response?.data}
         requireAuthToken: requireAuthToken,
       );
 
-      final response = await dio.put(
+      final response = await dio.put<dynamic>(
         endpoint,
         data: body,
         options: Options(
@@ -401,7 +407,7 @@ Response: ${error.response?.data}
   // DELETE
   // ============================================================
 
-  static Future<Response?> delete(
+  static Future<Response<dynamic>?> delete(
     String endpoint, {
     Map<String, String>? headers,
     bool requireAuthToken = true,
@@ -424,7 +430,7 @@ Response: ${error.response?.data}
         requireAuthToken: requireAuthToken,
       );
 
-      final response = await dio.delete(
+      final response = await dio.delete<dynamic>(
         endpoint,
         options: Options(
           headers: mergedHeaders,

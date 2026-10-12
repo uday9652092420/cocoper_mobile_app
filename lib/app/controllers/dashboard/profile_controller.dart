@@ -39,7 +39,7 @@ class ProfileController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    loadBootstrap();
+    Future.microtask(() => loadBootstrap());
   }
 
   // ============================================================
@@ -104,7 +104,7 @@ class ProfileController extends GetxController {
     final rawBranches = data['branches'];
     if (rawBranches is List) {
       branches.value = rawBranches
-          .whereType<Map>()
+          .whereType<Map<String, dynamic>>()
           .map((b) => Map<String, dynamic>.from(b))
           .toList();
     } else {

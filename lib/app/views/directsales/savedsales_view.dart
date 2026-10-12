@@ -300,12 +300,6 @@ class _SavedSalesViewState extends State<SavedSalesView> {
                 ),
               ),
               const SizedBox(width: 6),
-              IconButton(
-                tooltip: 'View direct sale',
-                visualDensity: VisualDensity.compact,
-                onPressed: () => _showSaleDetails(sale),
-                icon: const Icon(Icons.visibility_outlined, color: _kMuted),
-              ),
             ],
           ),
           const SizedBox(height: 4),
@@ -335,43 +329,10 @@ class _SavedSalesViewState extends State<SavedSalesView> {
               ],
             ),
           ],
-          if (sale.approved == false && sale.id.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            const Divider(height: 1, color: _kLine),
-            const SizedBox(height: 6),
-            Obx(() {
-              final actionBusy =
-                  _controller.actionInProgressId.value.isNotEmpty;
-              final thisSaleBusy =
-                  _controller.actionInProgressId.value == sale.id;
-              return Row(
-                children: [
-                  TextButton.icon(
-                    onPressed: actionBusy || thisSaleBusy
-                        ? null
-                        : () => _confirmApprove(sale),
-                    icon: thisSaleBusy
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.check_circle_outline, size: 18),
-                    label: const Text('Approve'),
-                  ),
-                  const SizedBox(width: 8),
-                  TextButton.icon(
-                    onPressed: actionBusy || thisSaleBusy
-                        ? null
-                        : () => _confirmDelete(sale),
-                    icon: const Icon(Icons.delete_outline, size: 18),
-                    label: const Text('Delete'),
-                    style: TextButton.styleFrom(foregroundColor: Colors.red),
-                  ),
-                ],
-              );
-            }),
-          ],
+          const SizedBox(height: 10),
+          const Divider(height: 1, color: _kLine),
+          const SizedBox(height: 8),
+          _buildSaleActions(sale),
         ],
       ),
     );
@@ -380,6 +341,107 @@ class _SavedSalesViewState extends State<SavedSalesView> {
   Future<void> _openCreateForm() async {
     final created = await Get.toNamed<dynamic>(Routes.newDirectSale);
     if (created == true) await _controller.loadDirectSales();
+  }
+
+  Future<void> _openEdit(DirectSale sale) async {
+    final refreshed = await Get.toNamed<dynamic>(
+      Routes.editDirectSale,
+      arguments: sale,
+    );
+    if (refreshed == true) await _controller.loadDirectSales();
+  }
+
+  void _openView(DirectSale sale) {
+    Get.toNamed<void>(Routes.viewDirectSale, arguments: sale);
+  }
+
+  Widget _buildSaleActions(DirectSale sale) {
+    final canManage = sale.approved == false && sale.id.isNotEmpty;
+    return Obx(() {
+      final actionBusy = _controller.actionInProgressId.value.isNotEmpty;
+      final thisSaleBusy = _controller.actionInProgressId.value == sale.id;
+      final enabled = !actionBusy;
+
+      return Wrap(
+        spacing: 12,
+        runSpacing: 4,
+        children: [
+          _buildAction(
+            Icons.visibility_outlined,
+            'View',
+            _kGreen,
+            () => _openView(sale),
+          ),
+          if (canManage)
+            _buildAction(
+              Icons.edit_outlined,
+              'Edit',
+              _kGreen,
+              () => _openEdit(sale),
+              enabled: !actionBusy,
+            ),
+          if (canManage)
+            _buildAction(
+              Icons.check_circle_outline,
+              'Approve',
+              const Color(0xFF0E8F86),
+              () => _confirmApprove(sale),
+              enabled: enabled,
+              showProgress: thisSaleBusy,
+            ),
+          if (canManage)
+            _buildAction(
+              Icons.delete_outline,
+              'Delete',
+              const Color(0xFFB3261E),
+              () => _confirmDelete(sale),
+              enabled: enabled,
+            ),
+        ],
+      );
+    });
+  }
+
+  Widget _buildAction(
+    IconData icon,
+    String label,
+    Color color,
+    VoidCallback onTap, {
+    bool enabled = true,
+    bool showProgress = false,
+  }) {
+    return InkWell(
+      onTap: enabled ? onTap : null,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (showProgress)
+              SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: color,
+                ),
+              )
+            else
+              Icon(icon, size: 16, color: enabled ? color : _kMuted),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+                color: enabled ? color : _kMuted,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _confirmApprove(DirectSale sale) {
@@ -418,55 +480,6 @@ class _SavedSalesViewState extends State<SavedSalesView> {
     return Text(
       '$label: ${value.isEmpty ? '—' : value}',
       style: const TextStyle(fontSize: 12, color: _kMuted),
-    );
-  }
-
-  void _showSaleDetails(DirectSale sale) {
-    final customer = _controller.customerName(sale);
-    final branch = _controller.branchName(sale);
-    Get.dialog<void>(
-      AlertDialog(
-        title: Text(
-          sale.directSaleNo.isEmpty ? 'Direct Sale' : sale.directSaleNo,
-          style: const TextStyle(color: _kInk, fontWeight: FontWeight.w700),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _detailLine('Invoice Date', _formatDisplayDate(sale.invoiceDate)),
-            _detailLine('Customer', customer),
-            _detailLine('Mode', sale.mode),
-            _detailLine('Branch', branch),
-            _detailLine(
-                'Invoice Total', '₹${_formatAmount(sale.invoiceTotal)}'),
-            if (sale.status.isNotEmpty) _detailLine('Status', sale.status),
-            if (sale.approved != null)
-              _detailLine('Approved', sale.approved! ? 'Yes' : 'No'),
-            for (var index = 0; index < sale.lines.length; index++)
-              _detailLine(
-                'Line ${index + 1}',
-                '${sale.lines[index].itemName.isEmpty ? sale.lines[index].itemId : sale.lines[index].itemName} · ${sale.lines[index].quantity} · ₹${_formatAmount(sale.lines[index].salesAmount)}',
-              ),
-            for (var index = 0; index < sale.gunnyBags.length; index++)
-              _detailLine(
-                'Gunny Bag ${index + 1}',
-                '${sale.gunnyBags[index].quantity} × ₹${_formatAmount(sale.gunnyBags[index].rate)}',
-              ),
-          ],
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Get.back<void>(), child: const Text('Close')),
-        ],
-      ),
-    );
-  }
-
-  Widget _detailLine(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Text('$label: ${value.isEmpty ? '—' : value}'),
     );
   }
 

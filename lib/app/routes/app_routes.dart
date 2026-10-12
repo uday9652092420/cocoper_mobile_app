@@ -23,6 +23,8 @@ abstract class Routes {
 
   static const savedDirectSales = '/saved_direct_sales_view';
   static const newDirectSale = '/new_direct_sale_view';
+  static const editDirectSale = '/edit_direct_sale_view';
+  static const viewDirectSale = '/view_direct_sale_view';
 
   static const newPurchaseInvoice = '/new_purchase_invoice_view';
 

@@ -16,7 +16,9 @@ const _kMint = Color(0xFFE7F3E4);
 const _kFieldFill = Color(0xFFF6F8F6);
 
 class NewDirectSaleView extends StatefulWidget {
-  const NewDirectSaleView({super.key});
+  const NewDirectSaleView({super.key, this.sale});
+
+  final DirectSale? sale;
 
   @override
   State<NewDirectSaleView> createState() => _NewDirectSaleViewState();
@@ -26,20 +28,168 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
   final DirectSalesController _controller = Get.find<DirectSalesController>();
   final _formKey = GlobalKey<FormState>();
   final _dateController = TextEditingController();
+  final _additionalChargesController = TextEditingController();
+  final _loadingChargesController = TextEditingController();
   final List<_SaleLineEditor> _lines = [];
   final List<_BagEditor> _bags = [];
 
   String? _customerId;
   String? _branchId;
-  String _mode = SalesOrderController.modeTonage;
+  late String _mode;
+  bool _piecesPercentageEnabled = false;
 
   @override
   void initState() {
     super.initState();
-    _dateController.text = DateFormat('dd/MM/yyyy').format(DateTime.now());
-    _lines.add(_SaleLineEditor());
-    _bags.add(_BagEditor());
+    _mode = widget.sale?.mode == SalesOrderController.modeLessing
+        ? SalesOrderController.modeLessing
+        : SalesOrderController.modeTonage;
+    _piecesPercentageEnabled = _mode == SalesOrderController.modeTonage &&
+        (widget.sale?.lines.any((line) => line.piecesPercentage > 0) ?? false);
+    if (widget.sale != null) {
+      _customerId = widget.sale!.customerId;
+      _branchId = widget.sale!.branchId;
+      _dateController.text = _formatInvoiceDate(widget.sale!.invoiceDate);
+      _controller.lastCreatedDirectSaleNo.value = widget.sale!.directSaleNo;
+      _seedFromSale(widget.sale!);
+    } else {
+      _dateController.text = DateFormat('dd/MM/yyyy').format(DateTime.now());
+      _controller.lastCreatedDirectSaleNo.value = '';
+      _lines.add(_SaleLineEditor());
+      _bags.add(_BagEditor());
+      _loadPreviewNumber();
+    }
     _loadLookups();
+  }
+
+  Future<void> _loadPreviewNumber() async {
+    final preview = await _controller.generateDirectSaleNumber();
+    if (!mounted) return;
+    _controller.lastCreatedDirectSaleNo.value = preview;
+  }
+
+  String _formatInvoiceDate(String value) {
+    if (value.isEmpty) return DateFormat('dd/MM/yyyy').format(DateTime.now());
+
+    final parsed = DateTime.tryParse(value);
+    if (parsed != null) return DateFormat('dd/MM/yyyy').format(parsed);
+
+    return value;
+  }
+
+  void _seedFromSale(DirectSale sale) {
+    _lines.clear();
+    _bags.clear();
+
+    for (final line in sale.lines) {
+      final editor = _SaleLineEditor();
+      editor.itemId = line.itemId;
+      editor.quantity.text = line.quantity.toString();
+      editor.discount.text = line.discount.toString();
+      editor.manualDiscountText = line.discount.toString();
+      editor.piecesPercentage.text = line.piecesPercentage.toString();
+      editor.pieces.text = line.pieces.toString();
+      editor.salesPrice.text = line.salesPrice.toString();
+      _lines.add(editor);
+    }
+
+    if (_lines.isEmpty) {
+      _lines.add(_SaleLineEditor());
+    }
+
+    for (final bag in sale.gunnyBags) {
+      final editor = _BagEditor();
+      editor.bagTypeId = bag.bagTypeId;
+      editor.bharthiTypeId = bag.bharthiTypeId;
+      editor.bagBharthi = bag.bagBharthi;
+      editor.quantity.text = bag.quantity.toString();
+      editor.rate.text = bag.rate.toString();
+      _bags.add(editor);
+    }
+
+    if (_bags.isEmpty) {
+      _bags.add(_BagEditor());
+    }
+  }
+
+  void _setPiecesPercentageEnabled(bool enabled) {
+    if (_piecesPercentageEnabled == enabled) return;
+
+    setState(() => _updatePiecesPercentageState(enabled));
+  }
+
+  void _updatePiecesPercentageState(bool enabled) {
+    _piecesPercentageEnabled = enabled;
+    for (final line in _lines) {
+      if (enabled) {
+        line.manualDiscountText = line.discount.text;
+        _syncEffectiveDiscount(line);
+      } else {
+        final manualDiscount = line.manualDiscountText;
+        if (manualDiscount != null) {
+          line.discount.text = manualDiscount;
+        }
+        line.manualDiscountText = null;
+      }
+    }
+  }
+
+  void _selectMode(String mode) {
+    if (_mode == mode) return;
+    setState(() {
+      if (mode == SalesOrderController.modeLessing &&
+          _piecesPercentageEnabled) {
+        _updatePiecesPercentageState(false);
+      }
+      _mode = mode;
+    });
+  }
+
+  void _addLine() {
+    setState(() {
+      final line = _SaleLineEditor();
+      if (_piecesPercentageEnabled) {
+        line.manualDiscountText = '';
+        _syncEffectiveDiscount(line);
+      }
+      _lines.add(line);
+    });
+  }
+
+  void _onLineValueChanged(_SaleLineEditor line) {
+    if (_piecesPercentageEnabled && _mode == SalesOrderController.modeTonage) {
+      _syncEffectiveDiscount(line);
+    }
+    setState(() {});
+  }
+
+  void _syncEffectiveDiscount(_SaleLineEditor line) {
+    final text = _lineValues(line).discount.toString();
+    if (line.discount.text == text) return;
+    line.discount.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+  }
+
+  DirectSaleLineValues _lineValues(_SaleLineEditor editor) {
+    return DirectSalesController.calculateLineValues(
+      mode: _mode,
+      quantity: _number(editor.quantity),
+      discount: _number(editor.discount),
+      piecesPercentage: DirectSalesController.parsePiecesPercentage(
+            editor.piecesPercentage.text,
+          ) ??
+          0,
+      piecesPercentageEnabled: _piecesPercentageEnabled,
+      salesPrice: _number(editor.salesPrice),
+    );
+  }
+
+  String? _validatePiecesPercentage(String? value) {
+    return DirectSalesController.parsePiecesPercentage(value) == null
+        ? 'Enter a valid percentage.'
+        : null;
   }
 
   Future<void> _loadLookups() async {
@@ -60,6 +210,8 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
   @override
   void dispose() {
     _dateController.dispose();
+    _additionalChargesController.dispose();
+    _loadingChargesController.dispose();
     for (final line in _lines) {
       line.dispose();
     }
@@ -107,6 +259,7 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
   }
 
   Widget _buildHeader() {
+    final isEditMode = widget.sale != null;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: Row(
@@ -130,22 +283,24 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
             ),
           ),
           const SizedBox(width: 12),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Add New Sales',
-                  style: TextStyle(
+                  isEditMode ? 'Edit Sales' : 'Add New Sales',
+                  style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w800,
                     color: _kInk,
                   ),
                 ),
-                SizedBox(height: 2),
+                const SizedBox(height: 2),
                 Text(
-                  'Create a direct sales invoice',
-                  style: TextStyle(fontSize: 13, color: _kMuted),
+                  isEditMode
+                      ? 'Update direct sales invoice'
+                      : 'Create a direct sales invoice',
+                  style: const TextStyle(fontSize: 13, color: _kMuted),
                 ),
               ],
             ),
@@ -186,7 +341,13 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
         children: [
           _label('Direct Sale No'),
           const SizedBox(height: 6),
-          _readOnlyField('Assigned by server on save'),
+          Obx(
+            () => _readOnlyField(
+              _controller.lastCreatedDirectSaleNo.value.isEmpty
+                  ? 'Assigned by server when saved'
+                  : _controller.lastCreatedDirectSaleNo.value,
+            ),
+          ),
           const SizedBox(height: 14),
           _label('Invoice Date', required: true),
           const SizedBox(height: 6),
@@ -214,7 +375,7 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
           const SizedBox(height: 14),
           _label('Sales Order No'),
           const SizedBox(height: 6),
-          _readOnlyField(
+          _disabledSalesOrderField(
             _customerId == null
                 ? 'Select customer first'
                 : 'Order linking unavailable',
@@ -235,47 +396,49 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
             children: [
               _buildModeOption('Tonnage'),
               const SizedBox(width: 10),
-              _buildModeOption('Lessing'),
+              _buildModeOption('Pieces'),
             ],
           ),
-          const SizedBox(height: 8),
-          Tooltip(
-            message:
-                'Pieces percentage is unavailable until its Direct Sales calculation is verified.',
-            child: Row(
+          if (_mode == SalesOrderController.modeTonage) ...[
+            const SizedBox(height: 8),
+            Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const SizedBox(
+                SizedBox(
                   width: 20,
                   height: 20,
-                  child: Checkbox(value: false, onChanged: null),
+                  child: Checkbox(
+                    value: _piecesPercentageEnabled,
+                    onChanged: (value) =>
+                        _setPiecesPercentageEnabled(value ?? false),
+                  ),
                 ),
                 const SizedBox(width: 8),
-                Text(
+                const Text(
                   'Pieces %',
                   style: TextStyle(
                     fontSize: 13.5,
                     fontWeight: FontWeight.w600,
-                    color: _kMuted.withValues(alpha: 0.7),
+                    color: _kInk,
                   ),
                 ),
               ],
             ),
-          ),
+          ],
         ],
       ),
     );
   }
 
   Widget _buildModeOption(String label) {
-    final mode = label == 'Lessing'
+    final mode = label == 'Pieces'
         ? SalesOrderController.modeLessing
         : SalesOrderController.modeTonage;
     final selected = _mode == mode;
 
     return Expanded(
       child: InkWell(
-        onTap: () => setState(() => _mode = mode),
+        onTap: () => _selectMode(mode),
         borderRadius: BorderRadius.circular(10),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 11),
@@ -320,7 +483,7 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
           _sectionHeader(
             'Sales Line Items',
             addLabel: 'Add Line',
-            onAdd: () => setState(() => _lines.add(_SaleLineEditor())),
+            onAdd: _addLine,
           ),
           const Divider(height: 1, color: _kLine),
           if (_lines.isEmpty)
@@ -350,8 +513,7 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
 
   Widget _buildLineEditor(int index) {
     final line = _lines[index];
-    final actualQuantity = _actualQuantity(line);
-    final amount = _salesAmount(line);
+    final values = _lineValues(line);
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
@@ -390,6 +552,7 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
                       : 'Quantity (tons)',
                   controller: line.quantity,
                   required: true,
+                  onChanged: (_) => _onLineValueChanged(line),
                 ),
               ),
               const SizedBox(width: 10),
@@ -399,10 +562,23 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
                       ? 'Discount (pieces)'
                       : 'Discount (kg)',
                   controller: line.discount,
+                  readOnly: _piecesPercentageEnabled &&
+                      _mode == SalesOrderController.modeTonage,
+                  onChanged: (_) => _onLineValueChanged(line),
                 ),
               ),
             ],
           ),
+          if (_piecesPercentageEnabled &&
+              _mode == SalesOrderController.modeTonage) ...[
+            const SizedBox(height: 12),
+            _numberField(
+              label: 'Pieces %',
+              controller: line.piecesPercentage,
+              validator: _validatePiecesPercentage,
+              onChanged: (_) => _onLineValueChanged(line),
+            ),
+          ],
           const SizedBox(height: 12),
           Row(
             children: [
@@ -418,6 +594,7 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
                   label: 'Sales Price',
                   controller: line.salesPrice,
                   required: true,
+                  onChanged: (_) => _onLineValueChanged(line),
                 ),
               ),
             ],
@@ -426,10 +603,12 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
           Row(
             children: [
               Expanded(
-                child: _computed('Actual Quantity', _format(actualQuantity)),
+                child: _computed(
+                    'Actual Quantity', _format(values.actualQuantity)),
               ),
               const SizedBox(width: 10),
-              Expanded(child: _computed('Sales Amount', _money(amount))),
+              Expanded(
+                  child: _computed('Sales Amount', _money(values.salesAmount))),
             ],
           ),
         ],
@@ -511,11 +690,16 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
             ),
           ),
           const SizedBox(height: 12),
-          _label('Loading Charges'),
-          const SizedBox(height: 6),
-          _readOnlyField(
-            'Unavailable',
-            helperText: 'Direct Sales charge payload format is unverified.',
+          _numberField(
+            label: 'Additional Charges',
+            controller: _additionalChargesController,
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 12),
+          _numberField(
+            label: 'Loading Charges',
+            controller: _loadingChargesController,
+            onChanged: (_) => setState(() {}),
           ),
         ],
       ),
@@ -528,7 +712,7 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
         children: [
           _totalRow('Total Sales Lines Amount', _salesLinesTotal()),
           const SizedBox(height: 8),
-          _totalRow('Charges Total', 0),
+          _totalRow('Charges Total', _chargesTotal()),
           const Divider(height: 22, color: _kLine),
           _totalRow('Invoice Total', _invoiceTotal(), emphasize: true),
         ],
@@ -572,6 +756,17 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
       enabled: false,
       style: const TextStyle(fontSize: 14, color: _kMuted),
       decoration: _decoration().copyWith(helperText: helperText),
+    );
+  }
+
+  Widget _disabledSalesOrderField(String hint) {
+    return DropdownButtonFormField<String>(
+      initialValue: null,
+      isExpanded: true,
+      disabledHint: Text(hint, overflow: TextOverflow.ellipsis),
+      decoration: _decoration(),
+      items: const [],
+      onChanged: null,
     );
   }
 
@@ -660,6 +855,23 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
   }
 
   Widget _buildBottomBar() {
+    Widget saveButton(
+        {required VoidCallback? onPressed, required String label}) {
+      return ElevatedButton(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: _kGreen,
+          foregroundColor: Colors.white,
+          disabledBackgroundColor: _kGreen.withValues(alpha: 0.6),
+          padding: const EdgeInsets.symmetric(vertical: 15),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        child: Text(label),
+      );
+    }
+
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
@@ -688,21 +900,16 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: Obx(
-                () => ElevatedButton(
-                  onPressed: _controller.isSaving.value ? null : _save,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _kGreen,
-                    foregroundColor: Colors.white,
-                    disabledBackgroundColor: _kGreen.withValues(alpha: 0.6),
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: Text(
-                      _controller.isSaving.value ? 'Saving…' : 'Save Sales'),
-                ),
-              ),
+              child: widget.sale != null
+                  ? saveButton(onPressed: null, label: 'Save Changes')
+                  : Obx(
+                      () => saveButton(
+                        onPressed: _controller.isSaving.value ? null : _save,
+                        label: _controller.isSaving.value
+                            ? 'Saving…'
+                            : 'Save Sales',
+                      ),
+                    ),
             ),
           ],
         ),
@@ -811,6 +1018,9 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
     required String label,
     required TextEditingController controller,
     bool required = false,
+    bool readOnly = false,
+    ValueChanged<String>? onChanged,
+    FormFieldValidator<String>? validator,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -821,23 +1031,25 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
           controller: controller,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           textAlign: TextAlign.right,
-          onChanged: (_) => setState(() {}),
-          validator: required
-              ? (value) {
-                  final parsed = double.tryParse(value?.trim() ?? '');
-                  if (parsed == null || !parsed.isFinite || parsed <= 0) {
-                    return 'Enter a value above zero.';
-                  }
-                  return null;
-                }
-              : (value) {
-                  if (value == null || value.trim().isEmpty) return null;
-                  final parsed = double.tryParse(value.trim());
-                  if (parsed == null || !parsed.isFinite || parsed < 0) {
-                    return 'Enter zero or more.';
-                  }
-                  return null;
-                },
+          readOnly: readOnly,
+          onChanged: onChanged ?? (_) => setState(() {}),
+          validator: validator ??
+              (required
+                  ? (value) {
+                      final parsed = double.tryParse(value?.trim() ?? '');
+                      if (parsed == null || !parsed.isFinite || parsed <= 0) {
+                        return 'Enter a value above zero.';
+                      }
+                      return null;
+                    }
+                  : (value) {
+                      if (value == null || value.trim().isEmpty) return null;
+                      final parsed = double.tryParse(value.trim());
+                      if (parsed == null || !parsed.isFinite || parsed < 0) {
+                        return 'Enter zero or more.';
+                      }
+                      return null;
+                    }),
           decoration: _decoration(),
         ),
       ],
@@ -901,6 +1113,15 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
   }
 
   Future<void> _save() async {
+    if (widget.sale != null) {
+      Get.snackbar(
+        'Edit not supported',
+        'Direct sale updates are not available in the current backend contract.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
     if (!_formKey.currentState!.validate()) return;
     if (_lines.isEmpty) {
       _showValidation('Add at least one sales line.');
@@ -935,24 +1156,28 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
       mode: _mode,
       lines: _lines.map(_buildLine).toList(),
       gunnyBags: _bags.map(_buildBag).toList(),
+      additionalCharges: _number(_additionalChargesController),
+      loadingCharges: _number(_loadingChargesController),
     );
     if (saved && mounted) Get.back<dynamic>(result: true);
   }
 
   DirectSaleLine _buildLine(_SaleLineEditor editor) {
-    final actual = _actualQuantity(editor);
-    final amount = _salesAmount(editor);
+    final values = _lineValues(editor);
     final pieces = _number(editor.pieces);
     return DirectSaleLine(
       itemId: editor.itemId,
       quantity: _number(editor.quantity),
-      discount: _number(editor.discount),
-      piecesPercentage: 0,
+      discount: values.discount,
+      piecesPercentage: values.piecesPercentage,
       pieces: pieces,
-      actualQuantity: actual,
+      actualQuantity: values.actualQuantity,
       salesPrice: _number(editor.salesPrice),
-      salesAmount: amount,
-      baseCost: SalesOrderController.calculateBaseCost(amount, pieces),
+      salesAmount: values.salesAmount,
+      baseCost: SalesOrderController.calculateBaseCost(
+        values.salesAmount,
+        pieces,
+      ),
     );
   }
 
@@ -970,24 +1195,26 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
   }
 
   double _actualQuantity(_SaleLineEditor editor) {
-    return SalesOrderController.calculateActualQuantity(
-      mode: _mode,
-      quantity: _number(editor.quantity),
-      discount: _number(editor.discount),
-      piecesPercentage: 0,
-    );
+    return _lineValues(editor).actualQuantity;
   }
 
   double _salesAmount(_SaleLineEditor editor) {
-    return SalesOrderController.calculateSaleAmount(
-      _number(editor.salesPrice),
-      _actualQuantity(editor),
-    );
+    return _lineValues(editor).salesAmount;
   }
 
   double _invoiceTotal() {
+    return DirectSalesController.calculateInvoiceTotal(
+      salesAmount: _salesLinesTotal(),
+      gunnyBagAmount: _gunnyBagsTotal(),
+      additionalCharges: _number(_additionalChargesController),
+      loadingCharges: _number(_loadingChargesController),
+    );
+  }
+
+  double _chargesTotal() {
     return SalesOrderController.roundValue(
-      _salesLinesTotal() + _gunnyBagsTotal(),
+      _number(_additionalChargesController) +
+          _number(_loadingChargesController),
       2,
     );
   }
@@ -1044,14 +1271,17 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
 
 class _SaleLineEditor {
   String itemId = '';
+  String? manualDiscountText;
   final quantity = TextEditingController();
   final discount = TextEditingController();
+  final piecesPercentage = TextEditingController();
   final pieces = TextEditingController();
   final salesPrice = TextEditingController();
 
   void dispose() {
     quantity.dispose();
     discount.dispose();
+    piecesPercentage.dispose();
     pieces.dispose();
     salesPrice.dispose();
   }

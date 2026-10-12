@@ -6,7 +6,9 @@ import 'package:cocoper_mobile/app/bindings/purchaseorder/purchase_order_binding
 import 'package:cocoper_mobile/app/bindings/salesorders/sales_order_binding.dart';
 import 'package:cocoper_mobile/app/views/auth/login_page_view.dart';
 import 'package:cocoper_mobile/app/views/dashboard/dashboard_view.dart';
+import 'package:cocoper_mobile/app/views/directsales/editsales_view.dart';
 import 'package:cocoper_mobile/app/views/directsales/savedsales_view.dart';
+import 'package:cocoper_mobile/app/views/directsales/viewsavedsale_view.dart';
 import 'package:cocoper_mobile/app/views/purchaseorder/editpurchaseorder_view.dart';
 import 'package:cocoper_mobile/app/views/purchaseorder/newpurchaseorder_view.dart';
 import 'package:cocoper_mobile/app/views/purchaseorder/purchaseorder_view.dart';
@@ -93,6 +95,17 @@ class AppPages {
     GetPage(
       name: Routes.newDirectSale,
       page: () => const NewDirectSaleView(),
+      binding: DirectSalesBinding(),
+    ),
+
+    GetPage(
+      name: Routes.editDirectSale,
+      page: () => const EditSalesView(),
+      binding: DirectSalesBinding(),
+    ),
+    GetPage(
+      name: Routes.viewDirectSale,
+      page: () => const ViewSavedSaleView(),
       binding: DirectSalesBinding(),
     ),
 

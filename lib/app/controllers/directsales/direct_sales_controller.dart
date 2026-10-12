@@ -8,6 +8,20 @@ import '../../controllers/salesorders/sales_order_controller.dart';
 import '../../services/api_service.dart';
 import '../../services/endpoints.dart';
 
+class DirectSaleLineValues {
+  final double discount;
+  final double piecesPercentage;
+  final double actualQuantity;
+  final double salesAmount;
+
+  const DirectSaleLineValues({
+    required this.discount,
+    required this.piecesPercentage,
+    required this.actualQuantity,
+    required this.salesAmount,
+  });
+}
+
 class DirectSalesController extends GetxController {
   final directSales = <DirectSale>[].obs;
   final customers = <LookupOption>[].obs;
@@ -25,6 +39,72 @@ class DirectSalesController extends GetxController {
   final lookupError = ''.obs;
   final isSaving = false.obs;
   final actionInProgressId = ''.obs;
+  final lastCreatedDirectSaleNo = ''.obs;
+
+  static double? parsePiecesPercentage(String? value) {
+    if (value == null || value.trim().isEmpty) return 0;
+    final parsed = double.tryParse(value.trim());
+    if (parsed == null || !parsed.isFinite) return null;
+    return parsed.clamp(0, 100).toDouble();
+  }
+
+  static DirectSaleLineValues calculateLineValues({
+    required String mode,
+    required double quantity,
+    required double discount,
+    required double piecesPercentage,
+    required bool piecesPercentageEnabled,
+    required double salesPrice,
+  }) {
+    final safeQuantity = _finiteOrZero(quantity);
+    final safeDiscount = _finiteOrZero(discount);
+    final safeSalesPrice = _finiteOrZero(salesPrice);
+    final percentageIsActive =
+        mode == SalesOrderController.modeTonage && piecesPercentageEnabled;
+    final effectivePercentage = percentageIsActive
+        ? _finiteOrZero(piecesPercentage).clamp(0, 100).toDouble()
+        : 0.0;
+    final effectiveDiscount = percentageIsActive
+        ? safeQuantity / 100 * effectivePercentage
+        : safeDiscount;
+    final safeEffectiveDiscount = _finiteOrZero(effectiveDiscount);
+    final actualQuantity = percentageIsActive
+        ? SalesOrderController.roundValue(
+            safeQuantity - safeEffectiveDiscount,
+            6,
+          )
+        : SalesOrderController.calculateActualQuantity(
+            mode: mode,
+            quantity: safeQuantity,
+            discount: safeDiscount,
+            piecesPercentage: 0,
+          );
+
+    return DirectSaleLineValues(
+      discount: safeEffectiveDiscount,
+      piecesPercentage: effectivePercentage,
+      actualQuantity: actualQuantity,
+      salesAmount: SalesOrderController.calculateSaleAmount(
+        safeSalesPrice,
+        actualQuantity,
+      ),
+    );
+  }
+
+  static double _finiteOrZero(double value) => value.isFinite ? value : 0;
+
+  static double calculateInvoiceTotal({
+    required double salesAmount,
+    required double gunnyBagAmount,
+    required double additionalCharges,
+    required double loadingCharges,
+  }) {
+    final total = _finiteOrZero(salesAmount) +
+        _finiteOrZero(gunnyBagAmount) +
+        _finiteOrZero(additionalCharges) +
+        _finiteOrZero(loadingCharges);
+    return SalesOrderController.roundValue(total, 2);
+  }
 
   Future<void> loadDirectSales() async {
     isLoadingList.value = true;
@@ -97,9 +177,14 @@ class DirectSalesController extends GetxController {
     required String mode,
     required List<DirectSaleLine> lines,
     required List<DirectSaleGunnyBag> gunnyBags,
+    required double additionalCharges,
+    required double loadingCharges,
   }) async {
     if (isSaving.value) return false;
     isSaving.value = true;
+    if (lastCreatedDirectSaleNo.value.trim().isEmpty) {
+      lastCreatedDirectSaleNo.value = await generateDirectSaleNumber();
+    }
 
     try {
       final organizationId = await SharedPrefsHelper.getString(
@@ -128,8 +213,12 @@ class DirectSalesController extends GetxController {
         'branchId': branchId,
         'invoiceDate': invoiceDate,
         'mode': mode,
-        'invoiceTotal':
-            SalesOrderController.roundValue(lineTotal + bagTotal, 2),
+        'invoiceTotal': calculateInvoiceTotal(
+          salesAmount: lineTotal,
+          gunnyBagAmount: bagTotal,
+          additionalCharges: additionalCharges,
+          loadingCharges: loadingCharges,
+        ),
         'charges': <dynamic>[],
         'lines': lines.map((line) => line.toJson()).toList(),
         'gunnyBags': gunnyBags.map((bag) => bag.toJson()).toList(),
@@ -137,7 +226,11 @@ class DirectSalesController extends GetxController {
 
       final response = await ApiService.post(EndPoints.directSales, body);
       if (_isSuccessful(response)) {
-        successToast('Direct sale created successfully.');
+        lastCreatedDirectSaleNo.value = _extractDirectSaleNo(response?.data);
+        final saleNo = lastCreatedDirectSaleNo.value;
+        successToast(saleNo.isEmpty
+            ? 'Direct sale created successfully.'
+            : 'Direct sale $saleNo created successfully.');
         return true;
       }
 
@@ -199,6 +292,44 @@ class DirectSalesController extends GetxController {
     } finally {
       actionInProgressId.value = '';
     }
+  }
+
+  Future<String> generateDirectSaleNumber() async {
+    if (directSales.isEmpty) {
+      final response = await ApiService.get(EndPoints.directSales);
+      if (response?.statusCode == 200) {
+        final sales = _extractList(response?.data);
+        if (sales != null) {
+          directSales.assignAll(
+            sales.whereType<Map<dynamic, dynamic>>().map(
+                (row) => DirectSale.fromJson(Map<String, dynamic>.from(row))),
+          );
+        }
+      }
+    }
+
+    final organizationName = await SharedPrefsHelper.getString(
+      SharedPrefsHelper.organizationName,
+    );
+
+    final initial = organizationName.trim().isNotEmpty
+        ? organizationName.trim()[0].toUpperCase()
+        : 'D';
+
+    final prefix = '${initial}DSO-';
+    var maxNumber = 0;
+
+    for (final sale in directSales) {
+      final number = sale.directSaleNo.toUpperCase();
+      if (number.startsWith(prefix)) {
+        final parsed = int.tryParse(number.substring(prefix.length));
+        if (parsed != null && parsed > maxNumber) {
+          maxNumber = parsed;
+        }
+      }
+    }
+
+    return '$prefix${(maxNumber + 1).toString().padLeft(2, '0')}';
   }
 
   List<DirectSale> get filteredSales {
@@ -283,5 +414,14 @@ class DirectSalesController extends GetxController {
       }
     }
     return fallback;
+  }
+
+  String _extractDirectSaleNo(dynamic data) {
+    if (data is! Map) return '';
+
+    final saleNo = data['directSaleNo']?.toString().trim() ?? '';
+    if (saleNo.isNotEmpty) return saleNo;
+
+    return _extractDirectSaleNo(data['data']);
   }
 }

@@ -1,4 +1,6 @@
-storeFile=/absolute/path/to/cocoper-upload.jks
-storePassword=REPLACE_WITH_LOCAL_SECRET
-keyPassword=REPLACE_WITH_LOCAL_SECRET
-keyAlias=cocoper
+# Copy this file to android/key.properties; keep the copy and keystore private.
+# storeFile accepts an absolute path or a path relative to android/app.
+storeFile=REPLACE_WITH_PATH_TO_EXISTING_RELEASE_KEYSTORE.jks
+storePassword=REPLACE_WITH_STORE_PASSWORD
+keyPassword=REPLACE_WITH_KEY_PASSWORD
+keyAlias=REPLACE_WITH_EXISTING_KEY_ALIAS

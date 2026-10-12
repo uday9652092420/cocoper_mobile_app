@@ -8,6 +8,10 @@ class LoginPageView extends GetView<LoginController> {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
+    final minContentHeight = size.height -
+        MediaQuery.of(context).padding.top -
+        MediaQuery.of(context).padding.bottom -
+        48;
 
     return Scaffold(
       body: Container(
@@ -33,10 +37,7 @@ class LoginPageView extends GetView<LoginController> {
             ),
             child: ConstrainedBox(
               constraints: BoxConstraints(
-                minHeight: size.height -
-                    MediaQuery.of(context).padding.top -
-                    MediaQuery.of(context).padding.bottom -
-                    48,
+                minHeight: minContentHeight > 0 ? minContentHeight : 0,
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,

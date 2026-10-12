@@ -1,3 +1,4 @@
+import java.io.File
 import java.io.FileInputStream
 import java.util.Properties
 
@@ -7,11 +8,65 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+val releaseBuildRequested = gradle.startParameter.taskNames.any {
+    it.contains("Release", ignoreCase = true)
+}
+val releasePropertiesFile = rootProject.file("key.properties")
+val requiredReleaseProperties = listOf(
+    "storeFile",
+    "storePassword",
+    "keyPassword",
+    "keyAlias",
+)
 val releaseProperties = Properties()
-val releaseFile = rootProject.file("key.properties")
-if (releaseFile.exists()) releaseProperties.load(FileInputStream(releaseFile))
-if (gradle.startParameter.taskNames.any { it.contains("Release", ignoreCase = true) } && !releaseFile.exists()) {
-    throw GradleException("Release signing is required. Create android/key.properties from key.properties.example.")
+val releaseKeystoreFile = if (releaseBuildRequested) {
+    if (!releasePropertiesFile.isFile) {
+        throw GradleException(
+            "Release signing configuration is missing: ${releasePropertiesFile.path}. " +
+                "Copy android/key.properties.example to android/key.properties, " +
+                "then set the existing release keystore path, alias, and passwords.",
+        )
+    }
+
+    FileInputStream(releasePropertiesFile).use(releaseProperties::load)
+
+    val missingProperties = requiredReleaseProperties.filter { property ->
+        releaseProperties.getProperty(property).isNullOrBlank()
+    }
+    if (missingProperties.isNotEmpty()) {
+        throw GradleException(
+            "Release signing configuration is incomplete in ${releasePropertiesFile.path}. " +
+                "Set these properties: ${missingProperties.joinToString()}.",
+        )
+    }
+
+    val placeholderProperties = requiredReleaseProperties.filter { property ->
+        releaseProperties.getProperty(property).trim().startsWith("REPLACE_WITH")
+    }
+    if (placeholderProperties.isNotEmpty()) {
+        throw GradleException(
+            "Release signing configuration still contains example placeholders for: " +
+                "${placeholderProperties.joinToString()}. Replace them with values " +
+                "for the existing release key; do not use a new key for an existing app.",
+        )
+    }
+
+    val configuredStoreFile = releaseProperties.getProperty("storeFile").trim()
+    val storeFile = File(configuredStoreFile).let { path ->
+        if (path.isAbsolute) path else project.file(configuredStoreFile)
+    }
+    if (!storeFile.isFile) {
+        throw GradleException(
+            "The release keystore configured by storeFile was not found. " +
+                "Absolute paths are used as-is; relative paths are resolved from " +
+                "${project.projectDir}. Set storeFile to the existing release " +
+                "keystore path in android/key.properties.",
+        )
+    }
+
+    storeFile
+} else {
+    null
 }
 
 android {
@@ -38,19 +93,21 @@ android {
         versionName = flutter.versionName
     }
 
-    if (releaseFile.exists()) {
+    if (releaseBuildRequested) {
         signingConfigs {
             create("release") {
-                keyAlias = releaseProperties["keyAlias"] as String
-                keyPassword = releaseProperties["keyPassword"] as String
-                storeFile = file(releaseProperties["storeFile"] as String)
-                storePassword = releaseProperties["storePassword"] as String
+                keyAlias = releaseProperties.getProperty("keyAlias").trim()
+                keyPassword = releaseProperties.getProperty("keyPassword").trim()
+                storeFile = requireNotNull(releaseKeystoreFile)
+                storePassword = releaseProperties.getProperty("storePassword").trim()
             }
         }
     }
     buildTypes {
         release {
-            if (releaseFile.exists()) signingConfig = signingConfigs.getByName("release")
+            if (releaseBuildRequested) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 }

@@ -10,8 +10,15 @@ import 'app/localization/localization.dart';
 import 'app/routes/app_pages.dart';
 import 'app/theme/app_theme.dart';
 
+final Stopwatch _startupStopwatch = Stopwatch();
+
 void main() {
+  if (!Environment.isProduction) {
+    _startupStopwatch.start();
+  }
+
   WidgetsFlutterBinding.ensureInitialized();
+  _logStartupTiming('Flutter binding initialized');
 
   // Orientation is locked at the platform level (AndroidManifest), so these
   // window calls run without blocking the first frame.
@@ -36,15 +43,22 @@ void main() {
   );
 
   runApp(const MyApp());
+  _logStartupTiming('runApp invoked');
 
   WidgetsBinding.instance.addPostFrameCallback((_) {
+    _logStartupTiming('First frame built');
     unawaited(_restoreSavedLocale());
   });
 }
 
 Future<void> _restoreSavedLocale() async {
   try {
+    final preferencesStopwatch = Stopwatch()..start();
     await SharedPrefsHelper.init();
+    _logStartupTiming(
+      'Preferences initialized (${preferencesStopwatch.elapsedMilliseconds} ms)',
+    );
+
     final localeValues = await Future.wait([
       SharedPrefsHelper.getString(
         SharedPrefsHelper.languageCode,
@@ -55,6 +69,9 @@ Future<void> _restoreSavedLocale() async {
         defaultValue: 'US',
       ),
     ]);
+    _logStartupTiming(
+      'Saved locale read (${preferencesStopwatch.elapsedMilliseconds} ms)',
+    );
 
     final languageCode = localeValues[0].isEmpty ? 'en' : localeValues[0];
     final countryCode = localeValues[1].isEmpty ? 'US' : localeValues[1];
@@ -63,6 +80,12 @@ Future<void> _restoreSavedLocale() async {
     Get.updateLocale(Locale(languageCode, countryCode));
   } catch (error) {
     debugPrint('Unable to restore saved locale: $error');
+  }
+}
+
+void _logStartupTiming(String step) {
+  if (!Environment.isProduction) {
+    debugPrint('[startup] ${_startupStopwatch.elapsedMilliseconds} ms: $step');
   }
 }
 
