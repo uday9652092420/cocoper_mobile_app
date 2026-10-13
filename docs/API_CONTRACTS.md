@@ -27,6 +27,30 @@ HTTP 401 on an authenticated request clears the session. HTTP 403 retains the ex
 | Supplier Payment | GET/POST /supplier-payments; PUT /supplier-payments/:id | POST /supplier-payments/:id/approve | DELETE /supplier-payments/:id |
 | Labour Payment | GET /labour-attendance; POST {records:[...]}; PUT /labour-attendance/:id | PATCH /labour-attendance/group/:groupId/status {status} | DELETE /labour-attendance/group/:groupId |
 | Cash & Bank Expenses | GET/POST /cash-bank-expenses; PUT /cash-bank-expenses/:id | POST /cash-bank-expenses/:id/approve | DELETE /cash-bank-expenses/:id |
+| Bag Purchase | GET/POST /bag-purchases; GET/PUT /bag-purchases/:id | Not verified | DELETE /bag-purchases/:id |
+
+Bag Purchase contract verified from the supplied TypeScript source: the list
+accepts optional `organizationId` and `branchId` query parameters and can be
+searched locally by purchase number, supplier name/code/ID, and remarks.
+Create and update send `purchase_date` (`YYYY-MM-DD`), `supplier_id`,
+`remarks`, `organization_id`, `branch_id`, and the complete `lines` array
+(`gunny_bag_id`, `quantity`, `rate`). The server generates the purchase number
+and authoritative amounts/totals. Supplier, branch, and gunny-bag selectors
+use the existing GET `/suppliers`, `/branches`, and `/gunny-bags` lookups;
+gunny-bag rates use `rate_per_bag`. These three selectors are organization-level
+master data and are requested without a branch header, matching the working
+Direct Sales lookups. Gunny bag entries are read from `id`/`_id`, `bag_type_id`,
+`bag_id`, `bag_name`, `bag_code`, and `rate_per_bag`; a successful but empty list
+is reported separately from a failed request. There is no verified pagination,
+sorting, or status-filter contract. Quantity must be greater than zero and rate
+must be nonnegative; no discount, tax, or Bharthi is submitted.
+
+The supplied backend source has no route-level authentication/permission
+middleware for Bag Purchase, and its single-record read/update/delete handlers
+do not enforce organization/branch ownership. Client scope headers and query
+parameters are sent but do not resolve that backend authorization gap. Do not
+treat the client UI as a security boundary; the backend must be secured before
+these operations are exposed to users who should not have unrestricted access.
 
 The client conservatively disables edits/deletes on approved/completed entries. Source=mobile labour rows are view-only in the payment screen because their IDs do not identify editable web payment records. Group-less legacy records cannot be group-approved without server correction.
 

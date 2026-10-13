@@ -11,6 +11,14 @@ abstract class Routes {
 
   static const purchaseOrder = '/purchase_order_view';
 
+  static const savedBagPurchases = '/saved_bag_purchases_view';
+
+  static const newBagPurchase = '/new_bag_purchase_view';
+
+  static const editBagPurchase = '/edit_bag_purchase_view';
+
+  static const viewBagPurchase = '/view_bag_purchase_view';
+
   static const newPurchaseOrder = '/new_purchase_order_view';
 
   static const editPurchaseOrder = '/edit_purchase_order_view';

@@ -125,8 +125,6 @@ class ApiService {
 ========== API REQUEST ==========
 URL: ${options.uri}
 Method: ${options.method}
-Headers: ${options.headers}
-Body: ${options.data ?? ''}
 ==================================
 ''',
             );

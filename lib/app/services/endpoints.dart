@@ -159,4 +159,12 @@ class EndPoints {
   // ============================================================
 
   static const String purchaseInvoices = 'purchase-invoices';
+
+  // ============================================================
+  // BAG PURCHASE
+  // ============================================================
+
+  static const String bagPurchases = 'bag-purchases';
+  static String bagPurchase(String id) => '$bagPurchases/$id';
+  static const String nextBagPurchaseNumber = '$bagPurchases/next-no';
 }

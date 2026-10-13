@@ -116,6 +116,10 @@ class MyApp extends StatelessWidget {
       // ----------------------------------------------------------
 
       getPages: AppPages.routes,
+      unknownRoute: GetPage(
+        name: '/not-found',
+        page: () => const _RouteNotFoundView(),
+      ),
 
       // ----------------------------------------------------------
       // PREVENT SYSTEM FONT SCALING FROM CHANGING UI
@@ -133,6 +137,34 @@ class MyApp extends StatelessWidget {
           child: child,
         );
       },
+    );
+  }
+}
+
+class _RouteNotFoundView extends StatelessWidget {
+  const _RouteNotFoundView();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.route_outlined, size: 40),
+                SizedBox(height: 12),
+                Text(
+                  'This page could not be found.',
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

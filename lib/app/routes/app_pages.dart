@@ -1,10 +1,15 @@
 import 'package:cocoper_mobile/app/bindings/auth/login_binding.dart';
+import 'package:cocoper_mobile/app/bindings/bagpurchase/bag_purchase_binding.dart';
 import 'package:cocoper_mobile/app/bindings/dashboard/dashboard_bindings.dart';
 import 'package:cocoper_mobile/app/bindings/directsales/direct_sales_binding.dart';
 import 'package:cocoper_mobile/app/bindings/purchaseinvoice/purchase_invoice_binding.dart';
 import 'package:cocoper_mobile/app/bindings/purchaseorder/purchase_order_binding.dart';
 import 'package:cocoper_mobile/app/bindings/salesorders/sales_order_binding.dart';
 import 'package:cocoper_mobile/app/views/auth/login_page_view.dart';
+import 'package:cocoper_mobile/app/views/bagpurchase/savedbagpurchases_view.dart';
+import 'package:cocoper_mobile/app/views/bagpurchase/newbagpurchase_view.dart';
+import 'package:cocoper_mobile/app/views/bagpurchase/editbagpurchase_view.dart';
+import 'package:cocoper_mobile/app/views/bagpurchase/viewbagpurchase_view.dart';
 import 'package:cocoper_mobile/app/views/dashboard/dashboard_view.dart';
 import 'package:cocoper_mobile/app/views/directsales/editsales_view.dart';
 import 'package:cocoper_mobile/app/views/directsales/savedsales_view.dart';
@@ -55,6 +60,30 @@ class AppPages {
       name: Routes.purchaseOrder,
       page: () => const PurchaseOrderView(),
       binding: PurchaseOrderBinding(),
+    ),
+
+    GetPage(
+      name: Routes.savedBagPurchases,
+      page: () => const SavedBagPurchasesView(),
+      binding: BagPurchaseBinding(),
+    ),
+
+    GetPage(
+      name: Routes.newBagPurchase,
+      page: () => const NewBagPurchaseView(),
+      binding: BagPurchaseBinding(),
+    ),
+
+    GetPage(
+      name: Routes.editBagPurchase,
+      page: () => const EditBagPurchaseView(),
+      binding: BagPurchaseBinding(),
+    ),
+
+    GetPage(
+      name: Routes.viewBagPurchase,
+      page: () => const ViewBagPurchaseView(),
+      binding: BagPurchaseBinding(),
     ),
 
     GetPage(

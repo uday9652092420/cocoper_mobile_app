@@ -14,6 +14,14 @@ class OperationsView extends GetView<DashboardController> {
 
   static const List<_TransactionModule> _modules = [
     _TransactionModule(
+      title: 'Bag Purchase',
+      subtitle: 'Manage bag purchases',
+      icon: Icons.shopping_bag_outlined,
+      color: Color(0xFF7C5CD6),
+      tint: Color(0xFFEDE8FB),
+      route: Routes.savedBagPurchases,
+    ),
+    _TransactionModule(
       title: 'Purchase Order',
       subtitle: 'Create and track purchase orders',
       icon: Icons.receipt_long_outlined,
@@ -192,7 +200,7 @@ class OperationsView extends GetView<DashboardController> {
       onTap: () {
         final route = module.route;
         if (route != null) {
-          Get.toNamed(route);
+          Get.toNamed<void>(route);
           return;
         }
         Get.snackbar(
