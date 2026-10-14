@@ -39,7 +39,7 @@ class CustomConfirmationDialog extends StatelessWidget {
         Visibility(
           visible: isCancel ?? true,
           child: TextButton(
-            onPressed: onNo ?? Get.back,
+            onPressed: onNo ?? Get.back<void>,
             child: Text(
               noText,
               style: TextStyle(

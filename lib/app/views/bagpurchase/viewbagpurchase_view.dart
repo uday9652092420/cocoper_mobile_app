@@ -273,9 +273,7 @@ class _ViewBagPurchaseViewState extends State<ViewBagPurchaseView> {
   }
 
   String _formatDate(String value) {
-    final date = DateTime.tryParse(value) ??
-        DateFormat('d/M/yyyy').tryParse(value) ??
-        DateFormat('dd/MM/yyyy').tryParse(value);
+    final date = BagPurchase.parsePurchaseDate(value);
     return date == null ? value : DateFormat('d/M/yyyy').format(date);
   }
 

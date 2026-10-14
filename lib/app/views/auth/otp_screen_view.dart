@@ -201,7 +201,7 @@ class _OtpScreenViewState extends State<OtpScreenView> {
                                                     Text('OTP Submitted: $otp'),
                                               ),
                                             );
-                                            Get.toNamed(Routes.dashboard);
+                                            Get.toNamed<void>(Routes.dashboard);
                                           }
                                         : null,
                                     style: ElevatedButton.styleFrom(

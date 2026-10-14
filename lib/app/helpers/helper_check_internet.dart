@@ -1,19 +1,21 @@
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/foundation.dart';
 
 Future<bool> isInternet() async {
   try {
-    final List<ConnectivityResult> resultList = await Connectivity().checkConnectivity();
+    final List<ConnectivityResult> resultList =
+        await Connectivity().checkConnectivity();
     final ConnectivityResult result = resultList.first;
 
     if (result == ConnectivityResult.none) {
-      print("No internet connection. Please check your connection.");
+      debugPrint("No internet connection. Please check your connection.");
       return false;
     } else {
-      print("Internet connection is available.");
+      debugPrint("Internet connection is available.");
       return true;
     }
   } catch (e) {
-    print("Error checking internet connectivity: ${e.toString()}");
+    debugPrint("Error checking internet connectivity: ${e.toString()}");
     return false;
   }
 }

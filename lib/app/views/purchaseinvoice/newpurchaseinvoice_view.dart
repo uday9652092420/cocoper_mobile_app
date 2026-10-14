@@ -145,7 +145,7 @@ class _NewPurchaseInvoiceViewState extends State<NewPurchaseInvoiceView> {
       child: Row(
         children: [
           InkWell(
-            onTap: () => Get.back(),
+            onTap: () => Get.back<void>(),
             borderRadius: BorderRadius.circular(12),
             child: Container(
               width: 40,
@@ -1276,7 +1276,7 @@ class _NewPurchaseInvoiceViewState extends State<NewPurchaseInvoiceView> {
       );
 
       if (success && mounted) {
-        Get.back();
+        Get.back<void>();
       }
     }
   }

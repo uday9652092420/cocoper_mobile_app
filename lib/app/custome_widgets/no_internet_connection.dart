@@ -12,7 +12,6 @@ class NoInternetConnection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final customTheme = CustomTheme.of(context);
-    final textTheme = Theme.of(context).textTheme;
 
     return AlertDialog(
       backgroundColor: customTheme.bgColor,
@@ -52,10 +51,10 @@ class NoInternetConnection extends StatelessWidget {
                 // );
 
                 if (await isInternet()) {
-                  Get.back();
+                  Get.back<void>();
                 } else {
-                  Get.back();
-                  Get.dialog(
+                  Get.back<void>();
+                  Get.dialog<void>(
                     const NoInternetConnection(),
                     barrierColor:
                         const Color(0xFF000000).withValues(alpha: 0.7),

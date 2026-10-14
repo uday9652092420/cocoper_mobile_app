@@ -136,7 +136,7 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
       child: Row(
         children: [
           InkWell(
-            onTap: () => Get.back(),
+            onTap: () => Get.back<void>(),
             borderRadius: BorderRadius.circular(12),
             child: Container(
               width: 40,
@@ -374,7 +374,7 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
           children: [
             Expanded(
               child: OutlinedButton(
-                onPressed: () => Get.back(),
+                onPressed: () => Get.back<void>(),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: _kGreen,
                   side: const BorderSide(color: _kGreen),
@@ -918,7 +918,7 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
     if (success && mounted) {
       // Return to the saved purchase orders list, clearing the edit +
       // conversion screens from the stack (dashboard stays as the root).
-      Get.offNamedUntil(
+      Get.offNamedUntil<void>(
         Routes.purchaseOrder,
         (route) => route.isFirst,
       );

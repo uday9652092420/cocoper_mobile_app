@@ -58,7 +58,6 @@ class CustomDatePicker extends StatelessWidget {
     // }
 
     final customTheme = CustomTheme.of(context);
-    final textTheme = Theme.of(context).textTheme;
 
     DateTime? pickedDate = await showDatePicker(
       context: context,

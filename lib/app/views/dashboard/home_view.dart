@@ -214,7 +214,7 @@ class HomeView extends GetView<DashboardController> {
       countryCode,
     );
 
-    Get.offAllNamed(Routes.loginPage);
+    Get.offAllNamed<void>(Routes.loginPage);
   }
 
   Widget _buildScopeRow() {

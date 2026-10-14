@@ -36,5 +36,5 @@ Future<void> deleteDataAndRedirectLoginPage() async {
   // Storage.remove(Storage.accountID);
 
   // Navigate to login page after data deletion
-  Get.offAllNamed(Routes.loginPage);
+  Get.offAllNamed<void>(Routes.loginPage);
 }

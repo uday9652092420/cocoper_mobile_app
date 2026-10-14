@@ -35,6 +35,7 @@ class ExceptionMessages {
   static const connectionTimeout = "Connection timeout";
   static const sendTimeout = "Send timeout";
   static const receiveTimeout = "Receive timeout";
+  static const transformTimeout = "Transform timeout";
   static const badCertificate = "Bad Certificate";
   static const requestCanceled = "Request Canceled";
   static const connectionError = "Connection Error";
@@ -65,6 +66,10 @@ String handleDioExceptions(DioException e) {
 
     case DioExceptionType.receiveTimeout:
       errorMessage = ExceptionMessages.receiveTimeout;
+      break;
+
+    case DioExceptionType.transformTimeout:
+      errorMessage = ExceptionMessages.transformTimeout;
       break;
 
     case DioExceptionType.badCertificate:

@@ -473,9 +473,8 @@ class _SavedBagPurchasesViewState extends State<SavedBagPurchasesView> {
   }
 
   String _formatDate(String value) {
-    final parsed = DateTime.tryParse(value);
-    if (parsed != null) return DateFormat('d/M/yyyy').format(parsed);
-    return value;
+    final date = BagPurchase.parsePurchaseDate(value);
+    return date == null ? value : DateFormat('d/M/yyyy').format(date);
   }
 
   String _currency(double value) =>

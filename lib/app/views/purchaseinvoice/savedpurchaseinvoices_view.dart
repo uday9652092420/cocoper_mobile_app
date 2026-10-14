@@ -80,7 +80,7 @@ class _SavedPurchaseInvoicesViewState extends State<SavedPurchaseInvoicesView> {
     return Row(
       children: [
         InkWell(
-          onTap: () => Get.back(),
+          onTap: () => Get.back<void>(),
           borderRadius: BorderRadius.circular(12),
           child: Container(
             width: 40,
@@ -443,22 +443,22 @@ class _SavedPurchaseInvoicesViewState extends State<SavedPurchaseInvoicesView> {
   }
 
   void _openDetail(PurchaseInvoice invoice) {
-    Get.toNamed(Routes.purchaseInvoiceDetail, arguments: invoice);
+    Get.toNamed<void>(Routes.purchaseInvoiceDetail, arguments: invoice);
   }
 
   void _openEdit(PurchaseInvoice invoice) {
-    Get.toNamed(Routes.editPurchaseInvoice, arguments: invoice);
+    Get.toNamed<void>(Routes.editPurchaseInvoice, arguments: invoice);
   }
 
   void _confirmDelete(PurchaseInvoice invoice) {
-    Get.dialog(
+    Get.dialog<void>(
       CustomConfirmationDialog(
         header: 'Delete Purchase Invoice',
         body: 'Are you sure you want to delete ${invoice.invoiceNumber}?',
         yesText: 'Delete',
         noText: 'Cancel',
         onYes: () {
-          Get.back();
+          Get.back<void>();
           _controller.deletePurchaseInvoice(invoice.id);
         },
       ),
@@ -466,14 +466,14 @@ class _SavedPurchaseInvoicesViewState extends State<SavedPurchaseInvoicesView> {
   }
 
   void _confirmApprove(PurchaseInvoice invoice) {
-    Get.dialog(
+    Get.dialog<void>(
       CustomConfirmationDialog(
         header: 'Approve Purchase Invoice',
         body: 'Are you sure you want to approve ${invoice.invoiceNumber}?',
         yesText: 'Approve',
         noText: 'Cancel',
         onYes: () {
-          Get.back();
+          Get.back<void>();
           _controller.approvePurchaseInvoice(invoice.id);
         },
       ),
@@ -613,7 +613,7 @@ class _SavedPurchaseInvoicesViewState extends State<SavedPurchaseInvoicesView> {
   }
 
   void _onNewPurchaseInvoice() {
-    Get.toNamed(Routes.newPurchaseInvoice);
+    Get.toNamed<void>(Routes.newPurchaseInvoice);
   }
 
   String _formatDisplayDate(String value) {

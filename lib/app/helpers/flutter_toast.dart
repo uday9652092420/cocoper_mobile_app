@@ -45,7 +45,7 @@ Future<dynamic> loadingPopUp(bool show) {
       ),
     );
   } else {
-    Get.back();
+    Get.back<void>();
     return Future.value();
   }
 }

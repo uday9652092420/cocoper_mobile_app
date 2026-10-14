@@ -107,4 +107,66 @@ void main() {
     expect(line.gunnyBagName, 'Jute Bag');
     expect(line.amount, 120000);
   });
+
+  test('reads purchase dates as the business calendar date', () {
+    void expectDate(DateTime? date, int year, int month, int day) {
+      expect(date, isNotNull);
+      expect([date!.year, date.month, date.day], [year, month, day]);
+    }
+
+    // Live UAT serialization: the date-only value is stored at midnight in the
+    // backend timezone, UTC+02:00 in summer and UTC+01:00 in winter.
+    expectDate(
+      BagPurchase.parsePurchaseDate('2026-10-13T22:00:00.000Z'),
+      2026,
+      10,
+      14,
+    );
+    expectDate(
+      BagPurchase.parsePurchaseDate('2026-11-19T23:00:00.000Z'),
+      2026,
+      11,
+      20,
+    );
+    expectDate(
+      BagPurchase.parsePurchaseDate('2026-01-14T23:00:00.000Z'),
+      2026,
+      1,
+      15,
+    );
+
+    // Date-only and display values are already the business date.
+    expectDate(BagPurchase.parsePurchaseDate('2026-10-14'), 2026, 10, 14);
+    expectDate(BagPurchase.parsePurchaseDate('14/10/2026'), 2026, 10, 14);
+    expectDate(BagPurchase.parsePurchaseDate('4/9/2026'), 2026, 9, 4);
+
+    // Unusable values are reported instead of guessed.
+    expect(BagPurchase.parsePurchaseDate(''), isNull);
+    expect(BagPurchase.parsePurchaseDate('not a date'), isNull);
+    expect(BagPurchase.parsePurchaseDate('2026-02-30'), isNull);
+  });
+
+  test('keeps the business date and the raw value for stored records', () {
+    final purchase = BagPurchase.fromJson({
+      'id': 'purchase-9',
+      'purchase_no': 'BP-005',
+      'purchase_date': '2026-10-13T22:00:00.000Z',
+    });
+    expect(purchase.purchaseDate, '2026-10-14');
+
+    final dateOnly = BagPurchase.fromJson({
+      'id': 'purchase-10',
+      'purchase_no': 'BP-006',
+      'purchase_date': '2026-10-14',
+    });
+    expect(dateOnly.purchaseDate, '2026-10-14');
+
+    // A missing or unusable value is never invented or shifted.
+    expect(BagPurchase.fromJson(const {}).purchaseDate, '');
+    final unusable = BagPurchase.fromJson({
+      'id': 'purchase-11',
+      'purchase_date': 'whenever',
+    });
+    expect(unusable.purchaseDate, 'whenever');
+  });
 }

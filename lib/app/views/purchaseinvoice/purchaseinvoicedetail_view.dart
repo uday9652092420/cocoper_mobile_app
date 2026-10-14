@@ -78,7 +78,7 @@ class PurchaseInvoiceDetailView extends StatelessWidget {
       child: Row(
         children: [
           InkWell(
-            onTap: () => Get.back(),
+            onTap: () => Get.back<void>(),
             borderRadius: BorderRadius.circular(12),
             child: Container(
               width: 40,

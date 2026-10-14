@@ -64,7 +64,7 @@ class _SavedSalesOrdersViewState extends State<SavedSalesOrdersView> {
     return Row(
       children: [
         InkWell(
-          onTap: () => Get.back(),
+          onTap: () => Get.back<void>(),
           borderRadius: BorderRadius.circular(12),
           child: Container(
             width: 40,

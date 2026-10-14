@@ -45,6 +45,15 @@ is reported separately from a failed request. There is no verified pagination,
 sorting, or status-filter contract. Quantity must be greater than zero and rate
 must be nonnegative; no discount, tax, or Bharthi is submitted.
 
+The live UAT list endpoint was re-checked against the web client: the web sends
+only the organization and auth headers, while the backend additionally narrows
+the list when `branchId` or `x-branch-id` is present. A branch that holds no bag
+purchases (including a stale or unknown branch ID) is answered with HTTP 200 and
+`{"success": true, "data": []}`, which cannot be told apart from an empty
+organization. The mobile saved list therefore stays organization-scoped, like the
+web client, so existing purchases are never hidden by the session branch;
+create, update, and delete still send the session branch.
+
 The supplied backend source has no route-level authentication/permission
 middleware for Bag Purchase, and its single-record read/update/delete handlers
 do not enforce organization/branch ownership. Client scope headers and query

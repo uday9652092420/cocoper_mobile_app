@@ -67,7 +67,7 @@ class _PurchaseOrderViewState extends State<PurchaseOrderView> {
     return Row(
       children: [
         InkWell(
-          onTap: () => Get.back(),
+          onTap: () => Get.back<void>(),
           borderRadius: BorderRadius.circular(12),
           child: Container(
             width: 40,
@@ -113,7 +113,7 @@ class _PurchaseOrderViewState extends State<PurchaseOrderView> {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
-        onPressed: () => Get.toNamed(Routes.newPurchaseOrder),
+        onPressed: () => Get.toNamed<void>(Routes.newPurchaseOrder),
         style: ElevatedButton.styleFrom(
           backgroundColor: _kGreen,
           foregroundColor: Colors.white,
@@ -285,7 +285,7 @@ class _PurchaseOrderViewState extends State<PurchaseOrderView> {
 
   Widget _buildEditButton(PurchaseOrder po) {
     return InkWell(
-      onTap: () => Get.toNamed(Routes.editPurchaseOrder, arguments: po),
+      onTap: () => Get.toNamed<void>(Routes.editPurchaseOrder, arguments: po),
       borderRadius: BorderRadius.circular(8),
       child: const Padding(
         padding: EdgeInsets.all(6),
@@ -306,14 +306,14 @@ class _PurchaseOrderViewState extends State<PurchaseOrderView> {
   }
 
   void _confirmDelete(PurchaseOrder po) {
-    Get.dialog(
+    Get.dialog<void>(
       CustomConfirmationDialog(
         header: 'Delete Purchase Order',
         body: 'Are you sure you want to delete ${po.poNumber}?',
         yesText: 'Delete',
         noText: 'Cancel',
         onYes: () {
-          Get.back();
+          Get.back<void>();
           _controller.deletePurchaseOrder(po.id);
         },
       ),

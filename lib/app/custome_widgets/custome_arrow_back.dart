@@ -11,7 +11,7 @@ class CustomeArrowBack extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return IconButton(
-        onPressed: onPressed ?? () => Get.back(),
+        onPressed: onPressed ?? () => Get.back<void>(),
         icon: const Icon(
           Icons.arrow_back,
           color: AppColors.textLightGrayLight,

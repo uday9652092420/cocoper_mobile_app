@@ -7,11 +7,9 @@ class LangSelectionController extends GetxController {
   var selectedValue = 'en'.obs;
   @override
   void onInit() async {
-    String? languageCode = await SharedPrefsHelper.getString(
+    await SharedPrefsHelper.getString(
       SharedPrefsHelper.languageCode,
     );
-
-    //selectedValue.value = languageCode;
 
     super.onInit();
   }
@@ -29,6 +27,6 @@ class LangSelectionController extends GetxController {
       SharedPrefsHelper.setString(SharedPrefsHelper.countryCode, 'SA');
       Get.updateLocale(const Locale('ar', 'SA'));
     }
-    Get.offNamed('/login');
+    Get.offNamed<void>('/login');
   }
 }

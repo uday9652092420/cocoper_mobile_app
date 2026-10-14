@@ -19,13 +19,13 @@ class CustomeTextBoxLabel extends StatelessWidget {
   final TextAlign? textAlign;
   final String? Function(String?)? validator;
   final String? Function(String?)? onChanged;
-  final Function()? onTap;
+  final VoidCallback? onTap;
   final TextInputType keyboardType;
   final FocusNode? focusNode;
   final bool? obscureText;
   final bool? enableOnlyDigits;
   final bool isRequired;
-  final Function()? onEditingComplete;
+  final VoidCallback? onEditingComplete;
   final List<TextInputFormatter>? inputFormatters;
 
   const CustomeTextBoxLabel({

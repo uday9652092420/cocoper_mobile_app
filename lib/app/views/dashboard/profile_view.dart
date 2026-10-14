@@ -42,7 +42,7 @@ class ProfileView extends GetView<ProfileController> {
     await FlutterSecureStore().deleteAllData();
     await SharedPrefsHelper.clearAll();
 
-    Get.offAllNamed(Routes.loginPage);
+    Get.offAllNamed<void>(Routes.loginPage);
   }
 
   @override

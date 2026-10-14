@@ -167,7 +167,7 @@ class LoginController extends GetxController {
           Map<String, dynamic>.from(data),
         );
 
-        Get.offAllNamed(
+        Get.offAllNamed<void>(
           Routes.dashboard,
         );
 

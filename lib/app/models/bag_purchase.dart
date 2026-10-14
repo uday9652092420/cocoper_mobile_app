@@ -32,6 +32,8 @@ class BagPurchase {
   factory BagPurchase.fromJson(Map<String, dynamic> json) {
     final supplier = _map(json['supplier']);
     final branch = _map(json['branch']);
+    final rawDate = _text(json['purchase_date'] ?? json['purchaseDate']);
+    final purchaseDate = parsePurchaseDate(rawDate);
     final rawLines = json['lines'];
     final lines = rawLines is List
         ? rawLines
@@ -50,9 +52,7 @@ class BagPurchase {
             json['purchase_number'] ??
             json['purchaseNumber'],
       ),
-      purchaseDate: _text(
-        json['purchase_date'] ?? json['purchaseDate'],
-      ),
+      purchaseDate: purchaseDate == null ? rawDate : _dateOnly(purchaseDate),
       supplierId: _text(
         json['supplier_id'] ?? json['supplierId'] ?? supplier['id'],
       ),
@@ -95,6 +95,51 @@ class BagPurchase {
   }
 
   static String _text(Object? value) => value?.toString().trim() ?? '';
+
+  /// Business calendar date of a backend `purchase_date` value.
+  ///
+  /// The backend keeps the date-only value at midnight in its own timezone
+  /// (UTC+02:00 in summer, UTC+01:00 in winter) and serializes it as a UTC
+  /// timestamp: `2026-10-14` is returned as `2026-10-13T22:00:00.000Z` and
+  /// `2026-11-20` as `2026-11-19T23:00:00.000Z`. Reading the UTC day would show
+  /// the day before the selected one, so a UTC instant is shifted into the
+  /// backend timezone before the calendar date is taken. A date-only value is
+  /// already the business date and is used unchanged.
+  ///
+  /// Returns null when [value] is not a recognised date.
+  static DateTime? parsePurchaseDate(String value) {
+    final text = value.trim();
+    if (text.isEmpty) return null;
+
+    final parsed = DateTime.tryParse(text);
+    if (parsed != null) {
+      return parsed.isUtc ? parsed.add(_backendDateOffset) : parsed;
+    }
+
+    final parts = text.split('/');
+    if (parts.length != 3) return null;
+    final day = int.tryParse(parts[0]);
+    final month = int.tryParse(parts[1]);
+    final year = int.tryParse(parts[2]);
+    if (day == null || month == null || year == null) return null;
+
+    final date = DateTime(year, month, day);
+    if (date.year != year || date.month != month || date.day != day) {
+      return null;
+    }
+    return date;
+  }
+
+  static String _dateOnly(DateTime date) =>
+      '${date.year.toString().padLeft(4, '0')}-'
+      '${date.month.toString().padLeft(2, '0')}-'
+      '${date.day.toString().padLeft(2, '0')}';
+
+  /// Offset added to a UTC `purchase_date` instant to read its calendar date.
+  ///
+  /// Covers the verified UTC+01:00/+02:00 backend serialization and stays
+  /// correct if the backend starts returning UTC-midnight dates.
+  static const Duration _backendDateOffset = Duration(hours: 2);
 
   static double parseNumber(Object? value, {double fallback = 0}) {
     if (value is num) return value.toDouble();

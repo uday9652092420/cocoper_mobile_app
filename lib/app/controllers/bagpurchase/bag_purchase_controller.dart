@@ -1,5 +1,6 @@
 import 'dart:developer' as developer;
 
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
 import '../../config/environment.dart';
@@ -40,6 +41,15 @@ class BagPurchaseController extends GetxController {
     }).toList(growable: false);
   }
 
+  /// Loads the organization's saved bag purchases.
+  ///
+  /// The verified list contract is organization-scoped: the web client sends
+  /// only the organization/auth headers and receives every bag purchase of the
+  /// organization. The backend also narrows the list by `branchId` /
+  /// `x-branch-id`, but a branch without bag purchases answers with
+  /// `{success: true, data: []}` and HTTP 200, which is indistinguishable from
+  /// an empty organization, so a branch-scoped list showed existing purchases
+  /// as "0 purchases". Create, update, and delete still send the session branch.
   Future<void> loadPurchases() async {
     if (isLoadingList.value) {
       _reloadAfterCurrentLoad = true;
@@ -53,31 +63,13 @@ class BagPurchaseController extends GetxController {
       final organizationId = await SharedPrefsHelper.getString(
         SharedPrefsHelper.organizationId,
       );
-      final branchId = await SharedPrefsHelper.getString(
-        SharedPrefsHelper.selectedBranchId,
-      );
       if (organizationId.trim().isEmpty) {
         throw const _BagPurchaseRequestException(
           'Organization scope is unavailable. Please sign in again.',
         );
       }
 
-      final response = await ApiService.get(
-        EndPoints.bagPurchases,
-        queryParameters: {
-          'organizationId': organizationId,
-          if (branchId.isNotEmpty) 'branchId': branchId,
-        },
-        headers: _scopeHeaders(organizationId, branchId),
-      );
-      if (response?.statusCode != 200) {
-        throw _BagPurchaseRequestException(
-          _responseMessage(response?.data) ??
-              'Unable to load bag purchases${_statusSuffix(response?.statusCode)}.',
-        );
-      }
-
-      purchases.assignAll(_decodeList(response?.data));
+      purchases.assignAll(await fetchPurchaseList(organizationId));
     } catch (error) {
       hasListError.value = true;
       listError.value =
@@ -90,6 +82,37 @@ class BagPurchaseController extends GetxController {
       }
     }
   }
+
+  /// Requests the saved list. Overridable in tests to supply canned responses.
+  @visibleForTesting
+  Future<List<BagPurchase>> fetchPurchaseList(String organizationId) async {
+    final response = await ApiService.get(
+      EndPoints.bagPurchases,
+      queryParameters: purchaseListQueryParameters(organizationId),
+      headers: purchaseListHeaders(organizationId),
+    );
+    if (response?.statusCode != 200) {
+      throw _BagPurchaseRequestException(
+        _responseMessage(response?.data) ??
+            'Unable to load bag purchases${_statusSuffix(response?.statusCode)}.',
+      );
+    }
+
+    return decodePurchaseList(response?.data);
+  }
+
+  /// Organization scope of the saved list. No branch scope is sent: the
+  /// verified web client lists every bag purchase of the organization, and the
+  /// backend silently returns an empty array for a branch without purchases.
+  @visibleForTesting
+  static Map<String, dynamic> purchaseListQueryParameters(
+    String organizationId,
+  ) =>
+      {'organizationId': organizationId};
+
+  @visibleForTesting
+  static Map<String, String> purchaseListHeaders(String organizationId) =>
+      {'x-organization-id': organizationId};
 
   /// Loads supplier, branch, and gunny bag selectors.
   ///
@@ -401,7 +424,9 @@ class BagPurchaseController extends GetxController {
         'lines': lines.map((line) => line.toRequestJson()).toList(),
       };
 
-  static List<BagPurchase> _decodeList(Object? data) {
+  /// Decodes the verified saved-list envelope (`{success, data: [...]}`) and
+  /// also accepts the bare-array and `items`/`records` wrappers.
+  static List<BagPurchase> decodePurchaseList(Object? data) {
     Object? value = data;
     for (var depth = 0; depth < 3 && value is Map<dynamic, dynamic>; depth++) {
       value = value['data'] ?? value['items'] ?? value['records'];

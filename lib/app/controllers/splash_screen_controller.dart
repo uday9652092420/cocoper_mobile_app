@@ -5,7 +5,7 @@ import '../routes/app_routes.dart';
 
 class SplashScreenController extends GetxController {
   Future<void> startTimer(BuildContext context) async {
-    await Future.delayed(const Duration(seconds: 2)); // Reduced for demo
+    await Future<void>.delayed(const Duration(seconds: 2)); // Reduced for demo
 
     // API-related checks (commented out until needed)
     /*
@@ -25,6 +25,6 @@ class SplashScreenController extends GetxController {
     */
 
     // Navigate to language selection for template
-    Get.offNamed(Routes.loginPage);
+    Get.offNamed<void>(Routes.loginPage);
   }
 }

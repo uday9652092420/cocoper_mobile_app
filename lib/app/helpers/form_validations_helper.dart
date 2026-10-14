@@ -48,8 +48,8 @@ class ValidationUtils {
   }
 }
 
-isItNull(
-  variable, [
+dynamic isItNull(
+  dynamic variable, [
   dynamic ifVal = true,
   dynamic elseVal = false,
   bool objKey = false,

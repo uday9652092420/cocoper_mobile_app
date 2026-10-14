@@ -132,7 +132,7 @@ class _NewPurchaseOrderViewState extends State<NewPurchaseOrderView> {
       child: Row(
         children: [
           InkWell(
-            onTap: () => Get.back(),
+            onTap: () => Get.back<void>(),
             borderRadius: BorderRadius.circular(12),
             child: Container(
               width: 40,
@@ -1151,7 +1151,7 @@ class _NewPurchaseOrderViewState extends State<NewPurchaseOrderView> {
       );
 
       if (success && mounted) {
-        Get.back();
+        Get.back<void>();
       }
     }
   }
@@ -1180,7 +1180,7 @@ class _NewPurchaseOrderViewState extends State<NewPurchaseOrderView> {
   void _onConvert() {
     final order = widget.order;
     if (order == null) return;
-    Get.toNamed(Routes.newSaleOrder, arguments: order);
+    Get.toNamed<void>(Routes.newSaleOrder, arguments: order);
   }
 
   void _prefillFromOrder(PurchaseOrder order) {

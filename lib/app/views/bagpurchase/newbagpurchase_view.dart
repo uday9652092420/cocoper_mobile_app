@@ -794,11 +794,8 @@ class _NewBagPurchaseViewState extends State<NewBagPurchaseView> {
   }
 
   static String _displayDate(String value) {
-    final parsed = DateTime.tryParse(value) ??
-        DateFormat('d/M/yyyy').tryParse(value) ??
-        DateFormat('dd/MM/yyyy').tryParse(value);
-    if (parsed != null) return DateFormat('dd/MM/yyyy').format(parsed);
-    return value;
+    final date = BagPurchase.parsePurchaseDate(value);
+    return date == null ? value : DateFormat('dd/MM/yyyy').format(date);
   }
 
   static String _initialNumber(double value) =>

@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-consolePrint(dynamic val) {
+void consolePrint(dynamic val) {
   if (kDebugMode) {
     print(val);
   }
