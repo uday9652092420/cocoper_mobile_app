@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart' hide TextDirection;
 
 import '../../controllers/bagpurchase/bag_purchase_controller.dart';
 import '../../helpers/flutter_toast.dart';
@@ -308,6 +308,7 @@ class _NewBagPurchaseViewState extends State<NewBagPurchaseView> {
             controller: _remarksController,
             minLines: 1,
             maxLines: 3,
+            textAlign: TextAlign.start,
             decoration: _inputDecoration(hint: 'Enter remarks'),
           ),
         ],
@@ -472,6 +473,8 @@ class _NewBagPurchaseViewState extends State<NewBagPurchaseView> {
         TextField(
           controller: controller,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          textAlign: TextAlign.start,
+          textDirection: TextDirection.ltr,
           onChanged: onChanged,
           decoration: _inputDecoration(hint: '0'),
         ),
@@ -550,43 +553,63 @@ class _NewBagPurchaseViewState extends State<NewBagPurchaseView> {
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 820),
-            child: Wrap(
-              alignment: WrapAlignment.end,
-              spacing: 8,
-              runSpacing: 8,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Obx(
-                  () => OutlinedButton.icon(
-                    onPressed:
-                        _controller.isSaving.value ? null : _addLine,
-                    icon: const Icon(Icons.add, size: 18),
-                    label: const Text('Add Line'),
-                  ),
-                ),
-                if (!_isEditing)
-                  Obx(
-                    () => OutlinedButton(
-                      onPressed:
-                          _controller.isSaving.value ? null : _saveAndNew,
-                      child: const Text('Save & New'),
+                Wrap(
+                  alignment: WrapAlignment.end,
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    Obx(
+                      () => OutlinedButton.icon(
+                        onPressed: _controller.isSaving.value ? null : _addLine,
+                        icon: const Icon(Icons.add, size: 18),
+                        label: const Text('Add Line'),
+                      ),
                     ),
-                  ),
+                    if (!_isEditing)
+                      Obx(
+                        () => OutlinedButton(
+                          onPressed:
+                              _controller.isSaving.value ? null : _saveAndNew,
+                          child: const Text('Save & New'),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 10),
                 Obx(
                   () => ElevatedButton(
                     onPressed: _controller.isSaving.value ? null : _save,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _kGreen,
                       foregroundColor: Colors.white,
+                      disabledBackgroundColor: _kGreen.withValues(alpha: 0.6),
+                      disabledForegroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
-                    child: Text(_isEditing ? 'Update' : 'Save'),
-                  ),
-                ),
-                Obx(
-                  () => OutlinedButton(
-                    onPressed: _controller.isSaving.value
-                        ? null
-                        : () => Get.back<void>(),
-                    child: const Text('Close'),
+                    child: _controller.isSaving.value
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.4,
+                              color: Colors.white,
+                            ),
+                          )
+                        : Text(
+                            _isEditing ? 'Save Changes' : 'Save',
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                   ),
                 ),
               ],

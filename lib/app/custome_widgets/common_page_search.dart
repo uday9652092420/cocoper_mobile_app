@@ -43,6 +43,7 @@ class CommonPageSearch extends StatelessWidget {
         autofocus: false,
         onChanged: onChanged,
         controller: controller,
+        textAlign: TextAlign.start,
         decoration: InputDecoration(
           hintText: txtHintValue,
           hintStyle: TextStyle(fontSize: textTheme.bodySmall?.fontSize, color: customTheme.textLightGray),

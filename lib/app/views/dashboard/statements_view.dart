@@ -131,6 +131,7 @@ class StatementsView extends GetView<DashboardController> {
           SizedBox(width: 8),
           Expanded(
             child: TextField(
+              textAlign: TextAlign.start,
               decoration: InputDecoration(
                 isDense: true,
                 border: InputBorder.none,

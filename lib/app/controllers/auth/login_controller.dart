@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 
 import 'package:cocoper_mobile/app/helpers/secure_store.dart';
 import 'package:cocoper_mobile/app/helpers/shared_preferences.dart';
+import 'package:cocoper_mobile/app/localization/localization.dart';
 import 'package:cocoper_mobile/app/routes/app_routes.dart';
 import 'package:cocoper_mobile/app/services/api_service.dart';
 import 'package:cocoper_mobile/app/services/endpoints.dart';
@@ -166,6 +167,7 @@ class LoginController extends GetxController {
         await _handleSuccessfulLogin(
           Map<String, dynamic>.from(data),
         );
+        await _restoreSavedLocale();
 
         Get.offAllNamed<void>(
           Routes.dashboard,
@@ -349,6 +351,35 @@ class LoginController extends GetxController {
     debugPrint(
       '========================================',
     );
+  }
+
+  Future<void> _restoreSavedLocale() async {
+    try {
+      final localeValues = await Future.wait([
+        SharedPrefsHelper.getString(
+          SharedPrefsHelper.languageCode,
+          defaultValue: 'en',
+        ),
+        SharedPrefsHelper.getString(
+          SharedPrefsHelper.countryCode,
+          defaultValue: 'US',
+        ),
+      ]);
+      final languageCode = localeValues[0].isEmpty ? 'en' : localeValues[0];
+      final countryCode = localeValues[1].isEmpty ? 'US' : localeValues[1];
+      final locale = Locale(languageCode, countryCode);
+      if (Localization.supportedLocales.contains(locale)) {
+        Get.updateLocale(locale);
+      } else {
+        debugPrint(
+          'Saved locale $languageCode-$countryCode is unsupported; using '
+          '${Localization.defaultLocale.languageCode}-'
+          '${Localization.defaultLocale.countryCode}.',
+        );
+      }
+    } catch (error) {
+      debugPrint('Unable to restore saved locale: $error');
+    }
   }
 
   // ============================================================

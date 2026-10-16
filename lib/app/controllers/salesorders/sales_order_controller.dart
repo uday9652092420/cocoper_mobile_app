@@ -11,7 +11,7 @@ import '../../models/sales_order_line.dart';
 import '../../services/api_service.dart';
 import '../../services/endpoints.dart';
 
-/// Handles Sales Order list, lookups, calculations and save/update flows
+/// Handles Sales Order list, lookups, calculations and create flows
 /// against the existing COCOPER backend using the shared [ApiService].
 class SalesOrderController extends GetxController {
   // ============================================================
@@ -67,6 +67,79 @@ class SalesOrderController extends GetxController {
     isLoadingList.value = false;
   }
 
+  /// Sales Orders are available through the verified list read only. Refresh
+  /// that list before resolving the selected ID so detail views never reuse a
+  /// stale order or accidentally select by its former list position.
+  Future<SalesOrder?> fetchSalesOrderById(String id) async {
+    await loadSalesOrders();
+    if (hasListError.value) return null;
+
+    for (final order in salesOrders) {
+      if (order.id == id) return order;
+    }
+    return null;
+  }
+
+  static String normalizedStatus(String status) => status.trim().toLowerCase();
+
+  static bool canEditSalesOrder(SalesOrder order) =>
+      normalizedStatus(order.status) == 'draft';
+
+  /// Validates the fields that are present in the verified Sales Order model.
+  /// The server write is intentionally not enabled without an update contract.
+  static String? validateSalesOrder({
+    required String soNumber,
+    required String date,
+    required String customerId,
+    required String mode,
+    required List<SalesOrderLine> lines,
+  }) {
+    if (soNumber.trim().isEmpty) return 'Please enter the SO number.';
+    final parsedDate = DateTime.tryParse(date);
+    if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(date) ||
+        parsedDate == null ||
+        parsedDate.toIso8601String().substring(0, 10) != date) {
+      return 'Please enter a valid date.';
+    }
+    if (customerId.trim().isEmpty) return 'Please select a customer.';
+    if (!const {modeTonage, modeLessing}.contains(mode)) {
+      return 'Select a supported Sales Order mode.';
+    }
+    if (lines.isEmpty) return 'Please add at least one line item.';
+
+    for (final line in lines) {
+      if (line.itemId.trim().isEmpty) {
+        return 'Please select an item for every line.';
+      }
+      if (!line.quantity.isFinite || line.quantity <= 0) {
+        return 'Each line quantity must be greater than zero.';
+      }
+      if (!line.discount.isFinite || line.discount < 0) {
+        return 'Discounts cannot be negative.';
+      }
+      if (!line.saleCost.isFinite || line.saleCost <= 0) {
+        return 'Each line sale cost must be greater than zero.';
+      }
+      if (!line.pieces.isFinite || line.pieces < 0) {
+        return 'Pieces cannot be negative.';
+      }
+      final actualQuantity = calculateActualQuantity(
+        mode: mode,
+        quantity: line.quantity,
+        discount: line.discount,
+        piecesPercentage: line.piecesPercentage,
+      );
+      if (!actualQuantity.isFinite || actualQuantity <= 0) {
+        return 'Each line must have a positive actual quantity.';
+      }
+      final saleAmount = calculateSaleAmount(line.saleCost, actualQuantity);
+      if (!saleAmount.isFinite || saleAmount <= 0) {
+        return 'Each line must have a valid positive sale amount.';
+      }
+    }
+    return null;
+  }
+
   // ============================================================
   // LOOKUPS
   // ============================================================
@@ -115,6 +188,10 @@ class SalesOrderController extends GetxController {
       for (final key in const ['data', 'items', 'results', 'records']) {
         final value = data[key];
         if (value is List) return value;
+        if (value is Map) {
+          final nested = _extractList(value);
+          if (nested != null) return nested;
+        }
       }
     }
     return null;
@@ -213,7 +290,11 @@ class SalesOrderController extends GetxController {
   }
 
   static double calculateTotalAmount(List<SalesOrderLine> lines) {
-    return lines.fold(0.0, (sum, line) => sum + line.saleAmount);
+    return lines.fold(
+      0.0,
+      (sum, line) =>
+          sum + (line.saleAmount != 0 ? line.saleAmount : line.amount),
+    );
   }
 
   /// Frontend-only profit: total sale amount minus total purchase amount.
@@ -260,21 +341,52 @@ class SalesOrderController extends GetxController {
     required String remarks,
     required String mode,
     required List<SalesOrderLine> lines,
-  }) {
-    return _submitSalesOrder(
-      id: id,
-      soNumber: soNumber,
-      date: date,
-      customerId: customerId,
-      remarks: remarks,
-      mode: mode,
-      lines: lines,
-      status: status,
-    );
+  }) async {
+    if (isSaving.value) return false;
+    isSaving.value = true;
+    try {
+      final validationError = validateSalesOrder(
+        soNumber: soNumber,
+        date: date,
+        customerId: customerId,
+        mode: mode,
+        lines: lines,
+      );
+      if (validationError != null) {
+        errorToast(validationError);
+        return false;
+      }
+
+      if (normalizedStatus(status) != 'draft') {
+        errorToast('Only a Draft Sales Order can be edited.');
+        return false;
+      }
+
+      final latestOrder = await fetchSalesOrderById(id);
+      if (latestOrder == null) {
+        errorToast(
+          hasListError.value
+              ? 'Unable to verify the latest Sales Order status.'
+              : 'This Sales Order is no longer available.',
+        );
+        return false;
+      }
+      if (!canEditSalesOrder(latestOrder)) {
+        errorToast('This Sales Order is no longer an editable Draft.');
+        return false;
+      }
+
+      errorToast(
+        'Sales Order editing is unavailable because no update endpoint is '
+        'verified.',
+      );
+      return false;
+    } finally {
+      isSaving.value = false;
+    }
   }
 
   Future<bool> _submitSalesOrder({
-    String? id,
     required String status,
     required String soNumber,
     required String date,
@@ -303,27 +415,17 @@ class SalesOrderController extends GetxController {
         'lines': lines.map((line) => line.toJson()).toList(),
       };
 
-      consolePrint(
-        id == null
-            ? 'SALES ORDER CREATE REQUEST'
-            : 'SALES ORDER UPDATE REQUEST',
-      );
+      consolePrint('SALES ORDER CREATE REQUEST');
       consolePrint('SALES ORDER NUMBER: $soNumber');
 
-      final response = id == null
-          ? await ApiService.post(EndPoints.salesOrders, body)
-          : await ApiService.put('${EndPoints.salesOrders}/$id', body);
+      final response = await ApiService.post(EndPoints.salesOrders, body);
 
       consolePrint('SALES ORDER SAVE STATUS: ${response?.statusCode}');
 
       if (response != null &&
           (response.statusCode == 200 || response.statusCode == 201)) {
         consolePrint('SALES ORDER SAVE SUCCESS');
-        successToast(
-          id == null
-              ? 'Sales order saved successfully.'
-              : 'Sales order updated.',
-        );
+        successToast('Sales order saved successfully.');
         await loadSalesOrders();
         return true;
       }

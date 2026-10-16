@@ -4,7 +4,7 @@ import 'package:cocoper_mobile/app/views/bagpurchase/newbagpurchase_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart' hide TextDirection;
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _bags = <BagPurchaseLookup>[
@@ -65,7 +65,7 @@ class _StubBagPurchaseController extends BagPurchaseController {
   }
 }
 
-late _StubBagPurchaseController stub;
+late _StubBagPurchaseController _stub;
 
 Future<void> _pumpForm(WidgetTester tester, {BagPurchase? purchase}) async {
   await tester.pumpWidget(
@@ -99,6 +99,20 @@ Future<void> _pumpFormOnRoute(
   await tester.pumpAndSettle();
 }
 
+double _caretX(WidgetTester tester, Finder field, {int? offset}) {
+  final state = tester.state<EditableTextState>(
+    find.descendant(of: field, matching: find.byType(EditableText)).first,
+  );
+  final caret = state.renderEditable.getLocalRectForCaret(
+    TextPosition(
+      offset: offset ?? state.textEditingValue.selection.extentOffset,
+    ),
+  );
+  return state.renderEditable
+      .localToGlobal(caret.center, ancestor: state.renderEditable)
+      .dx;
+}
+
 void main() {
   setUp(() {
     Get.testMode = true;
@@ -106,8 +120,8 @@ void main() {
       'organizationId': 'org-1',
       'selectedBranchId': 'branch-1',
     });
-    stub = _StubBagPurchaseController();
-    Get.put<BagPurchaseController>(stub);
+    _stub = _StubBagPurchaseController();
+    Get.put<BagPurchaseController>(_stub);
   });
 
   tearDown(Get.reset);
@@ -121,6 +135,7 @@ void main() {
             'Unable to load gunny bags. Check your connection and retry.'),
         findsNothing);
 
+    await tester.ensureVisible(find.text('Select bag'));
     await tester.tap(find.text('Select bag'), warnIfMissed: false);
     await tester.pumpAndSettle();
     expect(find.text('Jute Bag (JB-01)'), findsWidgets);
@@ -191,11 +206,11 @@ void main() {
     expect(find.text('14/10/2026'), findsOneWidget);
     expect(find.text('13/10/2026'), findsNothing);
 
-    await tester.ensureVisible(find.text('Update'));
-    await tester.tap(find.text('Update'));
+    await tester.ensureVisible(find.text('Save Changes'));
+    await tester.tap(find.text('Save Changes'));
     await tester.pumpAndSettle();
 
-    expect(stub.submittedDate, '2026-10-14');
+    expect(_stub.submittedDate, '2026-10-14');
   });
 
   testWidgets('new purchase submits the displayed date as a date-only value', (
@@ -208,22 +223,23 @@ void main() {
     await _pumpFormOnRoute(tester);
     expect(find.text(displayedDate), findsOneWidget);
 
+    await tester.ensureVisible(find.text('Select supplier'));
     await tester.tap(find.text('Select supplier'), warnIfMissed: false);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Kerala Cocos').last);
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(find.text('Select bag'));
     await tester.tap(find.text('Select bag'), warnIfMissed: false);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Jute Bag (JB-01)').last);
     await tester.pumpAndSettle();
 
-    final quantityField = find.byWidgetPredicate(
-      (widget) =>
-          widget is TextField &&
-          widget.decoration?.hintText == '0' &&
-          (widget.controller?.text ?? '').isEmpty,
-    );
+    final quantityField = find
+        .byWidgetPredicate(
+          (widget) => widget is TextField && widget.decoration?.hintText == '0',
+        )
+        .first;
     expect(quantityField, findsOneWidget);
     await tester.enterText(quantityField, '10');
     await tester.pumpAndSettle();
@@ -232,6 +248,66 @@ void main() {
     await tester.tap(find.text('Save'));
     await tester.pumpAndSettle();
 
-    expect(stub.submittedDate, requestDate);
+    expect(_stub.submittedDate, requestDate);
+  });
+
+  testWidgets('line item quantity and rate fields enter left to right', (
+    tester,
+  ) async {
+    await _pumpForm(tester);
+
+    final numberFields = find.byWidgetPredicate(
+      (widget) => widget is TextField && widget.decoration?.hintText == '0',
+    );
+    expect(numberFields, findsNWidgets(2));
+
+    final lineInputs = {'Qty': '25', 'Rate': '12.5'}.entries.toList();
+    for (var index = 0; index < lineInputs.length; index++) {
+      final entry = lineInputs[index];
+      final field = numberFields.at(index);
+      final fieldWidget = tester.widget<TextField>(field);
+      expect(fieldWidget.textAlign, TextAlign.start);
+      expect(fieldWidget.textDirection, TextDirection.ltr);
+
+      await tester.ensureVisible(field);
+      await tester.pumpAndSettle();
+      final rect = tester.getRect(field);
+      await tester.tapAt(Offset(rect.right - 6, rect.center.dy));
+      await tester.pumpAndSettle();
+
+      expect(
+        _caretX(tester, field),
+        lessThan(rect.center.dx),
+        reason: '${entry.key} must place its caret from the left edge',
+      );
+
+      final controller = fieldWidget.controller!;
+      await tester.enterText(field, entry.value);
+      await tester.pumpAndSettle();
+
+      expect(controller.text, entry.value);
+      expect(controller.selection.extentOffset, entry.value.length);
+      expect(
+        identical(tester.widget<TextField>(field).controller, controller),
+        isTrue,
+      );
+      expect(
+        _caretX(tester, field, offset: 0),
+        lessThan(rect.center.dx),
+        reason: '${entry.key} text must begin at the left edge',
+      );
+
+      if (entry.key == 'Rate') {
+        tester.testTextInput.updateEditingValue(
+          const TextEditingValue(
+            text: '102.5',
+            selection: TextSelection.collapsed(offset: 2),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(controller.text, '102.5');
+        expect(controller.selection.extentOffset, 2);
+      }
+    }
   });
 }

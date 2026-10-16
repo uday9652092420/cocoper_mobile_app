@@ -223,6 +223,8 @@ class LoginPageView extends GetView<LoginController> {
       controller: controller.emailController,
       keyboardType: TextInputType.emailAddress,
       textInputAction: TextInputAction.next,
+      textAlign: TextAlign.start,
+      textDirection: TextDirection.ltr,
       validator: controller.validateEmail,
       decoration: _buildInputDecoration(
         hintText: 'Enter email',
@@ -241,6 +243,8 @@ class LoginPageView extends GetView<LoginController> {
         controller: controller.passwordController,
         obscureText: !controller.isPasswordVisible.value,
         textInputAction: TextInputAction.done,
+        textAlign: TextAlign.start,
+        textDirection: TextDirection.ltr,
         validator: controller.validatePassword,
         onFieldSubmitted: (_) {
           controller.submit();

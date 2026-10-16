@@ -2,6 +2,7 @@ import 'package:cocoper_mobile/app/controllers/bagpurchase/bag_purchase_controll
 import 'package:cocoper_mobile/app/routes/app_pages.dart';
 import 'package:cocoper_mobile/app/views/dashboard/operations_view.dart';
 import 'package:cocoper_mobile/app/views/bagpurchase/newbagpurchase_view.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 
@@ -42,7 +43,7 @@ void main() {
     expect(find.byType(NewBagPurchaseView), findsOneWidget);
     expect(find.text('Bag purchase lines'), findsOneWidget);
 
-    await tester.tap(find.text('Close'));
+    await tester.tap(find.byIcon(Icons.arrow_back_ios_new));
     await tester.pumpAndSettle();
     expect(find.text('Saved Bag Purchases'), findsOneWidget);
     expect(controller.loadPurchaseCalls, 2);

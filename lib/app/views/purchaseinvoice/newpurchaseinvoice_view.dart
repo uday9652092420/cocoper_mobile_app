@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart' hide TextDirection;
 
 import '../../controllers/purchaseinvoice/purchase_invoice_controller.dart';
 import '../../helpers/flutter_toast.dart';
@@ -782,6 +782,7 @@ class _NewPurchaseInvoiceViewState extends State<NewPurchaseInvoiceView> {
       onTap: onTap,
       keyboardType: keyboardType,
       maxLines: maxLines,
+      textAlign: TextAlign.start,
       style: const TextStyle(fontSize: 14, color: _kInk),
       decoration: InputDecoration(
         hintText: hint,
@@ -985,7 +986,8 @@ class _NewPurchaseInvoiceViewState extends State<NewPurchaseInvoiceView> {
         TextField(
           controller: controller,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          textAlign: TextAlign.right,
+          textAlign: TextAlign.start,
+          textDirection: TextDirection.ltr,
           onChanged: (_) => setState(() {}),
           style: const TextStyle(fontSize: 13, color: _kInk),
           decoration: _compactInputDecoration(),
@@ -1006,7 +1008,8 @@ class _NewPurchaseInvoiceViewState extends State<NewPurchaseInvoiceView> {
             decimal: true,
             signed: true,
           ),
-          textAlign: TextAlign.right,
+          textAlign: TextAlign.start,
+          textDirection: TextDirection.ltr,
           onChanged: (_) => setState(() {}),
           style: const TextStyle(fontSize: 13, color: _kInk),
           decoration: _compactInputDecoration(),
@@ -1027,7 +1030,8 @@ class _NewPurchaseInvoiceViewState extends State<NewPurchaseInvoiceView> {
             decimal: true,
             signed: true,
           ),
-          textAlign: TextAlign.right,
+          textAlign: TextAlign.start,
+          textDirection: TextDirection.ltr,
           onChanged: (_) => setState(() {}),
           style: const TextStyle(fontSize: 13, color: _kInk),
           decoration: _compactInputDecoration(),

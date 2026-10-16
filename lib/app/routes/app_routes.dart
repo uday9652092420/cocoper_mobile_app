@@ -26,6 +26,8 @@ abstract class Routes {
   static const newSaleOrder = '/new_sale_order_view';
 
   static const savedSalesOrders = '/saved_sales_orders_view';
+  static const editSalesOrder = '/edit_sales_order_view';
+  static const viewSalesOrder = '/view_sales_order_view';
 
   static const purchaseInvoices = '/purchase_invoices_view';
 

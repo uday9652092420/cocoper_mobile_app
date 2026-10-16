@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 
 import '../../controllers/salesorders/sales_order_controller.dart';
 import '../../models/sales_order.dart';
+import '../../routes/app_routes.dart';
 
 const _kInk = Color(0xFF14342B);
 const _kMuted = Color(0xFF5C6B66);
@@ -212,6 +213,24 @@ class _SavedSalesOrdersViewState extends State<SavedSalesOrdersView> {
                 ),
               ),
               _buildStatusBadge(so.status),
+              const SizedBox(width: 2),
+              _buildActionIcon(
+                icon: Icons.visibility_outlined,
+                label: 'View Sales Order',
+                onTap: () => Get.toNamed<void>(
+                  Routes.viewSalesOrder,
+                  arguments: so.id,
+                ),
+              ),
+              if (_isDraft(so))
+                _buildActionIcon(
+                  icon: Icons.edit_outlined,
+                  label: 'Edit Sales Order',
+                  onTap: () => Get.toNamed<void>(
+                    Routes.editSalesOrder,
+                    arguments: so.id,
+                  ),
+                ),
             ],
           ),
           if (so.customerName.isNotEmpty) ...[
@@ -221,10 +240,10 @@ class _SavedSalesOrdersViewState extends State<SavedSalesOrdersView> {
               style: const TextStyle(fontSize: 13, color: _kMuted),
             ),
           ],
-          if (so.poNumber.isNotEmpty) ...[
+          if (so.poNumber.isNotEmpty || so.sourcePoId.isNotEmpty) ...[
             const SizedBox(height: 4),
             Text(
-              'Converted from ${so.poNumber}',
+              'Converted from ${so.poNumber.isNotEmpty ? so.poNumber : so.sourcePoId}',
               style: const TextStyle(fontSize: 12, color: _kMuted),
             ),
           ],
@@ -257,11 +276,37 @@ class _SavedSalesOrdersViewState extends State<SavedSalesOrdersView> {
     );
   }
 
+  bool _isDraft(SalesOrder so) =>
+      SalesOrderController.normalizedStatus(so.status) == 'draft';
+
+  Widget _buildActionIcon({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    Color color = _kGreen,
+  }) {
+    return Tooltip(
+      message: label,
+      child: Semantics(
+        button: true,
+        label: label,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.all(6),
+            child: Icon(icon, size: 19, color: color),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildStatusBadge(String status) {
     Color color;
     Color tint;
 
-    switch (status.toLowerCase()) {
+    switch (SalesOrderController.normalizedStatus(status)) {
       case 'approved':
         color = const Color(0xFF2D8135);
         tint = const Color(0xFFE7F3E4);
@@ -282,7 +327,7 @@ class _SavedSalesOrdersViewState extends State<SavedSalesOrdersView> {
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
-        status.isEmpty ? 'Draft' : status,
+        status.isEmpty ? 'Unknown' : status,
         style: TextStyle(
           fontSize: 11.5,
           fontWeight: FontWeight.w700,

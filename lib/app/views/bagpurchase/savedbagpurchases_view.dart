@@ -166,6 +166,7 @@ class _SavedBagPurchasesViewState extends State<SavedBagPurchasesView> {
             child: TextField(
               controller: _searchController,
               onChanged: (value) => _controller.searchQuery.value = value,
+              textAlign: TextAlign.start,
               decoration: const InputDecoration(
                 isDense: true,
                 border: InputBorder.none,

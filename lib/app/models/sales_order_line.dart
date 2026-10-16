@@ -31,16 +31,29 @@ class SalesOrderLine {
   });
 
   factory SalesOrderLine.fromJson(Map<String, dynamic> json) {
+    final rawItem = json['item'];
+    final item = rawItem is Map
+        ? Map<String, dynamic>.from(rawItem)
+        : const <String, dynamic>{};
     return SalesOrderLine(
-      itemId: _string(json['itemId'] ?? json['item_id']),
-      itemName: _string(json['itemName'] ?? json['item_name'] ?? json['name']),
+      itemId: _string(
+        json['itemId'] ?? json['item_id'] ?? item['id'] ?? item['_id'],
+      ),
+      itemName: _string(
+        json['itemName'] ??
+            json['item_name'] ??
+            json['name'] ??
+            item['name'] ??
+            item['itemName'] ??
+            item['item_name'],
+      ),
       quantity: _double(json['quantity']),
       discount: _double(json['discount']),
       piecesPercentage: _double(
         json['piecesPercentage'] ?? json['pieces_percentage'],
       ),
       pieces: _double(json['pieces']),
-      baseCost: _double(json['baseCost']),
+      baseCost: _double(json['baseCost'] ?? json['base_cost']),
       actualQuantity: _double(
         json['actualQuantity'] ?? json['actual_quantity'],
       ),

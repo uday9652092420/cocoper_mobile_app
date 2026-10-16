@@ -81,7 +81,7 @@ class CustomeTextBoxLabel extends StatelessWidget {
         TextFormField(
           key: key,
           initialValue: initialValue,
-          textAlign: textAlign ?? TextAlign.left,
+          textAlign: textAlign ?? TextAlign.start,
           validator: validator,
           controller: controller,
           readOnly: realOnly,

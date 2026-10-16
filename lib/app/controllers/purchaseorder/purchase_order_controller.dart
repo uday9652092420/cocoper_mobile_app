@@ -380,10 +380,28 @@ class PurchaseOrderController extends GetxController {
     final response = await ApiService.get('${EndPoints.purchaseOrders}/$id');
     final data = response?.data;
 
-    if (response?.statusCode == 200 && data is Map) {
-      return PurchaseOrder.fromJson(Map<String, dynamic>.from(data));
+    if (response?.statusCode == 200) {
+      final orderData = _extractObject(data);
+      if (orderData != null) {
+        final order = PurchaseOrder.fromJson(orderData);
+        if (order.id == id) {
+          final index = purchaseOrders.indexWhere((item) => item.id == id);
+          if (index == -1) {
+            purchaseOrders.add(order);
+          } else {
+            purchaseOrders[index] = order;
+          }
+          return order;
+        }
+      }
     }
 
+    final message = _extractMessage(data);
+    errorToast(
+      message.isNotEmpty
+          ? message
+          : 'Unable to refresh purchase order. Please try again.',
+    );
     return null;
   }
 
@@ -399,7 +417,8 @@ class PurchaseOrderController extends GetxController {
     }
 
     final message = _extractMessage(response?.data);
-    errorToast(message.isNotEmpty ? message : 'Unable to delete purchase order.');
+    errorToast(
+        message.isNotEmpty ? message : 'Unable to delete purchase order.');
     return false;
   }
 
@@ -415,5 +434,14 @@ class PurchaseOrderController extends GetxController {
       }
     }
     return '';
+  }
+
+  Map<String, dynamic>? _extractObject(dynamic data) {
+    if (data is! Map) return null;
+
+    final value = data['data'];
+    if (value is Map) return Map<String, dynamic>.from(value);
+
+    return Map<String, dynamic>.from(data);
   }
 }

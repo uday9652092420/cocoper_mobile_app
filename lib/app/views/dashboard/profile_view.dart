@@ -212,12 +212,6 @@ class ProfileView extends GetView<ProfileController> {
                   : controller.organizationId.value,
             ),
           ),
-          _divider(),
-          _detailRow(
-            Icons.fingerprint,
-            'User ID',
-            _value(controller.userId.value),
-          ),
         ],
       ),
     );

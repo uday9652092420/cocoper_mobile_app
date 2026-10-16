@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart' hide TextDirection;
 
 import '../../controllers/salesorders/sales_order_controller.dart';
 import '../../helpers/flutter_toast.dart';
@@ -50,7 +50,8 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
   void initState() {
     super.initState();
 
-    final order = Get.arguments as PurchaseOrder?;
+    final arguments = Get.arguments;
+    final order = arguments is PurchaseOrder ? arguments : null;
     _order = order;
     if (order != null) {
       _mode = order.mode.trim().isEmpty
@@ -631,7 +632,8 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
             decimal: true,
             signed: true,
           ),
-          textAlign: TextAlign.right,
+          textAlign: TextAlign.start,
+          textDirection: TextDirection.ltr,
           onChanged: (_) => setState(() {}),
           style: const TextStyle(fontSize: 13, color: _kInk),
           decoration: _compactInputDecoration(),
@@ -652,7 +654,8 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
             decimal: true,
             signed: true,
           ),
-          textAlign: TextAlign.right,
+          textAlign: TextAlign.start,
+          textDirection: TextDirection.ltr,
           onChanged: (_) {
             if (_syncingDiscount) return;
             setState(() {});
@@ -676,7 +679,8 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
             decimal: true,
             signed: true,
           ),
-          textAlign: TextAlign.right,
+          textAlign: TextAlign.start,
+          textDirection: TextDirection.ltr,
           onChanged: (_) => _onPiecesPercentageChanged(item),
           style: const TextStyle(fontSize: 13, color: _kInk),
           decoration: _compactInputDecoration(),
@@ -825,6 +829,8 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
       readOnly: readOnly,
       onTap: onTap,
       maxLines: maxLines,
+      textAlign: TextAlign.start,
+      textDirection: readOnly ? null : Directionality.of(context),
       style: const TextStyle(fontSize: 14, color: _kInk),
       decoration: InputDecoration(
         hintText: hint,
@@ -916,10 +922,9 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
     );
 
     if (success && mounted) {
-      // Return to the saved purchase orders list, clearing the edit +
-      // conversion screens from the stack (dashboard stays as the root).
+      // Return to the Sales Order list after the create request succeeds.
       Get.offNamedUntil<void>(
-        Routes.purchaseOrder,
+        Routes.savedSalesOrders,
         (route) => route.isFirst,
       );
     }

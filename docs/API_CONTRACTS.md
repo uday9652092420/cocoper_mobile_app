@@ -29,6 +29,31 @@ HTTP 401 on an authenticated request clears the session. HTTP 403 retains the ex
 | Cash & Bank Expenses | GET/POST /cash-bank-expenses; PUT /cash-bank-expenses/:id | POST /cash-bank-expenses/:id/approve | DELETE /cash-bank-expenses/:id |
 | Bag Purchase | GET/POST /bag-purchases; GET/PUT /bag-purchases/:id | Not verified | DELETE /bag-purchases/:id |
 
+There is no verified Purchase Order → Sales Order conversion endpoint in the
+supplied backend contract. `POST /sales-orders` is a generic Sales Order create
+route; accepting `sourcePoId` and `poNumber` does not establish safe conversion,
+link persistence, or duplicate protection. Do not use it as a conversion
+operation. Enabling conversion requires a documented authenticated operation
+and payload, permitted Purchase Order status and permissions, an authoritative
+response/detail representation containing the linked Sales Order ID and
+persisted converted state, database-backed atomic/idempotent duplicate
+protection, and confirmed stock, accounting, and audit effects.
+
+The supplied contract only verifies `GET /sales-orders` as a read-only lookup
+whose list records include line items. The mobile client contains a Sales Order
+creation request, but no verified Sales Order update, delete, detail, or
+approval route is documented. The Edit screen refreshes the list and resolves
+the selected order by ID; it displays Draft fields and locally edits supported
+basic fields and lines only for the verified `tonage` and `lessing` calculation
+modes. Pieces-percentage and unknown modes preserve their existing values and
+keep line editing disabled. Save Changes remains disabled because no update
+request schema is verified. Approved and unrecognized statuses are read-only.
+Approval and deletion remain unavailable; the list does not expose Delete until
+a verified delete endpoint and Draft-deletion rule are available.
+Do not infer an update/approval/delete route or reuse the create endpoint for
+any of these operations. The View screen also refreshes the list and resolves
+the selected order by ID because a detail endpoint is not documented.
+
 Bag Purchase contract verified from the supplied TypeScript source: the list
 accepts optional `organizationId` and `branchId` query parameters and can be
 searched locally by purchase number, supplier name/code/ID, and remarks.

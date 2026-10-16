@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart' hide TextDirection;
 
 import '../../controllers/directsales/direct_sales_controller.dart';
 import '../../controllers/salesorders/sales_order_controller.dart';
@@ -1030,7 +1030,8 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
         TextFormField(
           controller: controller,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          textAlign: TextAlign.right,
+          textAlign: readOnly ? TextAlign.right : TextAlign.start,
+          textDirection: readOnly ? null : TextDirection.ltr,
           readOnly: readOnly,
           onChanged: onChanged ?? (_) => setState(() {}),
           validator: validator ??

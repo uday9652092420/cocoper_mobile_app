@@ -22,7 +22,9 @@ import 'package:cocoper_mobile/app/views/purchaseinvoice/newpurchaseinvoice_view
 import 'package:cocoper_mobile/app/views/purchaseinvoice/purchaseinvoicedetail_view.dart';
 import 'package:cocoper_mobile/app/views/purchaseinvoice/savedpurchaseinvoices_view.dart';
 import 'package:cocoper_mobile/app/views/salesorders/newsaleorder_view.dart';
+import 'package:cocoper_mobile/app/views/salesorders/editsalesorder_view.dart';
 import 'package:cocoper_mobile/app/views/salesorders/savedsalesorders_view.dart';
+import 'package:cocoper_mobile/app/views/salesorders/viewsalesorder_view.dart';
 import 'package:get/get.dart';
 import 'package:cocoper_mobile/app/views/directsales/new_direct_sale_view.dart';
 
@@ -107,6 +109,28 @@ class AppPages {
     GetPage(
       name: Routes.savedSalesOrders,
       page: () => const SavedSalesOrdersView(),
+      binding: SalesOrderBinding(),
+    ),
+
+    GetPage(
+      name: Routes.editSalesOrder,
+      page: () {
+        final arguments = Get.arguments;
+        return EditSalesOrderView(
+          orderId: arguments is String ? arguments : '',
+        );
+      },
+      binding: SalesOrderBinding(),
+    ),
+
+    GetPage(
+      name: Routes.viewSalesOrder,
+      page: () {
+        final arguments = Get.arguments;
+        return ViewSalesOrderView(
+          orderId: arguments is String ? arguments : '',
+        );
+      },
       binding: SalesOrderBinding(),
     ),
 

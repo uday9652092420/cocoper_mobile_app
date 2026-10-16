@@ -35,8 +35,10 @@ class SalesOrder {
     final rawLines = json['lines'];
     final parsedLines = rawLines is List
         ? rawLines
-              .whereType<Map<String, dynamic>>()
-              .map(SalesOrderLine.fromJson)
+              .whereType<Map<dynamic, dynamic>>()
+              .map((line) => SalesOrderLine.fromJson(
+                    Map<String, dynamic>.from(line),
+                  ))
               .toList()
         : <SalesOrderLine>[];
 
@@ -49,7 +51,9 @@ class SalesOrder {
       id: _string(json['id'] ?? json['_id']),
       soNumber: _string(json['soNumber'] ?? json['so_number']),
       date: _string(json['date'] ?? json['invoiceDate']),
-      customerId: _string(json['customerId'] ?? json['customer_id']),
+      customerId: _string(
+        json['customerId'] ?? json['customer_id'] ?? customer['id'],
+      ),
       customerName: _string(
         json['customerName'] ??
             json['customer_name'] ??

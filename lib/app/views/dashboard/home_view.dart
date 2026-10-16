@@ -552,6 +552,7 @@ class HomeView extends GetView<DashboardController> {
           SizedBox(width: 8),
           Expanded(
             child: TextField(
+              textAlign: TextAlign.start,
               decoration: InputDecoration(
                 isDense: true,
                 border: InputBorder.none,
@@ -678,7 +679,7 @@ class HomeView extends GetView<DashboardController> {
         Icons.shopping_cart_outlined
       ),
       (
-        'Sales order',
+        'New Sales order',
         'Create and dispatch customer orders',
         Icons.local_shipping_outlined
       ),

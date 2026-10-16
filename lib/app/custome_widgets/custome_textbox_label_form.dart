@@ -90,7 +90,7 @@ class CustomeTextBoxLabelForm extends StatelessWidget {
           //         // LengthLimitingTextInputFormatter(10),
           //       ]
           //     : null,
-          textAlign: textAlign ?? TextAlign.left,
+          textAlign: textAlign ?? TextAlign.start,
           validator: enabled ? validator : null,
           controller: controller,
           readOnly: realOnly,
