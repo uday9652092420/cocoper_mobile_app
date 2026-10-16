@@ -1,6 +1,7 @@
 import 'package:cocoper_mobile/app/bindings/auth/login_binding.dart';
 import 'package:cocoper_mobile/app/bindings/bagpurchase/bag_purchase_binding.dart';
 import 'package:cocoper_mobile/app/bindings/dashboard/dashboard_bindings.dart';
+import 'package:cocoper_mobile/app/bindings/customerreceipt/customer_receipt_binding.dart';
 import 'package:cocoper_mobile/app/bindings/directsales/direct_sales_binding.dart';
 import 'package:cocoper_mobile/app/bindings/purchaseinvoice/purchase_invoice_binding.dart';
 import 'package:cocoper_mobile/app/bindings/purchaseorder/purchase_order_binding.dart';
@@ -11,6 +12,9 @@ import 'package:cocoper_mobile/app/views/bagpurchase/newbagpurchase_view.dart';
 import 'package:cocoper_mobile/app/views/bagpurchase/editbagpurchase_view.dart';
 import 'package:cocoper_mobile/app/views/bagpurchase/viewbagpurchase_view.dart';
 import 'package:cocoper_mobile/app/views/dashboard/dashboard_view.dart';
+import 'package:cocoper_mobile/app/views/customerreceipt/savedcustomerreceipt_view.dart';
+import 'package:cocoper_mobile/app/views/customerreceipt/newcustomerreceipt_view.dart';
+import 'package:cocoper_mobile/app/views/customerreceipt/editcustomerreceipt_view.dart';
 import 'package:cocoper_mobile/app/views/directsales/editsales_view.dart';
 import 'package:cocoper_mobile/app/views/directsales/savedsales_view.dart';
 import 'package:cocoper_mobile/app/views/directsales/viewsavedsale_view.dart';
@@ -138,6 +142,27 @@ class AppPages {
       name: Routes.purchaseInvoices,
       page: () => const SavedPurchaseInvoicesView(),
       binding: PurchaseInvoiceBinding(),
+    ),
+
+    GetPage(
+      name: Routes.savedCustomerReceipts,
+      page: () => const SavedCustomerReceiptsView(),
+      binding: CustomerReceiptBinding(),
+    ),
+    GetPage(
+      name: Routes.newCustomerReceipt,
+      page: () => const NewCustomerReceiptView(),
+      binding: CustomerReceiptBinding(),
+    ),
+    GetPage(
+      name: Routes.editCustomerReceipt,
+      page: () {
+        final arguments = Get.arguments;
+        return EditCustomerReceiptView(
+          receiptId: arguments is String ? arguments : '',
+        );
+      },
+      binding: CustomerReceiptBinding(),
     ),
 
     GetPage(

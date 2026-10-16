@@ -31,6 +31,10 @@ abstract class Routes {
 
   static const purchaseInvoices = '/purchase_invoices_view';
 
+  static const savedCustomerReceipts = '/saved_customer_receipts_view';
+  static const newCustomerReceipt = '/new_customer_receipt_view';
+  static const editCustomerReceipt = '/edit_customer_receipt_view';
+
   static const savedDirectSales = '/saved_direct_sales_view';
   static const newDirectSale = '/new_direct_sale_view';
   static const editDirectSale = '/edit_direct_sale_view';

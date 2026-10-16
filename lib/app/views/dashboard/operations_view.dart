@@ -66,6 +66,7 @@ class OperationsView extends GetView<DashboardController> {
       icon: Icons.payments_outlined,
       color: Color(0xFFB3261E),
       tint: Color(0xFFFBE9E7),
+      route: Routes.savedCustomerReceipts,
     ),
     _TransactionModule(
       title: 'Supplier Payments',
