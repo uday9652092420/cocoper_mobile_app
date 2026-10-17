@@ -35,6 +35,21 @@ abstract class Routes {
   static const newCustomerReceipt = '/new_customer_receipt_view';
   static const editCustomerReceipt = '/edit_customer_receipt_view';
 
+  static const savedSupplierPayments = '/saved_supplier_payments_view';
+  static const newSupplierPayment = '/new_supplier_payment_view';
+  static const editSupplierPayment = '/edit_supplier_payment_view';
+  static const viewSupplierPayment = '/view_supplier_payment_view';
+
+  static const savedLoadingDispatches = '/saved_loading_dispatches_view';
+  static const newLoadingDispatch = '/new_loading_dispatch_view';
+  static const editLoadingDispatch = '/edit_loading_dispatch_view';
+  static const viewLoadingDispatch = '/view_loading_dispatch_view';
+
+  static const savedCashBankExpenses = '/saved_cash_bank_expenses_view';
+  static const newCashBankExpense = '/new_cash_bank_expense_view';
+  static const editCashBankExpense = '/edit_cash_bank_expense_view';
+  static const viewCashBankExpense = '/view_cash_bank_expense_view';
+
   static const savedDirectSales = '/saved_direct_sales_view';
   static const newDirectSale = '/new_direct_sale_view';
   static const editDirectSale = '/edit_direct_sale_view';

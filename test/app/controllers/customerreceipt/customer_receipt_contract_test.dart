@@ -138,6 +138,90 @@ void main() {
       );
     });
 
+    test('loads the requested receipt detail and attachment metadata',
+        () async {
+      final controller = _ReceiptDetailController(
+        const {
+          'success': true,
+          'data': {
+            'id': 'receipt-21',
+            'receipt_no': 'RCP-21',
+            'receipt_date': '2026-10-16',
+            'customer_id': 'customer-4',
+            'invoice_mode': 'Invoice by Invoice',
+            'invoice_no': 'INV-021',
+            'payment_mode': 'UPI',
+            'amount': 125,
+            'approved': false,
+            'attachment_names': '["proof.png"]',
+            'attachment_files': '["data:image/png;base64,AQID"]',
+          },
+        },
+      );
+
+      final receipt = await controller.fetchReceipt('receipt-21');
+
+      expect(controller.requestedId, 'receipt-21');
+      expect(receipt?.invoiceNumber, 'INV-021');
+      expect(receipt?.hasAttachmentFields, isTrue);
+      expect(receipt?.attachmentNamesJson, '["proof.png"]');
+      expect(receipt?.attachmentFilesJson, '["data:image/png;base64,AQID"]');
+    });
+
+    test('uses the listed receipt when detail route returns 404', () async {
+      final listedReceipt = const CustomerReceipt(
+        id: 'receipt-22',
+        receiptNumber: 'RCP-22',
+        date: '2026-10-16',
+        customerId: 'customer-4',
+        invoiceMode: 'Cumulative',
+        paymentMode: 'Cash',
+        amount: 125,
+        status: 'Draft',
+      );
+      final controller = _ReceiptDetailController(
+        const {'message': 'Not found'},
+        statusCode: 404,
+        listedReceipts: [listedReceipt],
+      );
+
+      final receipt = await controller.fetchReceipt('receipt-22');
+
+      expect(controller.requestedId, 'receipt-22');
+      expect(controller.listRefreshes, 1);
+      expect(receipt, listedReceipt);
+      expect(receipt?.hasAttachmentFields, isFalse);
+      expect(controller.receiptLoadError.value, isEmpty);
+    });
+
+    test('reports genuine not found only after the refreshed list omits ID',
+        () async {
+      final controller = _ReceiptDetailController(
+        const {'message': 'Not found'},
+        statusCode: 404,
+      );
+
+      final receipt = await controller.fetchReceipt('missing-receipt');
+
+      expect(receipt, isNull);
+      expect(controller.receiptLoadError.value,
+          'This customer receipt was not found (404).');
+    });
+
+    test('does not classify server failures as not found', () async {
+      final controller = _ReceiptDetailController(
+        const {'message': 'Temporary server error'},
+        statusCode: 500,
+      );
+
+      final receipt = await controller.fetchReceipt('receipt-23');
+
+      expect(receipt, isNull);
+      expect(controller.listRefreshes, 0);
+      expect(controller.receiptLoadError.value,
+          'Temporary server error');
+    });
+
     test('rejects non-integer amounts for receipt creation', () {
       const receipt = CustomerReceipt(
         receiptNumber: 'RCP-02',
@@ -169,6 +253,14 @@ void main() {
       expect(invoice.displayNumber, 'DS-001');
       expect(invoice.total, 1000.5);
       expect(invoice.approved, isTrue);
+      expect(
+        CustomerReceiptInvoice.fromSaleJson({
+          'id': 'sale-2',
+          'directSaleNo': 'DS-002',
+          'approved': true,
+        }).number,
+        isEmpty,
+      );
     });
 
     test('allocates direct and cumulative payments using web invoice ordering',
@@ -326,7 +418,142 @@ void main() {
       expect(controller.updateId, isNull);
       expect(controller.createRequestCount, 0);
       expect(controller.refreshCount, 0);
-      expect(controller.lastError, contains('Select replacement attachment'));
+      expect(controller.lastError,
+          contains('Select files and confirm replacement'));
+    });
+
+    test('edit appends new attachments without dropping existing files',
+        () async {
+      final controller = _ReceiptWriteController(
+        latestReceipt: const CustomerReceipt(
+          id: 'receipt-12',
+          receiptNumber: 'RCP-12',
+          date: '2026-10-16',
+          customerId: 'customer-4',
+          invoiceMode: 'Cumulative',
+          paymentMode: 'Cash',
+          amount: 200,
+          status: 'Draft',
+          attachmentNamesJson: '["existing.png"]',
+          attachmentFilesJson: '["data:image/png;base64,OLD"]',
+          hasAttachmentFields: true,
+        ),
+      );
+      final attachment = CustomerReceiptAttachment(
+        name: 'new.pdf',
+        bytes: Uint8List.fromList([0x25, 0x50, 0x44, 0x46]),
+      );
+
+      final saved = await controller.saveReceipt(
+        const CustomerReceipt(
+          id: 'receipt-12',
+          receiptNumber: 'RCP-12',
+          date: '2026-10-16',
+          customerId: 'customer-4',
+          invoiceMode: 'Cumulative',
+          paymentMode: 'Cash',
+          amount: 250,
+          status: 'Draft',
+        ),
+        isEdit: true,
+        attachments: [attachment],
+      );
+
+      expect(saved, isTrue);
+      expect(
+        jsonDecode(controller.updateRequest!['attachment_names'] as String),
+        ['existing.png', 'new.pdf'],
+      );
+      expect(
+        jsonDecode(controller.updateRequest!['attachment_files'] as String),
+        ['data:image/png;base64,OLD', attachment.dataUrl],
+      );
+    });
+
+    test('explicit attachment replacement only sends selected files', () async {
+      final controller = _ReceiptWriteController(
+        latestReceipt: const CustomerReceipt(
+          id: 'receipt-13',
+          receiptNumber: 'RCP-13',
+          date: '2026-10-16',
+          customerId: 'customer-4',
+          invoiceMode: 'Cumulative',
+          paymentMode: 'Cash',
+          amount: 200,
+          status: 'Draft',
+          attachmentNamesJson: '["existing.png"]',
+          attachmentFilesJson: '["data:image/png;base64,OLD"]',
+          hasAttachmentFields: true,
+        ),
+      );
+      final attachment = CustomerReceiptAttachment(
+        name: 'replacement.jpg',
+        bytes: Uint8List.fromList([1, 2, 3]),
+      );
+
+      final saved = await controller.saveReceipt(
+        const CustomerReceipt(
+          id: 'receipt-13',
+          receiptNumber: 'RCP-13',
+          date: '2026-10-16',
+          customerId: 'customer-4',
+          invoiceMode: 'Cumulative',
+          paymentMode: 'Cash',
+          amount: 250,
+          status: 'Draft',
+        ),
+        isEdit: true,
+        attachments: [attachment],
+        replaceExistingAttachments: true,
+      );
+
+      expect(saved, isTrue);
+      expect(
+          controller.updateRequest?['attachment_names'], '["replacement.jpg"]');
+      expect(
+        controller.updateRequest?['attachment_files'],
+        '["${attachment.dataUrl}"]',
+      );
+    });
+
+    test('reports update failures without refreshing the receipt list',
+        () async {
+      final controller = _ReceiptWriteController(
+        latestReceipt: const CustomerReceipt(
+          id: 'receipt-14',
+          receiptNumber: 'RCP-14',
+          date: '2026-10-16',
+          customerId: 'customer-4',
+          invoiceMode: 'Cumulative',
+          paymentMode: 'Cash',
+          amount: 200,
+          status: 'Draft',
+          attachmentNamesJson: '[]',
+          attachmentFilesJson: '[]',
+          hasAttachmentFields: true,
+        ),
+      )..updateSucceeds = false;
+
+      final saved = await controller.saveReceipt(
+        const CustomerReceipt(
+          id: 'receipt-14',
+          receiptNumber: 'RCP-14',
+          date: '2026-10-16',
+          customerId: 'customer-4',
+          invoiceMode: 'Cumulative',
+          paymentMode: 'UPI',
+          amount: 250,
+          status: 'Draft',
+        ),
+        isEdit: true,
+      );
+
+      expect(saved, isFalse);
+      expect(controller.updateId, 'receipt-14');
+      expect(controller.createRequestCount, 0);
+      expect(controller.refreshCount, 0);
+      expect(controller.lastError, 'Update rejected.');
+      expect(controller.isSaving.value, isFalse);
     });
 
     test('create sends selected attachments and refreshes after success',
@@ -365,6 +592,38 @@ void main() {
   });
 }
 
+class _ReceiptDetailController extends CustomerReceiptController {
+  _ReceiptDetailController(
+    this.detailResponse, {
+    this.statusCode = 200,
+    this.listedReceipts = const [],
+  });
+
+  final Map<String, dynamic> detailResponse;
+  final int statusCode;
+  final List<CustomerReceipt> listedReceipts;
+  String? requestedId;
+  int listRefreshes = 0;
+
+  @override
+  Future<Response<dynamic>?> getCustomerReceiptRequest(String id) async {
+    requestedId = id;
+    return Response<dynamic>(
+      requestOptions: RequestOptions(path: 'customer-receipts/$id'),
+      statusCode: statusCode,
+      data: detailResponse,
+    );
+  }
+
+  @override
+  Future<void> loadCustomerReceipts() async {
+    listRefreshes++;
+    receipts.assignAll(listedReceipts);
+    hasListError.value = false;
+    listError.value = '';
+  }
+}
+
 class _ReceiptWriteController extends CustomerReceiptController {
   _ReceiptWriteController({required this.latestReceipt});
 
@@ -375,6 +634,7 @@ class _ReceiptWriteController extends CustomerReceiptController {
   int createRequestCount = 0;
   int refreshCount = 0;
   String? lastError;
+  bool updateSucceeds = true;
 
   @override
   Future<CustomerReceipt?> fetchReceipt(String id) async => latestReceipt;
@@ -398,7 +658,13 @@ class _ReceiptWriteController extends CustomerReceiptController {
   ) async {
     updateId = id;
     updateRequest = body;
-    return _successResponse();
+    return updateSucceeds
+        ? _successResponse()
+        : Response<dynamic>(
+            requestOptions: RequestOptions(path: 'customer-receipts/$id'),
+            statusCode: 400,
+            data: const {'success': false, 'message': 'Update rejected.'},
+          );
   }
 
   @override

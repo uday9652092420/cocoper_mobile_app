@@ -10,6 +10,8 @@ import '../../models/lookup_option.dart';
 import '../../services/api_service.dart';
 import '../../services/endpoints.dart';
 
+const _maxReceiptRequestBytes = 15 * 1024 * 1024;
+
 class CustomerReceiptController extends GetxController {
   final receipts = <CustomerReceipt>[].obs;
   final customers = <LookupOption>[].obs;
@@ -21,6 +23,7 @@ class CustomerReceiptController extends GetxController {
   final hasListError = false.obs;
   final listError = ''.obs;
   final lookupError = ''.obs;
+  final receiptLoadError = ''.obs;
   Future<void>? _listRequest;
   bool _hasLoadedReceipts = false;
 
@@ -181,11 +184,103 @@ class CustomerReceiptController extends GetxController {
   }
 
   Future<CustomerReceipt?> fetchReceipt(String id) async {
+    receiptLoadError.value = '';
+    if (id.trim().isEmpty) {
+      receiptLoadError.value = 'The receipt ID is missing.';
+      return null;
+    }
+    try {
+      final response = await getCustomerReceiptRequest(id);
+      if (response == null) {
+        receiptLoadError.value =
+            'Unable to connect while loading this receipt. Check your '
+            'connection and retry.';
+        return null;
+      }
+      if (response.statusCode == 404) {
+        return await _findListedReceiptAfterDetailNotFound(id);
+      }
+      if (response.statusCode == 401) {
+        receiptLoadError.value =
+            'Your session has expired. Sign in again and retry.';
+        return null;
+      }
+      if (response.statusCode == 403) {
+        receiptLoadError.value =
+            _message(response.data, 'You do not have access to this receipt.');
+        return null;
+      }
+      if (response.statusCode == null || response.statusCode! >= 500) {
+        receiptLoadError.value = _message(
+          response.data,
+          'The server could not load this receipt. Please retry.',
+        );
+        return null;
+      }
+      if (response.statusCode != 200) {
+        receiptLoadError.value = _message(
+          response.data,
+          'Unable to load customer receipt (HTTP ${response.statusCode}).',
+        );
+        return null;
+      }
+      if (response.data is Map && response.data['success'] == false) {
+        receiptLoadError.value = _message(
+          response.data,
+          'The server could not load this receipt.',
+        );
+        return null;
+      }
+
+      dynamic data = response.data;
+      while (data is Map && data['data'] is Map) {
+        data = data['data'];
+      }
+      if (data is! Map) {
+        receiptLoadError.value =
+            'The server returned an invalid receipt detail response.';
+        return null;
+      }
+
+      final receipt = CustomerReceipt.fromJson(
+        Map<String, dynamic>.from(data),
+        fallbackId: id,
+      );
+      if (receipt.id != id) {
+        receiptLoadError.value =
+            'The server returned details for a different receipt.';
+        return null;
+      }
+      if (receipt.receiptNumber.isEmpty ||
+          receipt.customerId.isEmpty ||
+          receipt.date.isEmpty) {
+        receiptLoadError.value =
+            'The server returned incomplete receipt details. Please retry.';
+        return null;
+      }
+      return receipt;
+    } catch (error) {
+      receiptLoadError.value =
+          'Unable to read customer receipt details. Please retry.';
+      return null;
+    }
+  }
+
+  Future<CustomerReceipt?> _findListedReceiptAfterDetailNotFound(
+    String id,
+  ) async {
     await loadCustomerReceipts();
-    if (hasListError.value) return null;
+    if (hasListError.value) {
+      receiptLoadError.value =
+          'The receipt detail request returned HTTP 404, but the receipt '
+          'listing could not verify whether this receipt exists: '
+          '${listError.value}';
+      return null;
+    }
     for (final receipt in receipts) {
       if (receipt.id == id) return receipt;
     }
+    receiptLoadError.value = 'This customer receipt was not found (404).';
     return null;
   }
 
@@ -197,6 +292,9 @@ class CustomerReceiptController extends GetxController {
     Map<String, dynamic> body,
   ) =>
       ApiService.post(EndPoints.customerReceipts, body);
+
+  Future<Response<dynamic>?> getCustomerReceiptRequest(String id) =>
+      ApiService.get(EndPoints.customerReceipt(id));
 
   Future<Response<dynamic>?> updateCustomerReceiptRequest(
     String id,
@@ -216,11 +314,12 @@ class CustomerReceiptController extends GetxController {
     CustomerReceipt receipt, {
     required bool isEdit,
     List<CustomerReceiptAttachment> attachments = const [],
+    bool replaceExistingAttachments = false,
   }) async {
     if (isSaving.value) return false;
     final validationError = validate(receipt);
     if (validationError != null) {
-    showReceiptSaveError(validationError);
+      showReceiptSaveError(validationError);
       return false;
     }
     isSaving.value = true;
@@ -236,8 +335,8 @@ class CustomerReceiptController extends GetxController {
         latest = await fetchReceipt(receipt.id);
         if (latest == null) {
           showReceiptSaveError(
-            hasListError.value
-                ? 'Unable to verify the latest receipt.'
+            receiptLoadError.value.isNotEmpty
+                ? receiptLoadError.value
                 : 'This receipt is no longer available.',
           );
           return false;
@@ -248,8 +347,17 @@ class CustomerReceiptController extends GetxController {
         }
         if (attachments.isEmpty && !latest.hasAttachmentFields) {
           showReceiptSaveError(
-            'The receipt API does not return existing attachments. Select '
-            'replacement attachment(s) before saving to avoid clearing files.',
+            'Existing attachment data is unavailable. Select files and '
+            'confirm replacement before saving.',
+          );
+          return false;
+        }
+        if (attachments.isNotEmpty &&
+            !latest.hasAttachmentFields &&
+            !replaceExistingAttachments) {
+          showReceiptSaveError(
+            'Existing attachments cannot be verified. Confirm replacement '
+            'before saving.',
           );
           return false;
         }
@@ -263,19 +371,46 @@ class CustomerReceiptController extends GetxController {
         return false;
       }
 
-      final namesJson = attachments.isEmpty
-          ? latest?.attachmentNamesJson
-          : jsonEncode(
-              attachments.map((attachment) => attachment.name).toList());
-      final filesJson = attachments.isEmpty
-          ? latest?.attachmentFilesJson
-          : jsonEncode(
-              attachments.map((attachment) => attachment.dataUrl).toList());
+      String? namesJson = latest?.attachmentNamesJson;
+      String? filesJson = latest?.attachmentFilesJson;
+      if (attachments.isNotEmpty) {
+        final names = attachments.map((attachment) => attachment.name).toList();
+        final files =
+            attachments.map((attachment) => attachment.dataUrl).toList();
+        if (isEdit && !replaceExistingAttachments) {
+          final existingNames = _decodeAttachmentArray(
+            latest!.attachmentNamesJson,
+            'attachment_names',
+          );
+          final existingFiles = _decodeAttachmentArray(
+            latest.attachmentFilesJson,
+            'attachment_files',
+          );
+          if (existingNames.length != existingFiles.length) {
+            showReceiptSaveError(
+              'Existing attachment data is incomplete. Confirm replacement '
+              'or contact support before saving.',
+            );
+            return false;
+          }
+          names.insertAll(0, existingNames);
+          files.insertAll(0, existingFiles);
+        }
+        namesJson = jsonEncode(names);
+        filesJson = jsonEncode(files);
+      }
       final body = receipt.toRequestJson(
         organizationId: organizationId,
         attachmentNamesJson: namesJson,
         attachmentFilesJson: filesJson,
       );
+      if (utf8.encode(jsonEncode(body)).length > _maxReceiptRequestBytes) {
+        showReceiptSaveError(
+          'Receipt attachments make the request exceed the server limit. '
+          'Remove some files or explicitly replace existing attachments.',
+        );
+        return false;
+      }
       final response = isEdit
           ? await updateCustomerReceiptRequest(receipt.id, body)
           : await createCustomerReceiptRequest(body);
@@ -299,6 +434,15 @@ class CustomerReceiptController extends GetxController {
     } finally {
       isSaving.value = false;
     }
+  }
+
+  List<String> _decodeAttachmentArray(String? value, String field) {
+    if (value == null || value.trim().isEmpty) return [];
+    final decoded = jsonDecode(value);
+    if (decoded is! List || decoded.any((item) => item is! String)) {
+      throw FormatException('Invalid existing $field attachment data.');
+    }
+    return decoded.cast<String>();
   }
 
   Future<bool> deleteReceipt(CustomerReceipt receipt) async {
@@ -564,11 +708,7 @@ class CustomerReceiptInvoice {
             .trim();
     return CustomerReceiptInvoice(
       id: id,
-      number: storedNumber.isNotEmpty
-          ? storedNumber
-          : displayNumber.isNotEmpty
-              ? displayNumber
-              : id,
+      number: storedNumber,
       displayNumber: displayNumber,
       customerId:
           (json['customer_id'] ?? json['customerId'] ?? customer['id'] ?? '')

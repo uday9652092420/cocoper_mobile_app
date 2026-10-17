@@ -52,6 +52,7 @@ class _CustomerReceiptFormViewState extends State<CustomerReceiptFormView> {
   bool _isGeneratingNumber = false;
   bool _hasUserEditedNumber = false;
   bool _isPickingAttachments = false;
+  bool _replaceExistingAttachments = false;
   final List<CustomerReceiptAttachment> _attachments = [];
   String? _attachmentError;
 
@@ -83,8 +84,8 @@ class _CustomerReceiptFormViewState extends State<CustomerReceiptFormView> {
       if (receipt == null) {
         setState(() {
           _loading = false;
-          _loadError = _controller.hasListError.value
-              ? 'Unable to load the latest receipt.'
+          _loadError = _controller.receiptLoadError.value.isNotEmpty
+              ? _controller.receiptLoadError.value
               : 'This receipt is no longer available.';
         });
         return;
@@ -134,6 +135,7 @@ class _CustomerReceiptFormViewState extends State<CustomerReceiptFormView> {
           ? receipt.amount.toInt().toString()
           : receipt.amount.toString();
       _remarks.text = receipt.remarks;
+      _invoiceNumber.text = receipt.invoiceNumber;
       _customerId = receipt.customerId;
       _invoiceMode = receipt.invoiceMode;
       _paymentMode = receipt.paymentMode;
@@ -309,7 +311,8 @@ class _CustomerReceiptFormViewState extends State<CustomerReceiptFormView> {
                           ],
                           const SizedBox(height: 14),
                         ],
-                        if (widget.isEdit) ...[
+                        if (widget.isEdit &&
+                            _receipt?.hasAttachmentFields != true) ...[
                           Container(
                             width: double.infinity,
                             margin: const EdgeInsets.only(bottom: 14),
@@ -322,11 +325,9 @@ class _CustomerReceiptFormViewState extends State<CustomerReceiptFormView> {
                               ),
                             ),
                             child: const Text(
-                              'The receipt list may omit existing attachment '
-                              'data. Select replacement attachment(s) before '
-                              'saving unless the existing files are shown '
-                              'below; this prevents an update from clearing '
-                              'unknown attachments.',
+                              'The receipt details do not include attachment '
+                              'data. To protect existing files, confirm '
+                              'replacement after selecting the files to save.',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Color(0xFF765B1B),
@@ -469,8 +470,7 @@ class _CustomerReceiptFormViewState extends State<CustomerReceiptFormView> {
           DropdownMenuItem(
             value: invoice.number,
             child: Text(
-              '${invoice.displayNumber.isEmpty ? invoice.number : invoice.displayNumber}'
-              ' · ${_formatAmount(invoice.total)}',
+              '${invoice.number} · ${_formatAmount(invoice.total)}',
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -532,6 +532,30 @@ class _CustomerReceiptFormViewState extends State<CustomerReceiptFormView> {
             ),
           ),
         ],
+        if (widget.isEdit &&
+            (existingNames?.isNotEmpty == true ||
+                _receipt?.hasAttachmentFields != true ||
+                ((_receipt?.attachmentNamesJson?.isNotEmpty ?? false) &&
+                    existingNames == null) ||
+                (_receipt?.attachmentFilesJson?.isNotEmpty ?? false) &&
+                    existingNames == null)) ...[
+          Material(
+            color: Colors.transparent,
+            child: CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              value: _replaceExistingAttachments,
+              onChanged: (value) => setState(
+                () => _replaceExistingAttachments = value ?? false,
+              ),
+              title: const Text(
+                'Replace existing attachments with selected files',
+                style: TextStyle(fontSize: 12, color: _kInk),
+              ),
+              controlAffinity: ListTileControlAffinity.leading,
+            ),
+          ),
+        ],
         OutlinedButton.icon(
           onPressed: _isPickingAttachments ? null : _pickAttachments,
           icon: _isPickingAttachments
@@ -559,9 +583,11 @@ class _CustomerReceiptFormViewState extends State<CustomerReceiptFormView> {
         ),
         if (widget.isEdit && _attachments.isNotEmpty) ...[
           const SizedBox(height: 4),
-          const Text(
-            'Selected files will replace the receipt’s existing attachments.',
-            style: TextStyle(fontSize: 11, color: _kMuted),
+          Text(
+            _replaceExistingAttachments
+                ? 'Selected files will replace the existing attachments.'
+                : 'Selected files will be added to the existing attachments.',
+            style: const TextStyle(fontSize: 11, color: _kMuted),
           ),
         ],
         if (_attachments.isNotEmpty) ...[
@@ -884,9 +910,7 @@ class _CustomerReceiptFormViewState extends State<CustomerReceiptFormView> {
             color: Colors.white,
             child: ElevatedButton(
               onPressed: _controller.isSaving.value ||
-                      (widget.isEdit &&
-                          _attachments.isEmpty &&
-                          _receipt?.hasAttachmentFields != true)
+                      (_replaceExistingAttachments && _attachments.isEmpty)
                   ? null
                   : _save,
               style: ElevatedButton.styleFrom(
@@ -934,6 +958,7 @@ class _CustomerReceiptFormViewState extends State<CustomerReceiptFormView> {
       receipt,
       isEdit: widget.isEdit,
       attachments: _attachments,
+      replaceExistingAttachments: _replaceExistingAttachments,
     );
     if (saved && mounted) Get.back<void>();
   }

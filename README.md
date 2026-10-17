@@ -38,12 +38,14 @@ flutter test --coverage
 flutter run
 ```
 
-Debug/profile defaults to UAT; release defaults to production. Application host constants exist only in `lib/core/config/app_config.dart`.
+The VS Code **Staging** launch uses Flutter profile mode with the staging environment defines. Profile mode removes debug-mode startup overhead while keeping the UAT API endpoint. To run or build the same optimized staging configuration from a terminal:
 
 ```sh
-flutter run --dart-define=API_BASE_URL=https://uat.cocoper.com/api
-flutter build apk --debug --dart-define=API_BASE_URL=https://uat.cocoper.com/api
+flutter run --profile --dart-define-from-file=env/staging.json
+flutter build apk --profile --dart-define-from-file=env/staging.json
 ```
+
+Use debug mode during development when hot reload and debugging are needed; it is slower to launch. Environment values are defined in `env/` and read by `lib/app/config/environment.dart`.
 
 An override must be HTTPS and end in `/api`, without a trailing slash, embedded credentials, query or fragment. There is no environment-settings screen, mock login, hardcoded password or bundled token. Use an authorized backend account provisioned for mobile access.
 

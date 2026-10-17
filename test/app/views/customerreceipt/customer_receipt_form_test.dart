@@ -138,6 +138,14 @@ void main() {
           customerName: 'Acme Foods',
           total: 1000,
         ),
+        CustomerReceiptInvoice(
+          id: 'sale-2',
+          number: 'INV-002',
+          displayNumber: 'DS-002',
+          customerId: 'customer-1',
+          customerName: 'Acme Foods',
+          total: 500,
+        ),
       ]
       ..receiptRows = const [
         CustomerReceipt(
@@ -162,7 +170,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byType(DropdownButtonFormField<String>).at(2));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('DS-001 · 1000').last);
+    await tester.tap(find.text('INV-001 · 1000').last);
     await tester.pumpAndSettle();
 
     expect(
@@ -224,12 +232,12 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byType(DropdownButtonFormField<String>).at(2));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('DS-001 · 1000').last);
+    await tester.tap(find.text('INV-001 · 1000').last);
     await tester.pumpAndSettle();
 
     await tester.tap(find.byType(DropdownButtonFormField<String>).at(2));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('DS-002 · 200').last);
+    await tester.tap(find.text('INV-002 · 200').last);
     await tester.pumpAndSettle();
     expect(
       tester
@@ -261,7 +269,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byType(DropdownButtonFormField<String>).at(2));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('DS-002 · 200').last);
+    await tester.tap(find.text('INV-002 · 200').last);
     await tester.pumpAndSettle();
     await tester.tap(find.byType(DropdownButtonFormField<String>).first);
     await tester.pumpAndSettle();
@@ -305,6 +313,28 @@ void main() {
     expect(fieldControllers, contains('Advance payment'));
   });
 
+  testWidgets('edit Retry repeats receipt detail loading', (tester) async {
+    final controller = _FakeCustomerReceiptController()..fetchResults = [null];
+
+    await tester.pumpWidget(
+      GetMaterialApp(
+        initialBinding: _TestReceiptBinding(controller),
+        home: const EditCustomerReceiptView(receiptId: 'receipt-7'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Unable to connect'), findsOneWidget);
+    expect(controller.fetchCalls, 1);
+
+    await tester.tap(find.text('Retry'));
+    await tester.pumpAndSettle();
+
+    expect(controller.fetchCalls, 2);
+    expect(find.text('Acme Foods'), findsOneWidget);
+    expect(find.text('Edit Customer Receipt'), findsOneWidget);
+  });
+
   testWidgets('edit preserves fields and permits update with replacement files',
       (tester) async {
     final controller = _FakeCustomerReceiptController();
@@ -325,8 +355,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.textContaining('Select replacement attachment(s)'),
-        findsOneWidget);
+    expect(find.textContaining('confirm replacement'), findsOneWidget);
     expect(
         find.textContaining('Editing is temporarily read-only'), findsNothing);
     expect(find.text('Save Changes'), findsOneWidget);
@@ -336,6 +365,9 @@ void main() {
     await tester.tap(find.text('Attach File / Upload Attachment'));
     await tester.pumpAndSettle();
     expect(find.text('replacement.png'), findsOneWidget);
+    await tester
+        .tap(find.text('Replace existing attachments with selected files'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Save Changes'));
     await tester.pumpAndSettle();
 
@@ -346,6 +378,7 @@ void main() {
     expect(controller.savedAttachments.single.name, 'replacement.png');
     expect(controller.savedAttachments.single.dataUrl,
         'data:image/png;base64,AQID');
+    expect(controller.replaceExistingAttachmentsSaved, isTrue);
     expect(
       tester
           .widgetList<TextFormField>(find.byType(TextFormField))
@@ -356,7 +389,98 @@ void main() {
     );
   });
 
-  testWidgets('existing receipt without attachment data cannot save silently',
+  testWidgets('edit restores the saved invoice number and allows update',
+      (tester) async {
+    final controller = _FakeCustomerReceiptController()
+      ..receipt = const CustomerReceipt(
+        id: 'receipt-7',
+        receiptNumber: 'CR-103',
+        date: '2025-01-15',
+        customerId: 'customer-1',
+        invoiceMode: 'Invoice by Invoice',
+        invoiceNumber: 'INV-001',
+        paymentMode: 'UPI',
+        amount: 250,
+        remarks: 'Existing note',
+        status: 'Draft',
+        attachmentNamesJson: '[]',
+        attachmentFilesJson: '[]',
+        hasAttachmentFields: true,
+      )
+      ..invoiceRows = const [
+        CustomerReceiptInvoice(
+          id: 'sale-1',
+          number: 'INV-001',
+          displayNumber: 'DS-001',
+          customerId: 'customer-1',
+          customerName: 'Acme Foods',
+          total: 1000,
+        ),
+        CustomerReceiptInvoice(
+          id: 'sale-2',
+          number: 'INV-002',
+          displayNumber: 'DS-002',
+          customerId: 'customer-1',
+          customerName: 'Acme Foods',
+          total: 500,
+        ),
+      ]
+      ..receiptRows = const [
+        CustomerReceipt(
+          id: 'receipt-7',
+          customerId: 'customer-1',
+          invoiceMode: 'Invoice by Invoice',
+          invoiceNumber: 'INV-001',
+          amount: 250,
+        ),
+      ];
+
+    await tester.pumpWidget(
+      GetMaterialApp(
+        initialBinding: _TestReceiptBinding(controller),
+        home: const EditCustomerReceiptView(receiptId: 'receipt-7'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('INV-001 · 1000'), findsOneWidget);
+    expect(find.text('Select invoice'), findsNothing);
+    final fields = find.byType(TextFormField);
+    expect(tester.widget<TextFormField>(fields.at(2)).controller?.text, '250');
+    expect(
+      tester
+          .widget<ElevatedButton>(
+            find.widgetWithText(ElevatedButton, 'Save Changes'),
+          )
+          .onPressed,
+      isNotNull,
+    );
+
+    await tester.tap(find.byType(DropdownButtonFormField<String>).at(2));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('INV-002 · 500').last);
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextFormField>(fields.at(2)).controller?.text, '500');
+
+    await tester.tap(find.byType(DropdownButtonFormField<String>).at(3));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cash').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(fields.at(2), '375');
+    await tester.enterText(fields.last, 'Updated note');
+    await tester.tap(find.text('Save Changes'));
+    await tester.pumpAndSettle();
+
+    expect(controller.saveCalls, 1);
+    expect(controller.lastIsEdit, isTrue);
+    expect(controller.savedReceipt?.id, 'receipt-7');
+    expect(controller.savedReceipt?.invoiceNumber, 'INV-002');
+    expect(controller.savedReceipt?.paymentMode, 'Cash');
+    expect(controller.savedReceipt?.amount, 375);
+    expect(controller.savedReceipt?.remarks, 'Updated note');
+  });
+
+  testWidgets('edit save stays enabled without requiring new attachments',
       (tester) async {
     final controller = _FakeCustomerReceiptController();
     await tester.pumpWidget(
@@ -373,9 +497,16 @@ void main() {
             find.widgetWithText(ElevatedButton, 'Save Changes'),
           )
           .onPressed,
-      isNull,
+      isNotNull,
     );
     expect(controller.saveCalls, 0);
+
+    await tester.tap(find.text('Save Changes'));
+    await tester.pumpAndSettle();
+
+    expect(controller.saveCalls, 1);
+    expect(controller.lastIsEdit, isTrue);
+    expect(controller.savedAttachments, isEmpty);
   });
 
   testWidgets('supports multiple PDF, JPG, and PNG files and removal',
@@ -505,13 +636,8 @@ class _FakeCustomerReceiptController extends CustomerReceiptController {
   CustomerReceipt? savedReceipt;
   List<CustomerReceiptAttachment> savedAttachments = [];
   bool? lastIsEdit;
-  List<String?> numberResults = ['CR-104'];
-  int numberCall = 0;
-  Completer<String?>? numberCompleter;
-  List<CustomerReceiptInvoice> invoiceRows = [];
-  List<CustomerReceipt> receiptRows = [];
-
-  final _receipt = const CustomerReceipt(
+  bool? replaceExistingAttachmentsSaved;
+  CustomerReceipt receipt = const CustomerReceipt(
     id: 'receipt-7',
     receiptNumber: 'CR-103',
     date: '2025-01-15',
@@ -522,6 +648,13 @@ class _FakeCustomerReceiptController extends CustomerReceiptController {
     remarks: 'Advance payment',
     status: 'Draft',
   );
+  List<String?> numberResults = ['CR-104'];
+  int numberCall = 0;
+  Completer<String?>? numberCompleter;
+  List<CustomerReceiptInvoice> invoiceRows = [];
+  List<CustomerReceipt> receiptRows = [];
+  List<CustomerReceipt?>? fetchResults;
+  int fetchCalls = 0;
 
   @override
   Future<void> loadFormLookups() async {
@@ -545,7 +678,13 @@ class _FakeCustomerReceiptController extends CustomerReceiptController {
   @override
   Future<CustomerReceipt?> fetchReceipt(String id) async {
     fetchedId = id;
-    return id == _receipt.id ? _receipt : null;
+    fetchCalls++;
+    if (fetchResults != null && fetchCalls <= fetchResults!.length) {
+      final result = fetchResults![fetchCalls - 1];
+      receiptLoadError.value = result == null ? 'Unable to connect.' : '';
+      return result;
+    }
+    return id == receipt.id ? receipt : null;
   }
 
   @override
@@ -553,11 +692,13 @@ class _FakeCustomerReceiptController extends CustomerReceiptController {
     CustomerReceipt receipt, {
     required bool isEdit,
     List<CustomerReceiptAttachment> attachments = const [],
+    bool replaceExistingAttachments = false,
   }) async {
     saveCalls++;
     savedReceipt = receipt;
     savedAttachments = attachments;
     lastIsEdit = isEdit;
+    replaceExistingAttachmentsSaved = replaceExistingAttachments;
     return false;
   }
 }

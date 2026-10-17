@@ -59,6 +59,7 @@ class OperationsView extends GetView<DashboardController> {
       icon: Icons.move_to_inbox_outlined,
       color: Color(0xFF7C5CD6),
       tint: Color(0xFFEDE8FB),
+      route: Routes.savedLoadingDispatches,
     ),
     _TransactionModule(
       title: 'Customer Receipts',
@@ -74,6 +75,7 @@ class OperationsView extends GetView<DashboardController> {
       icon: Icons.account_balance_wallet_outlined,
       color: Color(0xFF00696D),
       tint: Color(0xFFE0F2F2),
+      route: Routes.savedSupplierPayments,
     ),
     _TransactionModule(
       title: 'Labour Attendance',
@@ -88,6 +90,7 @@ class OperationsView extends GetView<DashboardController> {
       icon: Icons.savings_outlined,
       color: Color(0xFFD95C21),
       tint: Color(0xFFFBEBDD),
+      route: Routes.savedCashBankExpenses,
     ),
   ];
 

@@ -161,15 +161,40 @@ class EndPoints {
   static const String purchaseInvoices = 'purchase-invoices';
 
   // ============================================================
+  // LOADING & DISPATCH
+  // ============================================================
+
+  static const String loadingDispatches = 'loading-dispatch';
+  static String loadingDispatch(String id) => '$loadingDispatches/$id';
+
+  // ============================================================
   // CUSTOMER RECEIPTS
   // ============================================================
 
   static const String customerReceipts = 'customer-receipts';
-  static const String nextCustomerReceiptNumber =
-      '$customerReceipts/next-no';
+  static const String nextCustomerReceiptNumber = '$customerReceipts/next-no';
   static String customerReceipt(String id) => '$customerReceipts/$id';
   static String customerReceiptApproval(String id) =>
       '${customerReceipt(id)}/approve';
+
+  // ============================================================
+  // SUPPLIER PAYMENTS
+  // ============================================================
+
+  static const String supplierPayments = 'supplier-payments';
+  static const String nextSupplierPaymentNumber = '$supplierPayments/next-no';
+  static String supplierPayment(String id) => '$supplierPayments/$id';
+  static String supplierPaymentApproval(String id) =>
+      '${supplierPayment(id)}/approve';
+
+  // ============================================================
+  // CASH & BANK EXPENSES
+  // ============================================================
+
+  static const String cashBankExpenses = 'cash-bank-expenses';
+  static String cashBankExpense(String id) => '$cashBankExpenses/$id';
+  static String cashBankExpenseApproval(String id) =>
+      '${cashBankExpense(id)}/approve';
 
   // ============================================================
   // BAG PURCHASE

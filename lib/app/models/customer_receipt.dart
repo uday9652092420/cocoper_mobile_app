@@ -33,9 +33,12 @@ class CustomerReceipt {
     this.hasAttachmentFields = false,
   });
 
-  factory CustomerReceipt.fromJson(Map<String, dynamic> json) {
+  factory CustomerReceipt.fromJson(
+    Map<String, dynamic> json, {
+    String? fallbackId,
+  }) {
     return CustomerReceipt(
-      id: _string(json['id'] ?? json['_id']),
+      id: _string(json['id'] ?? json['_id'] ?? fallbackId),
       receiptNumber: _string(json['receipt_no']),
       date: _string(json['receipt_date']),
       customerId: _string(json['customer_id']),

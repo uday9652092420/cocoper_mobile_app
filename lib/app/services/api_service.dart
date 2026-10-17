@@ -144,7 +144,6 @@ Method: ${options.method}
 ========== API RESPONSE =========
 URL: ${response.requestOptions.uri}
 Status: ${response.statusCode}
-Data: ${response.data}
 ==================================
 ''',
             );
@@ -166,7 +165,6 @@ URL: ${error.requestOptions.uri}
 Method: ${error.requestOptions.method}
 Status: ${error.response?.statusCode}
 Message: ${error.message}
-Response: ${error.response?.data}
 =================================
 ''',
             );
@@ -248,9 +246,6 @@ Response: ${error.response?.data}
         'Status: ${e.response?.statusCode}',
       );
       debugPrint(
-        'Response: ${e.response?.data}',
-      );
-      debugPrint(
         'Message: ${e.message}',
       );
       debugPrint(
@@ -313,9 +308,6 @@ Response: ${error.response?.data}
       );
       debugPrint(
         'Status: ${e.response?.statusCode}',
-      );
-      debugPrint(
-        'Response: ${e.response?.data}',
       );
       debugPrint(
         'Message: ${e.message}',
@@ -382,9 +374,6 @@ Response: ${error.response?.data}
         'Status: ${e.response?.statusCode}',
       );
       debugPrint(
-        'Response: ${e.response?.data}',
-      );
-      debugPrint(
         'Message: ${e.message}',
       );
       debugPrint(
@@ -445,9 +434,6 @@ Response: ${error.response?.data}
       );
       debugPrint(
         'Status: ${e.response?.statusCode}',
-      );
-      debugPrint(
-        'Response: ${e.response?.data}',
       );
       debugPrint(
         'Message: ${e.message}',

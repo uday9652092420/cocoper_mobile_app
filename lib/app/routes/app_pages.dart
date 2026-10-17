@@ -1,11 +1,14 @@
 import 'package:cocoper_mobile/app/bindings/auth/login_binding.dart';
 import 'package:cocoper_mobile/app/bindings/bagpurchase/bag_purchase_binding.dart';
+import 'package:cocoper_mobile/app/bindings/cash&bankexpenses/cash_bank_expenses_binding.dart';
 import 'package:cocoper_mobile/app/bindings/dashboard/dashboard_bindings.dart';
+import 'package:cocoper_mobile/app/bindings/loading&dispatch/loading_dispatch_binding.dart';
 import 'package:cocoper_mobile/app/bindings/customerreceipt/customer_receipt_binding.dart';
 import 'package:cocoper_mobile/app/bindings/directsales/direct_sales_binding.dart';
 import 'package:cocoper_mobile/app/bindings/purchaseinvoice/purchase_invoice_binding.dart';
 import 'package:cocoper_mobile/app/bindings/purchaseorder/purchase_order_binding.dart';
 import 'package:cocoper_mobile/app/bindings/salesorders/sales_order_binding.dart';
+import 'package:cocoper_mobile/app/bindings/supplierpayments/supplier_payment_binding.dart';
 import 'package:cocoper_mobile/app/views/auth/login_page_view.dart';
 import 'package:cocoper_mobile/app/views/bagpurchase/savedbagpurchases_view.dart';
 import 'package:cocoper_mobile/app/views/bagpurchase/newbagpurchase_view.dart';
@@ -15,6 +18,14 @@ import 'package:cocoper_mobile/app/views/dashboard/dashboard_view.dart';
 import 'package:cocoper_mobile/app/views/customerreceipt/savedcustomerreceipt_view.dart';
 import 'package:cocoper_mobile/app/views/customerreceipt/newcustomerreceipt_view.dart';
 import 'package:cocoper_mobile/app/views/customerreceipt/editcustomerreceipt_view.dart';
+import 'package:cocoper_mobile/app/views/loading&dispatch/editloading&dispatch_view.dart';
+import 'package:cocoper_mobile/app/views/loading&dispatch/newloading&dispatch_view.dart';
+import 'package:cocoper_mobile/app/views/loading&dispatch/savedloading&dispatches_view.dart';
+import 'package:cocoper_mobile/app/views/loading&dispatch/viewloading&dispacth_view.dart';
+import 'package:cocoper_mobile/app/views/cash&bankexpenses/editcash&bankexpenses_view.dart';
+import 'package:cocoper_mobile/app/views/cash&bankexpenses/newbank&cashexpenses_view.dart';
+import 'package:cocoper_mobile/app/views/cash&bankexpenses/savedcash&bankexpenses_view.dart';
+import 'package:cocoper_mobile/app/views/cash&bankexpenses/viewcash&bankexpenses_view.dart';
 import 'package:cocoper_mobile/app/views/directsales/editsales_view.dart';
 import 'package:cocoper_mobile/app/views/directsales/savedsales_view.dart';
 import 'package:cocoper_mobile/app/views/directsales/viewsavedsale_view.dart';
@@ -29,6 +40,10 @@ import 'package:cocoper_mobile/app/views/salesorders/newsaleorder_view.dart';
 import 'package:cocoper_mobile/app/views/salesorders/editsalesorder_view.dart';
 import 'package:cocoper_mobile/app/views/salesorders/savedsalesorders_view.dart';
 import 'package:cocoper_mobile/app/views/salesorders/viewsalesorder_view.dart';
+import 'package:cocoper_mobile/app/views/supplierpayments/editsupplierpayments_view.dart';
+import 'package:cocoper_mobile/app/views/supplierpayments/newsupplierpayments_view.dart';
+import 'package:cocoper_mobile/app/views/supplierpayments/savedsupplierpayments_view.dart';
+import 'package:cocoper_mobile/app/views/supplierpayments/viewsupplierpayment_view.dart';
 import 'package:get/get.dart';
 import 'package:cocoper_mobile/app/views/directsales/new_direct_sale_view.dart';
 
@@ -163,6 +178,99 @@ class AppPages {
         );
       },
       binding: CustomerReceiptBinding(),
+    ),
+
+    GetPage(
+      name: Routes.savedSupplierPayments,
+      page: () => const SavedSupplierPaymentsView(),
+      binding: SupplierPaymentBinding(),
+    ),
+    GetPage(
+      name: Routes.newSupplierPayment,
+      page: () => const NewSupplierPaymentView(),
+      binding: SupplierPaymentBinding(),
+    ),
+    GetPage(
+      name: Routes.editSupplierPayment,
+      page: () {
+        final argument = Get.arguments;
+        return EditSupplierPaymentView(
+          paymentId: argument is String ? argument : '',
+        );
+      },
+      binding: SupplierPaymentBinding(),
+    ),
+    GetPage(
+      name: Routes.viewSupplierPayment,
+      page: () {
+        final argument = Get.arguments;
+        return ViewSupplierPaymentView(
+          paymentId: argument is String ? argument : '',
+        );
+      },
+      binding: SupplierPaymentBinding(),
+    ),
+
+    GetPage(
+      name: Routes.savedLoadingDispatches,
+      page: () => const SavedLoadingDispatchesView(),
+      binding: LoadingDispatchBinding(),
+    ),
+    GetPage(
+      name: Routes.newLoadingDispatch,
+      page: () => const NewLoadingDispatchView(),
+      binding: LoadingDispatchBinding(),
+    ),
+    GetPage(
+      name: Routes.editLoadingDispatch,
+      page: () {
+        final argument = Get.arguments;
+        return EditLoadingDispatchView(
+          dispatchId: argument is String ? argument : '',
+        );
+      },
+      binding: LoadingDispatchBinding(),
+    ),
+    GetPage(
+      name: Routes.viewLoadingDispatch,
+      page: () {
+        final argument = Get.arguments;
+        return ViewLoadingDispatchView(
+          dispatchId: argument is String ? argument : '',
+        );
+      },
+      binding: LoadingDispatchBinding(),
+    ),
+
+    GetPage(
+      name: Routes.savedCashBankExpenses,
+      page: () => const SavedCashBankExpensesView(),
+      binding: CashBankExpensesBinding(),
+    ),
+    GetPage(
+      name: Routes.newCashBankExpense,
+      page: () => const NewCashBankExpenseView(),
+      binding: CashBankExpensesBinding(),
+    ),
+    GetPage(
+      name: Routes.editCashBankExpense,
+      page: () {
+        final argument = Get.arguments;
+        return EditCashBankExpenseView(
+          expenseId: argument is String ? argument : '',
+        );
+      },
+      binding: CashBankExpensesBinding(),
+    ),
+    GetPage(
+      name: Routes.viewCashBankExpense,
+      page: () {
+        final argument = Get.arguments;
+        return ViewCashBankExpenseView(
+          expenseId: argument is String ? argument : '',
+        );
+      },
+      binding: CashBankExpensesBinding(),
     ),
 
     GetPage(
