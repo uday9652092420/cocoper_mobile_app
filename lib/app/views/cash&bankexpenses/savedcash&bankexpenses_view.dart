@@ -21,8 +21,7 @@ class SavedCashBankExpensesView extends StatefulWidget {
       _SavedCashBankExpensesViewState();
 }
 
-class _SavedCashBankExpensesViewState
-    extends State<SavedCashBankExpensesView> {
+class _SavedCashBankExpensesViewState extends State<SavedCashBankExpensesView> {
   final CashBankExpensesController _controller =
       Get.find<CashBankExpensesController>();
   final _search = TextEditingController();
@@ -117,7 +116,7 @@ class _SavedCashBankExpensesViewState
         width: double.infinity,
         child: ElevatedButton.icon(
           onPressed: () async {
-            await Get.toNamed<bool>(Routes.newCashBankExpense);
+            await Get.toNamed<dynamic>(Routes.newCashBankExpense);
             await _controller.refreshExpenses();
           },
           style: ElevatedButton.styleFrom(
@@ -178,8 +177,7 @@ class _SavedCashBankExpensesViewState
       );
 
   Widget _expenseList() => Obx(() {
-        if (_controller.isLoadingList.value &&
-            _controller.expenses.isEmpty) {
+        if (_controller.isLoadingList.value && _controller.expenses.isEmpty) {
           return _stateCard(
             const Padding(
               padding: EdgeInsets.all(28),
@@ -323,7 +321,7 @@ class _SavedCashBankExpensesViewState
                     if (!expense.approved) ...[
                       TextButton.icon(
                         onPressed: () async {
-                          final result = await Get.toNamed<bool>(
+                          final result = await Get.toNamed<dynamic>(
                             Routes.editCashBankExpense,
                             arguments: expense.id,
                           );

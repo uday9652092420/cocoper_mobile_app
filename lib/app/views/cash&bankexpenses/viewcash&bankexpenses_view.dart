@@ -11,7 +11,6 @@ import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 
 import '../../controllers/cash&bankexpenses/cash_bank_expenses_controller.dart';
 import '../../models/cash_bank_expense_model.dart';
-import '../../routes/app_routes.dart';
 
 const _ink = Color(0xFF14342B);
 const _muted = Color(0xFF5C6B66);
@@ -98,25 +97,6 @@ class _ViewCashBankExpenseViewState extends State<ViewCashBankExpenseView> {
                 ),
               ),
             ),
-            Obx(() {
-              final expense = _controller.detail.value;
-              if (expense == null || expense.id.isEmpty || expense.approved) {
-                return const SizedBox.shrink();
-              }
-              return IconButton(
-                tooltip: 'Edit',
-                onPressed: () async {
-                  final result = await Get.toNamed<bool>(
-                    Routes.editCashBankExpense,
-                    arguments: expense.id,
-                  );
-                  if (result == true) {
-                    await _controller.loadExpenseById(expense.id);
-                  }
-                },
-                icon: const Icon(Icons.edit_outlined, color: _green),
-              );
-            }),
           ],
         ),
       );

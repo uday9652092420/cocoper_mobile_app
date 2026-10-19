@@ -17,6 +17,14 @@ class CashBankExpensesRepository {
     return CashBankExpensesService.decodeExpenseList(response!.data);
   }
 
+  Future<CashBankExpense?> fetchExpenseById(String id) async {
+    final records = await fetchExpenses();
+    for (final expense in records) {
+      if (expense.id == id) return expense;
+    }
+    return null;
+  }
+
   Future<List<CashBankBranch>> fetchBranches(String organizationId) async {
     final response = await _service.fetchBranches();
     CashBankExpensesService.requireSuccessful(

@@ -45,10 +45,9 @@ class _CashBankExpenseFormViewState extends State<CashBankExpenseFormView> {
   CashBankExpense? _existingExpense;
   bool _loading = true;
   String? _loadError;
-  bool _replaceAttachments = false;
   bool _pickingAttachments = false;
   String? _attachmentError;
-  final List<CashBankExpenseAttachment> _pickedAttachments = [];
+  final List<CashBankExpenseAttachment> _attachments = [];
 
   bool get _readOnly => _existingExpense?.approved ?? false;
 
@@ -102,6 +101,9 @@ class _CashBankExpenseFormViewState extends State<CashBankExpenseFormView> {
       _description.text = expense.description;
       _paymentMode = expense.paymentMode;
       _transactionType = expense.transactionType;
+      _attachments
+        ..clear()
+        ..addAll(expense.attachments);
       if (_controller.branches.every((branch) => branch.id != expense.branchId)) {
         _controller.branches.add(
           CashBankBranch(
@@ -195,6 +197,15 @@ class _CashBankExpenseFormViewState extends State<CashBankExpenseFormView> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            const Text(
+                              'Transaction Details',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: _ink,
+                              ),
+                            ),
+                            const SizedBox(height: 14),
                             if (_readOnly) ...[
                               _notice(
                                 'Approved expenses cannot be changed.',
@@ -277,10 +288,14 @@ class _CashBankExpenseFormViewState extends State<CashBankExpenseFormView> {
         initialValue: _paymentMode,
         isExpanded: true,
         decoration: _decoration('Payment Mode'),
-        items: const [
-          DropdownMenuItem(value: 'Cash', child: Text('Cash')),
-          DropdownMenuItem(value: 'Bank', child: Text('Bank')),
-          DropdownMenuItem(value: 'UPI', child: Text('UPI')),
+        items: [
+          const DropdownMenuItem(value: 'Cash', child: Text('Cash')),
+          const DropdownMenuItem(value: 'Bank', child: Text('Bank')),
+          if (_paymentMode == 'UPI')
+            const DropdownMenuItem(
+              value: 'UPI',
+              child: Text('UPI (existing)'),
+            ),
         ],
         onChanged: _readOnly
             ? null
@@ -329,10 +344,6 @@ class _CashBankExpenseFormViewState extends State<CashBankExpenseFormView> {
       );
 
   Widget _attachmentSection() {
-    final existing = _existingExpense?.attachments ?? const [];
-    final displayed = widget.isEdit && !_replaceAttachments
-        ? existing
-        : _pickedAttachments;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -343,27 +354,10 @@ class _CashBankExpenseFormViewState extends State<CashBankExpenseFormView> {
         if (widget.isEdit) ...[
           const SizedBox(height: 4),
           Text(
-            existing.isEmpty
-                ? 'No existing attachments.'
-                : 'Existing files are preserved unless you choose to replace them.',
+            _attachments.isEmpty
+                ? 'No attachments selected.'
+                : 'Add files or remove existing attachments before saving.',
             style: const TextStyle(fontSize: 12, color: _muted),
-          ),
-          CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            dense: true,
-            value: _replaceAttachments,
-            onChanged: _readOnly
-                ? null
-                : (value) => setState(() {
-                      _replaceAttachments = value ?? false;
-                      if (!_replaceAttachments) _pickedAttachments.clear();
-                      _attachmentError = null;
-                    }),
-            title: const Text(
-              'Replace existing attachments with selected files',
-              style: TextStyle(fontSize: 13, color: _ink),
-            ),
-            controlAffinity: ListTileControlAffinity.leading,
           ),
         ] else
           const Padding(
@@ -373,44 +367,37 @@ class _CashBankExpenseFormViewState extends State<CashBankExpenseFormView> {
               style: TextStyle(fontSize: 12, color: _muted),
             ),
           ),
-        if (!widget.isEdit || _replaceAttachments)
-          OutlinedButton.icon(
-            onPressed:
-                _readOnly || _pickingAttachments ? null : _pickAttachments,
-            icon: _pickingAttachments
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.attach_file),
-            label: Text(_pickingAttachments ? 'Reading files...' : 'Choose files'),
-          ),
-        if (widget.isEdit && _replaceAttachments && _pickedAttachments.isEmpty)
-          const Text(
-            'Select at least one replacement file to confirm replacement.',
-            style: TextStyle(fontSize: 12, color: _muted),
-          ),
-        for (var index = 0; index < displayed.length; index++)
+        OutlinedButton.icon(
+          onPressed: _readOnly || _pickingAttachments ? null : _pickAttachments,
+          icon: _pickingAttachments
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.attach_file),
+          label: Text(_pickingAttachments ? 'Reading files...' : 'Choose files'),
+        ),
+        for (var index = 0; index < _attachments.length; index++)
           ListTile(
             dense: true,
             contentPadding: EdgeInsets.zero,
             leading: Icon(
-              displayed[index].mimeType == 'application/pdf'
+              _attachments[index].mimeType == 'application/pdf'
                   ? Icons.picture_as_pdf_outlined
                   : Icons.image_outlined,
               color: _green,
             ),
             title: Text(
-              displayed[index].name,
+              _attachments[index].name,
               overflow: TextOverflow.ellipsis,
             ),
-            trailing: widget.isEdit && !_replaceAttachments || _readOnly
+            trailing: _readOnly
                 ? null
                 : IconButton(
-                    tooltip: 'Remove ${displayed[index].name}',
+                    tooltip: 'Remove ${_attachments[index].name}',
                     onPressed: () => setState(() {
-                      _pickedAttachments.removeAt(index);
+                      _attachments.removeAt(index);
                       _attachmentError = null;
                     }),
                     icon: const Icon(Icons.close),
@@ -442,7 +429,7 @@ class _CashBankExpenseFormViewState extends State<CashBankExpenseFormView> {
         withData: true,
       );
       if (!mounted || result == null) return;
-      if (_pickedAttachments.length + result.files.length > 5) {
+      if (_attachments.length + result.files.length > 5) {
         throw const FormatException('You can attach up to 5 files.');
       }
       final selected = <CashBankExpenseAttachment>[];
@@ -466,7 +453,7 @@ class _CashBankExpenseFormViewState extends State<CashBankExpenseFormView> {
           ),
         );
       }
-      if (mounted) setState(() => _pickedAttachments.addAll(selected));
+      if (mounted) setState(() => _attachments.addAll(selected));
     } catch (error) {
       if (mounted) setState(() => _attachmentError = error.toString());
     } finally {
@@ -478,11 +465,8 @@ class _CashBankExpenseFormViewState extends State<CashBankExpenseFormView> {
         top: false,
         child: Obx(
           () {
-            final waitingForReplacement =
-                widget.isEdit && _replaceAttachments && _pickedAttachments.isEmpty;
             final blocked = _controller.isSaving.value ||
                 _readOnly ||
-                waitingForReplacement ||
                 (widget.isEdit &&
                     (_existingExpense?.hasAttachmentField != true ||
                         _existingExpense?.hasValidAttachmentData != true));
@@ -506,7 +490,7 @@ class _CashBankExpenseFormViewState extends State<CashBankExpenseFormView> {
                           color: Colors.white,
                         ),
                       )
-                    : Text(widget.isEdit ? 'Save Changes' : 'Save Expense'),
+                    : Text(widget.isEdit ? 'Save Changes' : 'Save'),
               ),
             );
           },
@@ -515,15 +499,7 @@ class _CashBankExpenseFormViewState extends State<CashBankExpenseFormView> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
-    if (widget.isEdit && _replaceAttachments && _pickedAttachments.isEmpty) {
-      setState(() => _attachmentError =
-          'Select at least one file before replacing attachments.');
-      return;
-    }
     final date = DateFormat('dd/MM/yyyy').parseStrict(_date.text.trim());
-    final attachments = widget.isEdit && !_replaceAttachments
-        ? _existingExpense!.attachments
-        : _pickedAttachments.toList(growable: false);
     final expense = CashBankExpense(
       id: _existingExpense?.id ?? '',
       organizationId: _existingExpense?.organizationId ?? '',
@@ -534,7 +510,7 @@ class _CashBankExpenseFormViewState extends State<CashBankExpenseFormView> {
       transactionType: _transactionType,
       amount: double.parse(_amount.text.trim()),
       description: _description.text.trim(),
-      attachments: attachments,
+      attachments: _attachments.toList(growable: false),
       hasAttachmentField: !widget.isEdit ||
           (_existingExpense?.hasAttachmentField ?? false),
       hasValidAttachmentData: !widget.isEdit ||
@@ -613,7 +589,7 @@ class _CashBankExpenseFormViewState extends State<CashBankExpenseFormView> {
   }
 
   String _formatAmount(double value) =>
-      NumberFormat('#,##0.##').format(value);
+      NumberFormat('0.##').format(value);
 
   String? _mimeTypeForName(String name) {
     final extension = name.split('.').last.toLowerCase();

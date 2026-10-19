@@ -104,12 +104,14 @@ Cash & Bank Expenses are read from the organization-scoped
 route; View and Edit refresh that list and resolve the record by its database
 `id`. `GET /branches` returns a raw array and the selected `branchId` is part
 of each create/update payload. `PUT /cash-bank-expenses/:id` overwrites the
-stored attachments array; an edit that does not replace files must therefore
-send the unchanged attachment objects from the list response. If that array is
-missing or malformed, the client blocks update rather than risking file loss.
-Replacement is explicit and sends only the newly selected files. Draft records
-can be edited, approved, or deleted; approved records are read-only in the
-client.
+stored attachments array. Edit therefore submits the currently selected
+attachment objects, preserving files by default while allowing individual
+existing files to be removed, new files to be added, or all files to be
+removed. If the attachment array is missing or malformed, the client blocks
+update rather than risking file loss. Draft records can be edited, approved,
+or deleted; approved records are read-only in the client. No server pagination
+or detail endpoint is verified, so list reads remain complete and detail views
+resolve the selected database ID from that list.
 
 Mode values are deliberately spelled exactly as the server expects: tonage, lessing, tonagePercentage. Tonnage actual quantity = quantity × 1000 / (discount + 1000); lessing = quantity − discount. Pieces % creation/editing is blocked pending the missing calculation contract.
 

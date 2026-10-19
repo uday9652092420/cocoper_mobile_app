@@ -12,7 +12,8 @@ void main() {
     amount: 12.5,
   );
 
-  test('accepts valid create and edit values without requiring attachments', () {
+  test('accepts valid create and edit values without requiring attachments',
+      () {
     expect(
       CashBankExpensesController.validate(validExpense, isEdit: false),
       isNull,
@@ -75,6 +76,39 @@ void main() {
       'Enter an amount greater than zero.',
     );
   });
+
+  test('limits attachments and rejects unsupported attachment types', () {
+    final sixAttachments = List.generate(
+      6,
+      (index) => CashBankExpenseAttachment(
+        name: 'proof-$index.pdf',
+        mimeType: 'application/pdf',
+        data: 'data:application/pdf;base64,AQID',
+      ),
+    );
+    expect(
+      CashBankExpensesController.validate(
+        validExpense.copyWith(attachments: sixAttachments),
+        isEdit: false,
+      ),
+      'You can attach up to 5 files.',
+    );
+    expect(
+      CashBankExpensesController.validate(
+        validExpense.copyWith(
+          attachments: const [
+            CashBankExpenseAttachment(
+              name: 'proof.exe',
+              mimeType: 'application/octet-stream',
+              data: 'data:application/octet-stream;base64,AQID',
+            ),
+          ],
+        ),
+        isEdit: false,
+      ),
+      'The attachment data is invalid.',
+    );
+  });
 }
 
 extension on CashBankExpense {
@@ -82,6 +116,7 @@ extension on CashBankExpense {
     String? date,
     String? paymentMode,
     double? amount,
+    List<CashBankExpenseAttachment>? attachments,
   }) =>
       CashBankExpense(
         id: id,
@@ -93,7 +128,7 @@ extension on CashBankExpense {
         transactionType: transactionType,
         amount: amount ?? this.amount,
         description: description,
-        attachments: attachments,
+        attachments: attachments ?? this.attachments,
         hasAttachmentField: hasAttachmentField,
         hasValidAttachmentData: hasValidAttachmentData,
         approved: approved,

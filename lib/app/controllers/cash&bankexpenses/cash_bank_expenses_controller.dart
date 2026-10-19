@@ -124,20 +124,17 @@ class CashBankExpensesController extends GetxController {
     }
     isLoadingDetail.value = true;
     try {
-      final records = await _repository.fetchExpenses();
-      expenses.assignAll(records);
-      for (final expense in records) {
-        if (expense.id == id) {
-          if (!expense.hasAttachmentField || !expense.hasValidAttachmentData) {
-            detailError.value = 'The expense response omitted attachment data.';
-            return null;
-          }
-          detail.value = expense;
-          return expense;
-        }
+      final expense = await _repository.fetchExpenseById(id);
+      if (expense == null) {
+        detailError.value = 'Cash / bank expense not found.';
+        return null;
       }
-      detailError.value = 'Cash / bank expense not found.';
-      return null;
+      if (!expense.hasAttachmentField || !expense.hasValidAttachmentData) {
+        detailError.value = 'The expense response omitted attachment data.';
+        return null;
+      }
+      detail.value = expense;
+      return expense;
     } catch (error) {
       detailError.value = 'Unable to load cash / bank expense: $error';
       return null;
