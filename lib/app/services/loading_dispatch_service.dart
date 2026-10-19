@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 
+import '../helpers/form_validations_helper.dart';
+import '../models/bag_purchase.dart';
 import '../models/loading_dispatch.dart';
 import '../models/lookup_option.dart';
 import '../repositories/loading_dispatch_repository.dart';
@@ -30,7 +32,7 @@ class LoadingDispatchService {
       final dispatch = LoadingDispatch.fromJson(
         Map<String, dynamic>.from(row),
       );
-      if (dispatch.id.isEmpty || dispatch.dispatchNumber.isEmpty) {
+      if (dispatch.id.isEmpty) {
         throw const LoadingDispatchException(
           'The server returned an incomplete dispatch record.',
         );
@@ -75,11 +77,22 @@ class LoadingDispatchService {
     return _decodeOptions(response!.data, 'item');
   }
 
+  Future<List<BagPurchaseLookup>> fetchGunnyBags() async {
+    final response = await _repository.fetchGunnyBags();
+    _requireSuccess(response, 'Unable to load gunny bag options.');
+    final options = BagPurchaseLookup.decodeGunnyBagResponse(response!.data);
+    if (options == null) {
+      throw const LoadingDispatchException(
+        'The server returned an invalid gunny bag list.',
+      );
+    }
+    return options;
+  }
+
   Future<void> saveDispatch(LoadingDispatch dispatch) async {
     final error = validate(dispatch);
     if (error != null) throw LoadingDispatchException(error);
-    final response =
-        await _repository.saveDispatch(dispatch.toRequestJson());
+    final response = await _repository.saveDispatch(dispatch.toRequestJson());
     _requireSuccess(response, 'Unable to save dispatch.');
   }
 
@@ -94,14 +107,11 @@ class LoadingDispatchService {
   }
 
   static String? validate(LoadingDispatch dispatch) {
-    if (dispatch.dispatchNumber.trim().isEmpty) {
-      return 'Enter a dispatch number.';
-    }
     if (dispatch.customerId.trim().isEmpty) return 'Select a customer.';
     if (dispatch.lorryNumber.trim().isEmpty) return 'Enter a lorry number.';
     if (dispatch.driverName.trim().isEmpty) return 'Enter the driver name.';
     final mobile = dispatch.driverMobile.trim();
-    if (!RegExp(r'^\+?[0-9][0-9\s-]{5,17}$').hasMatch(mobile)) {
+    if (!ValidationUtils.isValidPhoneNumber(mobile)) {
       return 'Enter a valid driver mobile number.';
     }
     if (dispatch.lines.isEmpty) return 'Add at least one loading line.';
@@ -119,7 +129,7 @@ class LoadingDispatchService {
       }
       if (line.itemId.trim().isEmpty) return '${prefix}select an item.';
       if (line.bharthi.trim().isEmpty) {
-        return '${prefix}enter Gunny Bag (Bharathi).';
+        return '${prefix}select Gunny Bag (Bharthi).';
       }
       if (!line.quantity.isFinite || line.quantity <= 0) {
         return '${prefix}enter a quantity greater than zero.';
@@ -154,19 +164,48 @@ class LoadingDispatchService {
     String fallback,
   ) {
     final status = response?.statusCode;
-    if (response == null ||
-        status == null ||
-        status < 200 ||
-        status >= 300 ||
-        (response.data is Map && response.data['success'] == false)) {
-      final body = response?.data;
-      final message = body is Map
-          ? (body['message'] ?? body['error'])?.toString().trim()
-          : null;
+    if (response == null || status == null) {
+      throw LoadingDispatchException(
+        '$fallback No response was received; check the network connection '
+        'and retry.',
+      );
+    }
+    if (status == 401) {
+      throw LoadingDispatchException(
+        '$fallback Authentication failed (HTTP 401). Sign in again and retry.',
+      );
+    }
+    if (status == 403) {
+      throw LoadingDispatchException(
+        '$fallback Access denied (HTTP 403). Check your organization access.',
+      );
+    }
+    final body = response.data;
+    final message = body is Map
+        ? (body['message'] ?? body['error'])?.toString().trim()
+        : null;
+    final requestId =
+        body is Map ? body['requestId']?.toString().trim() : null;
+    final requestReference = requestId == null || requestId.isEmpty
+        ? ''
+        : ' Request ID: $requestId.';
+    if (status >= 500) {
       throw LoadingDispatchException(
         message != null && message.isNotEmpty
-            ? message
-            : '$fallback${status == null ? '' : ' (HTTP $status)'}',
+            ? '$fallback The server returned HTTP $status: $message'
+                '$requestReference'
+            : '$fallback The server returned HTTP $status.'
+                ' Please retry later.$requestReference',
+      );
+    }
+    if (status < 200 ||
+        status >= 300 ||
+        (response.data is Map && response.data['success'] == false)) {
+      throw LoadingDispatchException(
+        message != null && message.isNotEmpty
+            ? '$fallback $message (HTTP $status).$requestReference'
+            : '$fallback Request failed with HTTP $status.'
+                '$requestReference',
       );
     }
   }

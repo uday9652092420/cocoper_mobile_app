@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
-class Constants {
-  static Color primaryColor = const Color(0xFFA32C2C);
+import '../theme/app_theme.dart';
 
-  static Color bgBackDropColor = Colors.transparent;
+class Constants {
+  static const Color primaryColor = AppColors.primaryLight;
+
+  static const Color bgBackDropColor = Colors.transparent;
 
   // static const imageBaseUrl = "http://6758056cb3fc.sn.mynetname.net:195/HMSImages/";
   // static const imageBaseUrlHost = "http://6758056cb3fc.sn.mynetname.net:195/";

@@ -16,8 +16,15 @@ class LoadingDispatchRepository {
   Future<Response<dynamic>?> fetchItems() =>
       ApiService.get(EndPoints.items);
 
+  Future<Response<dynamic>?> fetchGunnyBags() =>
+      ApiService.get(EndPoints.gunnyBags);
+
   Future<Response<dynamic>?> saveDispatch(Map<String, dynamic> payload) =>
-      ApiService.post(EndPoints.loadingDispatches, payload);
+      ApiService.post(
+        EndPoints.loadingDispatches,
+        payload,
+        diagnosticLabel: 'LoadingDispatchApi',
+      );
 
   Future<Response<dynamic>?> deleteDispatch(String id) =>
       ApiService.delete(EndPoints.loadingDispatch(id));

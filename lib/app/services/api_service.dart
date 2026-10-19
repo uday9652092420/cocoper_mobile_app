@@ -1,4 +1,5 @@
 import 'dart:developer';
+import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -207,6 +208,7 @@ Message: ${error.message}
     dynamic body, {
     Map<String, String>? headers,
     bool requireAuthToken = true,
+    String? diagnosticLabel,
   }) async {
     if (!await isInternet()) {
       consolePrint(
@@ -226,6 +228,24 @@ Message: ${error.message}
         requireAuthToken: requireAuthToken,
       );
 
+      if (!isProduction && diagnosticLabel != null) {
+        final safeHeaders = Map<String, String>.from(mergedHeaders);
+        if (safeHeaders.containsKey('Authorization')) {
+          safeHeaders['Authorization'] = '<redacted>';
+        }
+        if (safeHeaders.containsKey('x-organization-id')) {
+          safeHeaders['x-organization-id'] = '<redacted>';
+        }
+        log(
+          'HTTP request\n'
+          'url: ${dio.options.baseUrl}$endpoint\n'
+          'method: POST\n'
+          'headers: ${jsonEncode(safeHeaders)}\n'
+          'payloadKeys: ${_safePayloadKeys(body)}',
+          name: diagnosticLabel,
+        );
+      }
+
       final response = await dio.post<dynamic>(
         endpoint,
         data: body,
@@ -234,8 +254,31 @@ Message: ${error.message}
         ),
       );
 
+      if (!isProduction && diagnosticLabel != null) {
+        log(
+          'HTTP response\n'
+          'url: ${response.requestOptions.uri}\n'
+          'method: ${response.requestOptions.method}\n'
+          'status: ${response.statusCode}\n'
+          'requestId: ${response.headers.value('x-request-id') ?? 'none'}\n'
+          'body: ${jsonEncode(_safeDiagnosticBody(response.data))}',
+          name: diagnosticLabel,
+        );
+      }
       return response;
     } on DioException catch (e) {
+      if (!isProduction && diagnosticLabel != null) {
+        log(
+          'HTTP error\n'
+          'url: ${e.requestOptions.uri}\n'
+          'method: ${e.requestOptions.method}\n'
+          'status: ${e.response?.statusCode}\n'
+          'requestId: ${e.response?.headers.value('x-request-id') ?? 'none'}\n'
+          'body: ${jsonEncode(_safeDiagnosticBody(e.response?.data))}\n'
+          'message: ${e.message}',
+          name: diagnosticLabel,
+        );
+      }
       debugPrint(
         '========== POST API ERROR ==========',
       );
@@ -254,12 +297,36 @@ Message: ${error.message}
 
       return e.response;
     } catch (e) {
-      debugPrint(
-        'POST API EXCEPTION: $e',
-      );
+      debugPrint('POST API EXCEPTION: ${e.runtimeType}');
 
       return null;
     }
+  }
+
+  static List<String> _safePayloadKeys(dynamic body) {
+    if (body is! Map) {
+      return const [];
+    }
+    return body.keys.map((key) => key.toString()).toList(growable: false);
+  }
+
+  static Map<String, dynamic> _safeDiagnosticBody(dynamic body) {
+    if (body is! Map) {
+      return const {};
+    }
+    const safeKeys = {
+      'success',
+      'message',
+      'error',
+      'requestId',
+      'id',
+      'dispatchNumber',
+    };
+    return <String, dynamic>{
+      for (final entry in body.entries)
+        if (safeKeys.contains(entry.key.toString()))
+          entry.key.toString(): entry.value,
+    };
   }
 
   // ============================================================

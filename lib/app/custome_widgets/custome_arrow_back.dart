@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/route_manager.dart';
 
-import '../theme/app_theme.dart';
-
 class CustomeArrowBack extends StatelessWidget {
   final VoidCallback? onPressed;
   final EdgeInsets? padding;
@@ -11,23 +9,10 @@ class CustomeArrowBack extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return IconButton(
-        onPressed: onPressed ?? () => Get.back<void>(),
-        icon: const Icon(
-          Icons.arrow_back,
-          color: AppColors.textLightGrayLight,
-          //size: 20,
-        )
-        // icon: (Platform.isAndroid)
-        //     ? const Icon(
-        //         Icons.arrow_back,
-        //         color: AppColors.textLightGrayLight,
-        //         size: 20,
-        //       )
-        //     : const Icon(
-        //         Icons.arrow_back_ios,
-        //         color: AppColors.textLightGrayLight,
-        //         size: 20,
-        //       )
-        );
+      onPressed: onPressed ?? () => Get.back<void>(),
+      padding: padding,
+      tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+      icon: const Icon(Icons.arrow_back),
+    );
   }
 }

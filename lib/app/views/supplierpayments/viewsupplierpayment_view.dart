@@ -10,11 +10,12 @@ import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import '../../controllers/supplierpayments/supplier_payment_controller.dart';
 import '../../models/supplier_payment.dart';
 import '../../routes/app_routes.dart';
+import '../../theme/app_theme.dart';
 
-const _ink = Color(0xFF14342B);
-const _muted = Color(0xFF5C6B66);
-const _line = Color(0xFFE4EBE4);
-const _green = Color(0xFF2D8135);
+const _ink = AppColors.textDefaultLight;
+const _muted = AppColors.textLightGrayLight;
+const _line = AppColors.borderLightGrayLight;
+const _green = AppColors.primaryLight;
 
 class ViewSupplierPaymentView extends StatefulWidget {
   const ViewSupplierPaymentView({
@@ -45,11 +46,7 @@ class _ViewSupplierPaymentViewState extends State<ViewSupplierPaymentView> {
         backgroundColor: Colors.transparent,
         body: Container(
           decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFFE9F3E6), Color(0xFFFDFEFC)],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
+            gradient: AppGradients.pageBackground,
           ),
           child: SafeArea(
             child: Column(

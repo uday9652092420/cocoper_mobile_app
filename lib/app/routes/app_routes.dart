@@ -60,4 +60,10 @@ abstract class Routes {
   static const editPurchaseInvoice = '/edit_purchase_invoice_view';
 
   static const purchaseInvoiceDetail = '/purchase_invoice_detail_view';
+
+  static const purchaseRegisterReport = '/purchase_register_report_view';
+  static const salesRegisterReport = '/sales_register_report_view';
+  static const supplierStatementReport = '/supplier_statement_report_view';
+  static const customerStatementReport = '/customer_statement_report_view';
+  static const pendingDispatchReport = '/pending_dispatch_report_view';
 }

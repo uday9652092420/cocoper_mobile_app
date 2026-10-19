@@ -4,11 +4,12 @@ import 'package:intl/intl.dart';
 
 import '../../controllers/salesorders/sales_order_controller.dart';
 import '../../models/sales_order.dart';
+import '../../theme/app_theme.dart';
 
-const _kInk = Color(0xFF14342B);
-const _kMuted = Color(0xFF5C6B66);
-const _kLine = Color(0xFFE4EBE4);
-const _kGreen = Color(0xFF2D8135);
+const _kInk = AppColors.textDefaultLight;
+const _kMuted = AppColors.textLightGrayLight;
+const _kLine = AppColors.borderLightGrayLight;
+const _kGreen = AppColors.primaryLight;
 
 class ViewSalesOrderView extends StatefulWidget {
   const ViewSalesOrderView({super.key, this.orderId = ''});
@@ -46,11 +47,7 @@ class _ViewSalesOrderViewState extends State<ViewSalesOrderView> {
       body: SizedBox.expand(
         child: Container(
           decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFFE9F3E6), Color(0xFFFDFEFC)],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
+            gradient: AppGradients.pageBackground,
           ),
           child: SafeArea(
             child: Column(

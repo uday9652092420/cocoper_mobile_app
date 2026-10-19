@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import '../config/constants.dart';
 import '../theme/app_theme.dart';
 
 class CustomConfirmationDialog extends StatelessWidget {
@@ -28,13 +27,15 @@ class CustomConfirmationDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15.0)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadii.lg),
+      ),
       backgroundColor: AppColors.bgLight,
       title: Text(
         header,
-        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+        style: Theme.of(context).textTheme.titleLarge,
       ),
-      content: Text(body, style: const TextStyle(fontSize: 16)),
+      content: Text(body, style: Theme.of(context).textTheme.bodyLarge),
       actions: <Widget>[
         Visibility(
           visible: isCancel ?? true,
@@ -42,10 +43,7 @@ class CustomConfirmationDialog extends StatelessWidget {
             onPressed: onNo ?? Get.back<void>,
             child: Text(
               noText,
-              style: TextStyle(
-                color: Constants.primaryColor,
-                fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(fontWeight: FontWeight.w600),
             ),
           ),
         ),
@@ -53,10 +51,7 @@ class CustomConfirmationDialog extends StatelessWidget {
           onPressed: onYes,
           child: Text(
             yesText,
-            style: TextStyle(
-              color: Constants.primaryColor,
-              fontWeight: FontWeight.w600,
-            ),
+            style: const TextStyle(fontWeight: FontWeight.w600),
           ),
         ),
       ],

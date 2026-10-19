@@ -99,6 +99,25 @@ The client conservatively disables edits/deletes on approved/completed entries. 
 - Labour: records contain labour_id, labour_name, type, attendance_date, shift, in_time, out_time, hours, morning_ot, evening_ot, ot_rate, loading_10_tons_amount, loading_20_tons_amount, payment_group_id. Do not submit computed ot_hours/total_ot_amount. Bulk and per-row updates may partially succeed; automatic retries are unsafe.
 - Expense/income: branchId, date, paymentMode (Cash/Bank/UPI), transactionType (Expenses/Income), amount, description and attachments. Each attachment is {name,mimeType,data}, with a data: URL. App limits: five files, 5 MiB per file, 14 MiB total encoded request (server JSON limit is 15 MiB). Receipt/payment attachments are a different, unverified text-column encoding and are not uploaded here.
 
+Loading & Dispatch reads the full nested-line collection from
+`GET /loading-dispatch`; there is no verified detail endpoint, so View and Edit
+refresh the list and resolve the selected database ID. Create and update both
+use `POST /loading-dispatch`; updates include the existing dispatch ID and
+loading-line IDs in the request body. The mobile form does not collect a
+dispatch number; it omits the number on create and preserves the number
+returned for an existing dispatch on update. The backend uses its generated
+dispatch ID as the dispatch number when create omits it. Delete uses
+`DELETE /loading-dispatch/:id`. Customer, branch, and item selectors reuse the
+existing `GET /customers`, `GET /branches`, and `GET /items` lookups. The
+`GET /gunny-bags` master lookup also populates the line's Bharthi selector,
+using the existing Gunny Bag master fields (`id`/`bag_type_id`, `bag_name`,
+and optional `bag_code`). The selected bag name is sent in the existing scalar
+`bharthi` line field. This is an in-app mapping; the standalone Loading &
+Dispatch API document was not present in the repository to verify any further
+payload semantics. The lookup is organization-scoped and does not depend on the
+selected branch. The separate status route is not used to infer or perform
+approval transitions.
+
 Cash & Bank Expenses are read from the organization-scoped
 `GET /cash-bank-expenses` envelope (`{success, data}`). There is no detail
 route; View and Edit refresh that list and resolve the record by its database

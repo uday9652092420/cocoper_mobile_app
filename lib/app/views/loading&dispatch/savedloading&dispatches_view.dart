@@ -6,13 +6,15 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../controllers/loading&dispatch/loading_dispatch_controller.dart';
+import '../../custome_widgets/app_status_badge.dart';
 import '../../models/loading_dispatch.dart';
 import '../../routes/app_routes.dart';
+import '../../theme/app_theme.dart';
 
-const _ink = Color(0xFF14342B);
-const _muted = Color(0xFF5C6B66);
-const _line = Color(0xFFE4EBE4);
-const _green = Color(0xFF2D8135);
+const _ink = AppColors.textDefaultLight;
+const _muted = AppColors.textLightGrayLight;
+const _line = AppColors.borderLightGrayLight;
+const _green = AppColors.primaryLight;
 
 class SavedLoadingDispatchesView extends StatefulWidget {
   const SavedLoadingDispatchesView({super.key});
@@ -54,11 +56,7 @@ class _SavedLoadingDispatchesViewState
         body: SizedBox.expand(
           child: Container(
             decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFFE9F3E6), Color(0xFFFDFEFC)],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
+              gradient: AppGradients.pageBackground,
             ),
             child: SafeArea(
               child: RefreshIndicator(
@@ -108,7 +106,7 @@ class _SavedLoadingDispatchesViewState
                 ),
                 SizedBox(height: 2),
                 Text(
-                  'Saved loading dispatches',
+                  'Manage loading and dispatches',
                   style: TextStyle(fontSize: 13, color: _muted),
                 ),
               ],
@@ -126,7 +124,8 @@ class _SavedLoadingDispatchesViewState
         width: double.infinity,
         child: ElevatedButton.icon(
           onPressed: () async {
-            final result = await Get.toNamed<bool>(Routes.newLoadingDispatch);
+            final result =
+                await Get.toNamed<dynamic>(Routes.newLoadingDispatch);
             if (result == true) await _controller.refreshDispatches();
           },
           style: ElevatedButton.styleFrom(
@@ -187,8 +186,7 @@ class _SavedLoadingDispatchesViewState
       );
 
   Widget _dispatchList() => Obx(() {
-        if (_controller.isLoadingList.value &&
-            _controller.dispatches.isEmpty) {
+        if (_controller.isLoadingList.value && _controller.dispatches.isEmpty) {
           return _stateCard(
             const Padding(
               padding: EdgeInsets.all(28),
@@ -329,7 +327,7 @@ class _SavedLoadingDispatchesViewState
       );
 
   Future<void> _openView(String id) async {
-    final result = await Get.toNamed<bool>(
+    final result = await Get.toNamed<dynamic>(
       Routes.viewLoadingDispatch,
       arguments: id,
     );
@@ -337,7 +335,7 @@ class _SavedLoadingDispatchesViewState
   }
 
   Future<void> _openEdit(String id) async {
-    final result = await Get.toNamed<bool>(
+    final result = await Get.toNamed<dynamic>(
       Routes.editLoadingDispatch,
       arguments: id,
     );
@@ -389,22 +387,7 @@ class _SavedLoadingDispatchesViewState
       );
 
   Widget _status(String status) {
-    final dispatched = status.toLowerCase() == 'dispatched';
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-      decoration: BoxDecoration(
-        color: dispatched ? const Color(0xFFE7F3E4) : const Color(0xFFFDF2E2),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        status.isEmpty ? 'Draft' : status,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          color: dispatched ? _green : const Color(0xFF8A5B00),
-        ),
-      ),
-    );
+    return AppStatusBadge(status: status, emptyLabel: 'Draft');
   }
 
   Widget _stateCard(Widget child) => Container(

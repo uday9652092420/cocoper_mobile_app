@@ -8,12 +8,12 @@ import 'package:intl/intl.dart';
 
 import '../../controllers/loading&dispatch/loading_dispatch_controller.dart';
 import '../../models/loading_dispatch.dart';
-import '../../routes/app_routes.dart';
+import '../../theme/app_theme.dart';
 
-const _ink = Color(0xFF14342B);
-const _muted = Color(0xFF5C6B66);
-const _line = Color(0xFFE4EBE4);
-const _green = Color(0xFF2D8135);
+const _ink = AppColors.textDefaultLight;
+const _muted = AppColors.textLightGrayLight;
+const _line = AppColors.borderLightGrayLight;
+const _green = AppColors.primaryLight;
 
 class ViewLoadingDispatchView extends StatefulWidget {
   const ViewLoadingDispatchView({
@@ -31,7 +31,6 @@ class ViewLoadingDispatchView extends StatefulWidget {
 class _ViewLoadingDispatchViewState extends State<ViewLoadingDispatchView> {
   final LoadingDispatchController _controller =
       Get.find<LoadingDispatchController>();
-  bool _wasEdited = false;
 
   @override
   void initState() {
@@ -45,11 +44,7 @@ class _ViewLoadingDispatchViewState extends State<ViewLoadingDispatchView> {
         backgroundColor: Colors.transparent,
         body: Container(
           decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFFE9F3E6), Color(0xFFFDFEFC)],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
+            gradient: AppGradients.pageBackground,
           ),
           child: SafeArea(
             child: Column(
@@ -84,7 +79,7 @@ class _ViewLoadingDispatchViewState extends State<ViewLoadingDispatchView> {
           children: [
             IconButton(
               tooltip: 'Back',
-              onPressed: () => Get.back<bool>(result: _wasEdited),
+              onPressed: () => Get.back<void>(),
               icon: const Icon(Icons.arrow_back_ios_new, color: _ink),
             ),
             const Expanded(
@@ -97,26 +92,6 @@ class _ViewLoadingDispatchViewState extends State<ViewLoadingDispatchView> {
                 ),
               ),
             ),
-            Obx(() {
-              final dispatch = _controller.detail.value;
-              if (dispatch == null || dispatch.id.isEmpty) {
-                return const SizedBox.shrink();
-              }
-              return IconButton(
-                tooltip: 'Edit',
-                onPressed: () async {
-                  final result = await Get.toNamed<bool>(
-                    Routes.editLoadingDispatch,
-                    arguments: dispatch.id,
-                  );
-                  if (result == true) {
-                    _wasEdited = true;
-                    await _controller.loadDispatchById(dispatch.id);
-                  }
-                },
-                icon: const Icon(Icons.edit_outlined, color: _green),
-              );
-            }),
           ],
         ),
       );
@@ -164,7 +139,8 @@ class _ViewLoadingDispatchViewState extends State<ViewLoadingDispatchView> {
                     _row('Driver Mobile', dispatch.driverMobile),
                     _row('Status', dispatch.dispatchStatus),
                     if (dispatch.dispatchDate.isNotEmpty)
-                      _row('Dispatch Date', _displayDate(dispatch.dispatchDate)),
+                      _row(
+                          'Dispatch Date', _displayDate(dispatch.dispatchDate)),
                     _row(
                       'Invoice Generated',
                       dispatch.invoiceGenerated ? 'Yes' : 'No',
@@ -189,7 +165,9 @@ class _ViewLoadingDispatchViewState extends State<ViewLoadingDispatchView> {
                         style: TextStyle(color: _muted),
                       )
                     else
-                      for (var index = 0; index < dispatch.lines.length; index++)
+                      for (var index = 0;
+                          index < dispatch.lines.length;
+                          index++)
                         _lineCard(index, dispatch.lines[index]),
                   ],
                 ),

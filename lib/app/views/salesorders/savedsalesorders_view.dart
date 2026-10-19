@@ -2,14 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../controllers/salesorders/sales_order_controller.dart';
+import '../../custome_widgets/app_status_badge.dart';
 import '../../models/sales_order.dart';
 import '../../routes/app_routes.dart';
+import '../../theme/app_theme.dart';
 
-const _kInk = Color(0xFF14342B);
-const _kMuted = Color(0xFF5C6B66);
-const _kLine = Color(0xFFE4EBE4);
-const _kGreen = Color(0xFF2D8135);
-const _kMint = Color(0xFFE7F3E4);
+const _kInk = AppColors.textDefaultLight;
+const _kMuted = AppColors.textLightGrayLight;
+const _kLine = AppColors.borderLightGrayLight;
+const _kGreen = AppColors.primaryLight;
+const _kMint = AppColors.surfaceTint;
 
 /// Saved / converted Sales Orders list screen, opened from the Operations
 /// dashboard when the "Sales Order" transaction is tapped.
@@ -36,11 +38,7 @@ class _SavedSalesOrdersViewState extends State<SavedSalesOrdersView> {
       body: SizedBox.expand(
         child: Container(
           decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFFE9F3E6), Color(0xFFFDFEFC)],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
+            gradient: AppGradients.pageBackground,
           ),
           child: SafeArea(
             child: SingleChildScrollView(
@@ -303,38 +301,7 @@ class _SavedSalesOrdersViewState extends State<SavedSalesOrdersView> {
   }
 
   Widget _buildStatusBadge(String status) {
-    Color color;
-    Color tint;
-
-    switch (SalesOrderController.normalizedStatus(status)) {
-      case 'approved':
-        color = const Color(0xFF2D8135);
-        tint = const Color(0xFFE7F3E4);
-        break;
-      case 'invoiced':
-        color = const Color(0xFF0C8CE9);
-        tint = const Color(0xFFE3F1FC);
-        break;
-      default:
-        color = const Color(0xFFE9A23B);
-        tint = const Color(0xFFFDF2E2);
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: tint,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        status.isEmpty ? 'Unknown' : status,
-        style: TextStyle(
-          fontSize: 11.5,
-          fontWeight: FontWeight.w700,
-          color: color,
-        ),
-      ),
-    );
+    return AppStatusBadge(status: status);
   }
 
   Widget _buildErrorState() {

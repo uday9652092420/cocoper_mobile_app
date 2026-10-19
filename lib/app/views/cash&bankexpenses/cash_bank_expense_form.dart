@@ -10,11 +10,12 @@ import 'package:intl/intl.dart';
 import '../../controllers/cash&bankexpenses/cash_bank_expenses_controller.dart';
 import '../../helpers/shared_preferences.dart';
 import '../../models/cash_bank_expense_model.dart';
+import '../../theme/app_theme.dart';
 
-const _ink = Color(0xFF14342B);
-const _muted = Color(0xFF5C6B66);
-const _line = Color(0xFFE4EBE4);
-const _green = Color(0xFF2D8135);
+const _ink = AppColors.textDefaultLight;
+const _muted = AppColors.textLightGrayLight;
+const _line = AppColors.borderLightGrayLight;
+const _green = AppColors.primaryLight;
 const _maxFileBytes = 5 * 1024 * 1024;
 
 class CashBankExpenseFormView extends StatefulWidget {
@@ -104,7 +105,8 @@ class _CashBankExpenseFormViewState extends State<CashBankExpenseFormView> {
       _attachments
         ..clear()
         ..addAll(expense.attachments);
-      if (_controller.branches.every((branch) => branch.id != expense.branchId)) {
+      if (_controller.branches
+          .every((branch) => branch.id != expense.branchId)) {
         _controller.branches.add(
           CashBankBranch(
             id: expense.branchId,
@@ -119,9 +121,10 @@ class _CashBankExpenseFormViewState extends State<CashBankExpenseFormView> {
         SharedPrefsHelper.selectedBranchId,
       );
       if (!mounted) return;
-      _branchId = _controller.branches.any((branch) => branch.id == selectedBranch)
-          ? selectedBranch
-          : _controller.branches.first.id;
+      _branchId =
+          _controller.branches.any((branch) => branch.id == selectedBranch)
+              ? selectedBranch
+              : _controller.branches.first.id;
     }
     if (mounted) setState(() => _loading = false);
   }
@@ -136,10 +139,12 @@ class _CashBankExpenseFormViewState extends State<CashBankExpenseFormView> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        backgroundColor: const Color(0xFFF4F6F4),
+        backgroundColor: AppColors.scaffoldBackground,
         appBar: AppBar(
           title: Text(
-            widget.isEdit ? 'Edit Cash & Bank Expense' : 'New Cash & Bank Expense',
+            widget.isEdit
+                ? 'Edit Cash & Bank Expense'
+                : 'New Cash & Bank Expense',
           ),
           foregroundColor: _ink,
           backgroundColor: Colors.white,
@@ -215,7 +220,8 @@ class _CashBankExpenseFormViewState extends State<CashBankExpenseFormView> {
                             ],
                             _twoFields(_branchField(), _dateField()),
                             const SizedBox(height: 14),
-                            _twoFields(_paymentModeField(), _transactionTypeField()),
+                            _twoFields(
+                                _paymentModeField(), _transactionTypeField()),
                             const SizedBox(height: 14),
                             _amountField(),
                             const SizedBox(height: 14),
@@ -248,9 +254,8 @@ class _CashBankExpenseFormViewState extends State<CashBankExpenseFormView> {
   Widget _branchField() {
     final branches = _controller.branches.toList(growable: false);
     return DropdownButtonFormField<String>(
-      initialValue: branches.any((branch) => branch.id == _branchId)
-          ? _branchId
-          : null,
+      initialValue:
+          branches.any((branch) => branch.id == _branchId) ? _branchId : null,
       isExpanded: true,
       decoration: _decoration('Branch'),
       hint: const Text('Select branch'),
@@ -349,7 +354,8 @@ class _CashBankExpenseFormViewState extends State<CashBankExpenseFormView> {
       children: [
         const Text(
           'Attachments',
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _ink),
+          style:
+              TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _ink),
         ),
         if (widget.isEdit) ...[
           const SizedBox(height: 4),
@@ -376,7 +382,8 @@ class _CashBankExpenseFormViewState extends State<CashBankExpenseFormView> {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : const Icon(Icons.attach_file),
-          label: Text(_pickingAttachments ? 'Reading files...' : 'Choose files'),
+          label:
+              Text(_pickingAttachments ? 'Reading files...' : 'Choose files'),
         ),
         for (var index = 0; index < _attachments.length; index++)
           ListTile(
@@ -511,10 +518,10 @@ class _CashBankExpenseFormViewState extends State<CashBankExpenseFormView> {
       amount: double.parse(_amount.text.trim()),
       description: _description.text.trim(),
       attachments: _attachments.toList(growable: false),
-      hasAttachmentField: !widget.isEdit ||
-          (_existingExpense?.hasAttachmentField ?? false),
-      hasValidAttachmentData: !widget.isEdit ||
-          (_existingExpense?.hasValidAttachmentData ?? false),
+      hasAttachmentField:
+          !widget.isEdit || (_existingExpense?.hasAttachmentField ?? false),
+      hasValidAttachmentData:
+          !widget.isEdit || (_existingExpense?.hasValidAttachmentData ?? false),
       approved: _existingExpense?.approved ?? false,
       createdAt: _existingExpense?.createdAt ?? '',
     );
@@ -571,7 +578,7 @@ class _CashBankExpenseFormViewState extends State<CashBankExpenseFormView> {
         width: double.infinity,
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: error ? const Color(0xFFFFF1F0) : const Color(0xFFE7F3E4),
+          color: error ? const Color(0xFFFFF1F0) : AppColors.surfaceTint,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: error ? const Color(0xFFF1C7C4) : const Color(0xFFC9E0C4),
@@ -588,8 +595,7 @@ class _CashBankExpenseFormViewState extends State<CashBankExpenseFormView> {
     return parsed == null ? value : DateFormat('dd/MM/yyyy').format(parsed);
   }
 
-  String _formatAmount(double value) =>
-      NumberFormat('0.##').format(value);
+  String _formatAmount(double value) => NumberFormat('0.##').format(value);
 
   String? _mimeTypeForName(String name) {
     final extension = name.split('.').last.toLowerCase();

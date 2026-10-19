@@ -1,4 +1,5 @@
 import 'package:cocoper_mobile/app/models/loading_dispatch.dart';
+import 'package:cocoper_mobile/app/models/lookup_option.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -36,7 +37,7 @@ void main() {
     expect(dispatch.lines.single.pendingQuantity, 10.5);
   });
 
-  test('serializes edits as a save payload containing the existing ID', () {
+  test('serializes edits with the existing ID but no dispatch number', () {
     const dispatch = LoadingDispatch(
       id: 'LD-42',
       dispatchNumber: 'DSP-2026-42',
@@ -61,14 +62,13 @@ void main() {
 
     final payload = dispatch.toRequestJson();
     expect(payload['id'], 'LD-42');
-    expect(payload['dispatchNumber'], 'DSP-2026-42');
+    expect(payload.containsKey('dispatchNumber'), isFalse);
     expect(payload['dispatchStatus'], 'Draft');
     expect((payload['lines'] as List).single['branchId'], 'branch-id');
   });
 
-  test('omits ID on new dispatch request for server-side ID creation', () {
+  test('omits generated ID and dispatch number from a new request', () {
     const dispatch = LoadingDispatch(
-      dispatchNumber: 'DSP-2026-43',
       customerId: 'customer-id',
       lorryNumber: 'TN-01-AB-1234',
       driverName: 'Driver One',
@@ -76,5 +76,16 @@ void main() {
     );
 
     expect(dispatch.toRequestJson().containsKey('id'), isFalse);
+    expect(dispatch.toRequestJson().containsKey('dispatchNumber'), isFalse);
+  });
+
+  test('maps customer lookup IDs and labels from API customer fields', () {
+    final option = LookupOption.fromDynamic({
+      'customer_id': 'customer-1',
+      'customer_name': 'Customer One',
+    });
+
+    expect(option.id, 'customer-1');
+    expect(option.label, 'Customer One');
   });
 }

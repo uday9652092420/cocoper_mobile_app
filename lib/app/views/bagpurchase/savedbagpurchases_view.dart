@@ -6,11 +6,12 @@ import '../../controllers/bagpurchase/bag_purchase_controller.dart';
 import '../../custome_widgets/custome_confirmation_dialog.dart';
 import '../../models/bag_purchase.dart';
 import '../../routes/app_routes.dart';
+import '../../theme/app_theme.dart';
 
-const _kInk = Color(0xFF14342B);
-const _kMuted = Color(0xFF5C6B66);
-const _kLine = Color(0xFFE4EBE4);
-const _kGreen = Color(0xFF2D8135);
+const _kInk = AppColors.textDefaultLight;
+const _kMuted = AppColors.textLightGrayLight;
+const _kLine = AppColors.borderLightGrayLight;
+const _kGreen = AppColors.primaryLight;
 
 class SavedBagPurchasesView extends StatefulWidget {
   const SavedBagPurchasesView({super.key});
@@ -42,11 +43,7 @@ class _SavedBagPurchasesViewState extends State<SavedBagPurchasesView> {
       body: SizedBox.expand(
         child: Container(
           decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFFE9F3E6), Color(0xFFFDFEFC)],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
+            gradient: AppGradients.pageBackground,
           ),
           child: SafeArea(
             child: SingleChildScrollView(
@@ -376,7 +373,8 @@ class _SavedBagPurchasesViewState extends State<SavedBagPurchasesView> {
             spacing: 14,
             runSpacing: 6,
             children: [
-              _meta(Icons.calendar_today_outlined, _formatDate(record.purchaseDate)),
+              _meta(Icons.calendar_today_outlined,
+                  _formatDate(record.purchaseDate)),
               _meta(Icons.list_alt_outlined, '${record.lineCount} lines'),
             ],
           ),
@@ -460,8 +458,7 @@ class _SavedBagPurchasesViewState extends State<SavedBagPurchasesView> {
     Get.dialog<void>(
       CustomConfirmationDialog(
         header: 'Delete Bag Purchase',
-        body:
-            'Delete ${record.purchaseNumber}? This permanently removes the '
+        body: 'Delete ${record.purchaseNumber}? This permanently removes the '
             'purchase and cannot be undone.',
         yesText: 'Delete',
         noText: 'Cancel',

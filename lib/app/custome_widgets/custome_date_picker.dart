@@ -76,7 +76,8 @@ class CustomDatePicker extends StatelessWidget {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: ColorScheme.light(
-              primary: customTheme.primaryColor, // Background color of the selected date
+              primary: customTheme
+                  .primaryColor, // Background color of the selected date
               onPrimary: Colors.white, // Text color of the selected date
               surface: Colors.white, // Background color of the dialog
               onSurface: Colors.black, // Text color of the dates
@@ -102,6 +103,7 @@ class CustomDatePicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final customTheme = CustomTheme.of(context);
     return CustomeTextBoxLabel(
       controller: controller,
       validator: validator,
@@ -113,10 +115,10 @@ class CustomDatePicker extends StatelessWidget {
       onTap: () {
         selectDate(context, controller);
       },
-      suffixIcon: const Icon(
+      suffixIcon: Icon(
         Icons.date_range,
         size: 20,
-        color: Color.fromARGB(255, 145, 146, 158),
+        color: customTheme.textLightGray,
       ),
     );
   }

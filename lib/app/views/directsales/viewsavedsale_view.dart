@@ -2,14 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 
+import '../../custome_widgets/app_status_badge.dart';
 import '../../models/direct_sale.dart';
 import '../../controllers/salesorders/sales_order_controller.dart';
+import '../../theme/app_theme.dart';
 
-const _kInk = Color(0xFF14342B);
-const _kMuted = Color(0xFF5C6B66);
-const _kLine = Color(0xFFE4EBE4);
-const _kGreen = Color(0xFF2D8135);
-const _kMint = Color(0xFFE7F3E4);
+const _kInk = AppColors.textDefaultLight;
+const _kMuted = AppColors.textLightGrayLight;
+const _kLine = AppColors.borderLightGrayLight;
+const _kGreen = AppColors.primaryLight;
+const _kMint = AppColors.surfaceTint;
 
 class ViewSavedSaleView extends StatelessWidget {
   const ViewSavedSaleView({super.key});
@@ -24,11 +26,7 @@ class ViewSavedSaleView extends StatelessWidget {
       body: SizedBox.expand(
         child: Container(
           decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFFE9F3E6), Color(0xFFFDFEFC)],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
+            gradient: AppGradients.pageBackground,
           ),
           child: SafeArea(
             child: Column(
@@ -414,37 +412,13 @@ class ViewSavedSaleView extends StatelessWidget {
 
   Widget _statusBadge(DirectSale sale) {
     final approved = sale.approved;
-    final color = approved == true
-        ? _kGreen
-        : approved == false
-            ? const Color(0xFFE9A23B)
-            : _kMuted;
-    final tint = approved == true
-        ? _kMint
-        : approved == false
-            ? const Color(0xFFFDF2E2)
-            : const Color(0xFFF0F2F0);
     final label = approved == null
         ? _value(sale.status)
         : approved
             ? 'Approved'
             : 'Pending';
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: tint,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 11.5,
-          fontWeight: FontWeight.w700,
-          color: color,
-        ),
-      ),
-    );
+    return AppStatusBadge(status: label);
   }
 
   String _modeLabel(String mode) {

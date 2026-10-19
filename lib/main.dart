@@ -82,21 +82,12 @@ class MyApp extends StatelessWidget {
         page: () => const _RouteNotFoundView(),
       ),
 
-      // ----------------------------------------------------------
-      // PREVENT SYSTEM FONT SCALING FROM CHANGING UI
-      // ----------------------------------------------------------
-
       builder: (context, child) {
         if (child == null) {
           return const SizedBox.shrink();
         }
 
-        return MediaQuery(
-          data: MediaQuery.of(context).copyWith(
-            textScaler: const TextScaler.linear(1.0),
-          ),
-          child: child,
-        );
+        return child;
       },
     );
   }

@@ -1,6 +1,7 @@
 import 'package:get/get.dart';
 
 import '../../helpers/flutter_toast.dart';
+import '../../models/bag_purchase.dart';
 import '../../models/loading_dispatch.dart';
 import '../../models/lookup_option.dart';
 import '../../services/loading_dispatch_service.dart';
@@ -15,6 +16,7 @@ class LoadingDispatchController extends GetxController {
   final customers = <LookupOption>[].obs;
   final branches = <LookupOption>[].obs;
   final items = <LookupOption>[].obs;
+  final gunnyBags = <BagPurchaseLookup>[].obs;
   final searchQuery = ''.obs;
   final detail = Rxn<LoadingDispatch>();
   final isLoadingList = false.obs;
@@ -44,6 +46,12 @@ class LoadingDispatchController extends GetxController {
   String customerName(String id) => _lookupName(customers, id);
   String branchName(String id) => _lookupName(branches, id);
   String itemName(String id) => _lookupName(items, id);
+  String gunnyBagLabelForBharthi(String value) {
+    for (final option in gunnyBags) {
+      if (option.name == value) return option.label;
+    }
+    return value;
+  }
 
   Future<void> loadDispatches({bool force = false}) async {
     final running = _listRequest;
@@ -90,18 +98,19 @@ class LoadingDispatchController extends GetxController {
     isLoadingLookups.value = true;
     lookupError.value = '';
     try {
-      final lookups = await Future.wait<List<LookupOption>>([
-        _service.fetchCustomers(),
-        _service.fetchBranches(),
-        _service.fetchItems(),
+      await Future.wait<void>([
+        _service.fetchCustomers().then(customers.assignAll),
+        _service.fetchBranches().then(branches.assignAll),
+        _service.fetchItems().then(items.assignAll),
+        _service.fetchGunnyBags().then(gunnyBags.assignAll),
       ]);
-      customers.assignAll(lookups[0]);
-      branches.assignAll(lookups[1]);
-      items.assignAll(lookups[2]);
       final missing = <String>[
         if (customers.isEmpty) 'customers',
         if (branches.isEmpty) 'branches',
         if (items.isEmpty) 'items',
+        if (gunnyBags.isEmpty)
+          'the Gunny Bag master has no configured records for this '
+              'organization',
       ];
       if (missing.isNotEmpty) {
         throw LoadingDispatchException(

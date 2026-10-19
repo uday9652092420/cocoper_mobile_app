@@ -2,15 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../controllers/purchaseorder/purchase_order_controller.dart';
+import '../../custome_widgets/app_status_badge.dart';
 import '../../custome_widgets/custome_confirmation_dialog.dart';
 import '../../models/purchase_order.dart';
 import '../../routes/app_routes.dart';
+import '../../theme/app_theme.dart';
 
-const _kInk = Color(0xFF14342B);
-const _kMuted = Color(0xFF5C6B66);
-const _kLine = Color(0xFFE4EBE4);
-const _kGreen = Color(0xFF2D8135);
-const _kMint = Color(0xFFE7F3E4);
+const _kInk = AppColors.textDefaultLight;
+const _kMuted = AppColors.textLightGrayLight;
+const _kLine = AppColors.borderLightGrayLight;
+const _kGreen = AppColors.primaryLight;
+const _kMint = AppColors.surfaceTint;
 
 class PurchaseOrderView extends StatefulWidget {
   const PurchaseOrderView({super.key});
@@ -36,11 +38,7 @@ class _PurchaseOrderViewState extends State<PurchaseOrderView> {
       body: SizedBox.expand(
         child: Container(
           decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFFE9F3E6), Color(0xFFFDFEFC)],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
+            gradient: AppGradients.pageBackground,
           ),
           child: SafeArea(
             child: SingleChildScrollView(
@@ -321,38 +319,7 @@ class _PurchaseOrderViewState extends State<PurchaseOrderView> {
   }
 
   Widget _buildStatusBadge(String status) {
-    Color color;
-    Color tint;
-
-    switch (status.toLowerCase()) {
-      case 'approved':
-        color = const Color(0xFF2D8135);
-        tint = const Color(0xFFE7F3E4);
-        break;
-      case 'invoiced':
-        color = const Color(0xFF0C8CE9);
-        tint = const Color(0xFFE3F1FC);
-        break;
-      default:
-        color = const Color(0xFFE9A23B);
-        tint = const Color(0xFFFDF2E2);
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: tint,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        status.isEmpty ? 'Draft' : status,
-        style: TextStyle(
-          fontSize: 11.5,
-          fontWeight: FontWeight.w700,
-          color: color,
-        ),
-      ),
-    );
+    return AppStatusBadge(status: status, emptyLabel: 'Draft');
   }
 
   Widget _buildErrorState(String message) {

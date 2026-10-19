@@ -6,13 +6,15 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 
 import '../../controllers/loading&dispatch/loading_dispatch_controller.dart';
+import '../../helpers/form_validations_helper.dart';
 import '../../models/loading_dispatch.dart';
 import '../../models/lookup_option.dart';
+import '../../theme/app_theme.dart';
 
-const _ink = Color(0xFF14342B);
-const _muted = Color(0xFF5C6B66);
-const _line = Color(0xFFE4EBE4);
-const _green = Color(0xFF2D8135);
+const _ink = AppColors.textDefaultLight;
+const _muted = AppColors.textLightGrayLight;
+const _line = AppColors.borderLightGrayLight;
+const _green = AppColors.primaryLight;
 
 class LoadingDispatchFormView extends StatefulWidget {
   const LoadingDispatchFormView({
@@ -33,7 +35,6 @@ class _LoadingDispatchFormViewState extends State<LoadingDispatchFormView> {
   final LoadingDispatchController _controller =
       Get.find<LoadingDispatchController>();
   final _formKey = GlobalKey<FormState>();
-  final _dispatchNumber = TextEditingController();
   final _lorryNumber = TextEditingController();
   final _driverName = TextEditingController();
   final _driverMobile = TextEditingController();
@@ -51,7 +52,6 @@ class _LoadingDispatchFormViewState extends State<LoadingDispatchFormView> {
 
   @override
   void dispose() {
-    _dispatchNumber.dispose();
     _lorryNumber.dispose();
     _driverName.dispose();
     _driverMobile.dispose();
@@ -91,7 +91,6 @@ class _LoadingDispatchFormViewState extends State<LoadingDispatchFormView> {
         return;
       }
       _existingDispatch = dispatch;
-      _dispatchNumber.text = dispatch.dispatchNumber;
       _customerId = dispatch.customerId;
       _lorryNumber.text = dispatch.lorryNumber;
       _driverName.text = dispatch.driverName;
@@ -115,7 +114,7 @@ class _LoadingDispatchFormViewState extends State<LoadingDispatchFormView> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        backgroundColor: const Color(0xFFF4F6F4),
+        backgroundColor: AppColors.scaffoldBackground,
         appBar: AppBar(
           title: Text(
             widget.isEdit
@@ -180,8 +179,7 @@ class _LoadingDispatchFormViewState extends State<LoadingDispatchFormView> {
                           children: [
                             _sectionTitle('Dispatch Details'),
                             const SizedBox(height: 14),
-                            _twoFields(
-                                _dispatchNumberField(), _customerField()),
+                            _customerField(),
                             const SizedBox(height: 14),
                             _twoFields(_lorryField(), _driverNameField()),
                             const SizedBox(height: 14),
@@ -227,19 +225,6 @@ class _LoadingDispatchFormViewState extends State<LoadingDispatchFormView> {
         ),
       );
 
-  Widget _dispatchNumberField() => TextFormField(
-        controller: _dispatchNumber,
-        textCapitalization: TextCapitalization.characters,
-        decoration: _decoration('Dispatch Number').copyWith(
-          helperText: widget.isEdit
-              ? null
-              : 'Enter the number assigned for this dispatch.',
-        ),
-        validator: (value) => value == null || value.trim().isEmpty
-            ? 'Enter a dispatch number.'
-            : null,
-      );
-
   Widget _customerField() {
     final options = _withExistingOption(_controller.customers, _customerId);
     return DropdownButtonFormField<String>(
@@ -282,16 +267,14 @@ class _LoadingDispatchFormViewState extends State<LoadingDispatchFormView> {
         controller: _driverMobile,
         keyboardType: TextInputType.phone,
         inputFormatters: [
-          FilteringTextInputFormatter.allow(RegExp(r'[0-9+\s-]')),
+          FilteringTextInputFormatter.allow(RegExp(r'[0-9+]')),
         ],
         decoration: _decoration('Driver Mobile'),
-        validator: (value) {
-          if (!RegExp(r'^\+?[0-9][0-9\s-]{5,17}$')
-              .hasMatch(value?.trim() ?? '')) {
-            return 'Enter a valid driver mobile number.';
-          }
-          return null;
-        },
+        validator: (value) => ValidationUtils.isValidPhoneNumber(
+          value?.trim() ?? '',
+        )
+            ? null
+            : 'Enter a valid driver mobile number.',
       );
 
   Widget _lineCard(int index, _DispatchLineEditor line) => Container(
@@ -386,14 +369,38 @@ class _LoadingDispatchFormViewState extends State<LoadingDispatchFormView> {
                 : null,
       );
 
-  Widget _bharthiField(_DispatchLineEditor line) => TextFormField(
-        controller: line.bharthi,
-        textCapitalization: TextCapitalization.sentences,
-        decoration: _decoration('Gunny Bag (Bharathi)'),
-        validator: (value) => value == null || value.trim().isEmpty
-            ? 'Enter Gunny Bag (Bharathi).'
-            : null,
-      );
+  Widget _bharthiField(_DispatchLineEditor line) {
+    final values = _controller.gunnyBags
+        .map((option) => option.name)
+        .toSet()
+        .toList(growable: true);
+    if (line.bharthi.text.isNotEmpty && !values.contains(line.bharthi.text)) {
+      values.add(line.bharthi.text);
+    }
+    final selectedValue =
+        values.contains(line.bharthi.text) ? line.bharthi.text : null;
+    return DropdownButtonFormField<String>(
+      initialValue: selectedValue,
+      isExpanded: true,
+      decoration: _decoration('Gunny Bag (Bharthi)'),
+      hint: const Text('Select Gunny Bag (Bharthi)'),
+      items: [
+        for (final value in values)
+          DropdownMenuItem(
+            value: value,
+            child: Text(
+              _controller.gunnyBagLabelForBharthi(value),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+      ],
+      onChanged: (value) {
+        if (value != null) line.bharthi.text = value;
+      },
+      validator: (value) =>
+          value == null || value.isEmpty ? 'Select Gunny Bag (Bharthi).' : null,
+    );
+  }
 
   Widget _quantityField(_DispatchLineEditor line) => TextFormField(
         controller: line.quantity,
@@ -463,7 +470,7 @@ class _LoadingDispatchFormViewState extends State<LoadingDispatchFormView> {
     }
     final dispatch = LoadingDispatch(
       id: _existingDispatch?.id ?? '',
-      dispatchNumber: _dispatchNumber.text.trim(),
+      dispatchNumber: _existingDispatch?.dispatchNumber ?? '',
       customerId: _customerId ?? '',
       lorryNumber: _lorryNumber.text.trim(),
       driverName: _driverName.text.trim(),

@@ -10,13 +10,14 @@ import '../../models/lookup_option.dart';
 import '../../models/purchase_order.dart';
 import '../../models/purchase_order_line.dart';
 import '../../routes/app_routes.dart';
+import '../../theme/app_theme.dart';
 
-const _kInk = Color(0xFF14342B);
-const _kMuted = Color(0xFF5C6B66);
-const _kLine = Color(0xFFE4EBE4);
-const _kGreen = Color(0xFF2D8135);
-const _kMint = Color(0xFFE7F3E4);
-const _kFieldFill = Color(0xFFF6F8F6);
+const _kInk = AppColors.textDefaultLight;
+const _kMuted = AppColors.textLightGrayLight;
+const _kLine = AppColors.borderLightGrayLight;
+const _kGreen = AppColors.primaryLight;
+const _kMint = AppColors.surfaceTint;
+const _kFieldFill = AppColors.fieldFill;
 
 class NewPurchaseOrderView extends StatefulWidget {
   const NewPurchaseOrderView({super.key, this.order});
@@ -134,11 +135,7 @@ class _NewPurchaseOrderViewState extends State<NewPurchaseOrderView> {
       body: SizedBox.expand(
         child: Container(
           decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFFE9F3E6), Color(0xFFFDFEFC)],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
+            gradient: AppGradients.pageBackground,
           ),
           child: SafeArea(
             child: Column(
@@ -543,38 +540,37 @@ class _NewPurchaseOrderViewState extends State<NewPurchaseOrderView> {
       width: double.infinity,
       child: Obx(
         () {
-          final isBusy =
-              _controller.isSaving.value || _isPreparingSalesOrder;
+          final isBusy = _controller.isSaving.value || _isPreparingSalesOrder;
           return ElevatedButton(
-          onPressed: isBusy ? null : onPressed,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: color,
-            foregroundColor: Colors.white,
-            disabledBackgroundColor: color.withValues(alpha: 0.6),
-            disabledForegroundColor: Colors.white,
-            elevation: 0,
-            padding: const EdgeInsets.symmetric(vertical: 15),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+            onPressed: isBusy ? null : onPressed,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: color,
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: color.withValues(alpha: 0.6),
+              disabledForegroundColor: Colors.white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(vertical: 15),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
-          ),
-          child: isBusy
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.4,
-                    color: Colors.white,
+            child: isBusy
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.4,
+                      color: Colors.white,
+                    ),
+                  )
+                : Text(
+                    label,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                )
-              : Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-        );
+          );
         },
       ),
     );
@@ -824,9 +820,8 @@ class _NewPurchaseOrderViewState extends State<NewPurchaseOrderView> {
               ),
             )
             .toList(),
-        onChanged: _canEdit
-            ? (v) => setState(() => _lineItems[index].item = v)
-            : null,
+        onChanged:
+            _canEdit ? (v) => setState(() => _lineItems[index].item = v) : null,
       ),
     );
   }

@@ -59,27 +59,38 @@ class CustomeTextBoxLabelForm extends StatelessWidget {
   Widget build(BuildContext context) {
     final customTheme = CustomTheme.of(context);
     final textTheme = Theme.of(context).textTheme;
+    final radius = BorderRadius.circular(AppRadii.md);
+    final border = customTheme.borderLightGray;
+    final inputBorder = isBorderRequired
+        ? OutlineInputBorder(
+            borderSide: BorderSide(color: border),
+            borderRadius: radius,
+          )
+        : OutlineInputBorder(
+            borderSide: BorderSide(color: border.withValues(alpha: 0)),
+            borderRadius: radius,
+          );
 
-    return Wrap(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Visibility(
-          visible: labelText?.isNotEmpty ?? false,
-          child: Wrap(
+        if (labelText?.isNotEmpty ?? false) ...[
+          Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              const SizedBox(width: 15),
-              Text(
-                labelText ?? "",
-                style: TextStyle(
-                  color: customTheme.textDefault,
-                  fontSize: textTheme.labelMedium?.fontSize,
-                  fontWeight: FontWeight.w400,
+              Flexible(
+                child: Text(
+                  labelText!,
+                  style: textTheme.labelLarge?.copyWith(
+                    color: customTheme.textDefault,
+                  ),
                 ),
               ),
-              isRequired ? const CustomeStarLable() : const SizedBox.shrink(),
+              if (isRequired) const CustomeStarLable(),
             ],
           ),
-        ),
-        const SizedBox(height: 25),
+          const SizedBox(height: AppSpacing.sm),
+        ],
         TextFormField(
           initialValue: initialValue,
           inputFormatters: inputFormatters,
@@ -95,7 +106,7 @@ class CustomeTextBoxLabelForm extends StatelessWidget {
           controller: controller,
           readOnly: realOnly,
           enabled: enabled,
-          maxLines: obscureText! ? 1 : maxLines,
+          maxLines: obscureText == true ? 1 : maxLines,
           // maxLength: maxLength,
           maxLength: maxLength,
           keyboardType: keyboardType,
@@ -111,58 +122,42 @@ class CustomeTextBoxLabelForm extends StatelessWidget {
               : null,
           obscureText: obscureText ?? false,
 
-          style: textTheme.bodySmall, //   textRegular
+          style: textTheme.bodyMedium,
 
           decoration: InputDecoration(
             hintText: hintText,
-            hintStyle: textTheme.bodySmall,
-            contentPadding: contentPadding ?? const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-            fillColor: enabled ? Colors.transparent : const Color.fromARGB(255, 244, 249, 253),
-            filled: true,
-            disabledBorder: OutlineInputBorder(
-              borderSide: BorderSide(
-                color: customTheme.borderLightGray,
-                width: 1,
-              ),
-              borderRadius: const BorderRadius.all(Radius.circular(10)),
+            hintStyle: textTheme.bodyMedium?.copyWith(
+              color: customTheme.textLightGray,
             ),
-            enabledBorder: isBorderRequired
-                ? OutlineInputBorder(
-                    borderSide: BorderSide(
-                      color: customTheme.borderLightGray,
-                      width: 1,
-                    ),
-                    borderRadius: const BorderRadius.all(Radius.circular(10)),
-                  )
-                : const OutlineInputBorder(
-                    borderSide: BorderSide(
-                      color: Color.fromARGB(0, 216, 224, 240),
-                      width: 0,
-                    ),
-                    borderRadius: BorderRadius.all(Radius.circular(10)),
-                  ),
+            contentPadding: contentPadding ??
+                const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.lg,
+                  vertical: AppSpacing.md,
+                ),
+            fillColor:
+                enabled ? customTheme.bgColor : AppColors.scaffoldBackground,
+            filled: true,
+            disabledBorder: inputBorder,
+            enabledBorder: inputBorder,
             focusedBorder: isBorderRequired
                 ? OutlineInputBorder(
                     borderSide: BorderSide(
-                      color: customTheme.borderLightGray,
-                      width: 1,
+                      color: customTheme.primaryColor,
+                      width: 1.5,
                     ),
-                    borderRadius: const BorderRadius.all(Radius.circular(10)),
+                    borderRadius: radius,
                   )
-                : const OutlineInputBorder(
-                    borderSide: BorderSide(
-                      color: Color.fromARGB(0, 216, 224, 240),
-                      width: 0,
-                    ),
-                    borderRadius: BorderRadius.all(Radius.circular(10)),
-                  ),
+                : inputBorder,
             errorBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: customTheme.errorColor, width: 1),
-              borderRadius: const BorderRadius.all(Radius.circular(10)),
+              borderSide: BorderSide(color: customTheme.errorColor),
+              borderRadius: radius,
             ),
             focusedErrorBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: customTheme.errorColor, width: 1),
-              borderRadius: const BorderRadius.all(Radius.circular(10)),
+              borderSide: BorderSide(
+                color: customTheme.errorColor,
+                width: 1.5,
+              ),
+              borderRadius: radius,
             ),
             suffixIcon: suffixIcon,
             errorMaxLines: 3,

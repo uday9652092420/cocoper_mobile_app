@@ -9,11 +9,12 @@ import 'package:intl/intl.dart';
 
 import '../../controllers/customerreceipt/customer_receipt_controller.dart';
 import '../../models/customer_receipt.dart';
+import '../../theme/app_theme.dart';
 
-const _kInk = Color(0xFF14342B);
-const _kMuted = Color(0xFF5C6B66);
-const _kLine = Color(0xFFE4EBE4);
-const _kGreen = Color(0xFF2D8135);
+const _kInk = AppColors.textDefaultLight;
+const _kMuted = AppColors.textLightGrayLight;
+const _kLine = AppColors.borderLightGrayLight;
+const _kGreen = AppColors.primaryLight;
 const _maxAttachmentBytes = 10 * 1024 * 1024;
 
 class CustomerReceiptFormView extends StatefulWidget {
@@ -197,7 +198,7 @@ class _CustomerReceiptFormViewState extends State<CustomerReceiptFormView> {
     final title =
         widget.isEdit ? 'Edit Customer Receipt' : 'New Customer Receipt';
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6F4),
+      backgroundColor: AppColors.scaffoldBackground,
       appBar: AppBar(
         title: Text(title),
         foregroundColor: _kInk,
@@ -522,7 +523,7 @@ class _CustomerReceiptFormViewState extends State<CustomerReceiptFormView> {
             padding: const EdgeInsets.all(10),
             margin: const EdgeInsets.only(bottom: 8),
             decoration: BoxDecoration(
-              color: const Color(0xFFF6F8F6),
+              color: AppColors.fieldFill,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: _kLine),
             ),
@@ -616,7 +617,7 @@ class _CustomerReceiptFormViewState extends State<CustomerReceiptFormView> {
       margin: const EdgeInsets.only(bottom: 6),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
-        color: const Color(0xFFF6F8F6),
+        color: AppColors.fieldFill,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: _kLine),
       ),
@@ -766,7 +767,7 @@ class _CustomerReceiptFormViewState extends State<CustomerReceiptFormView> {
       width: double.infinity,
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: loading ? const Color(0xFFF6F8F6) : const Color(0xFFFFF1F0),
+        color: loading ? AppColors.fieldFill : const Color(0xFFFFF1F0),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: _kLine),
       ),

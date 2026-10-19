@@ -113,19 +113,11 @@ class LoginController extends GetxController {
       isLoading.value = true;
 
       debugPrint(
-        '========================================',
-      );
-      debugPrint(
         'COCOPER MOBILE LOGIN',
       );
-      debugPrint(
-        'Email: $email',
-      );
+      debugPrint('Submitting login request.');
       debugPrint(
         'Endpoint: $loginEndpoint',
-      );
-      debugPrint(
-        '========================================',
       );
 
       final response = await ApiService.post(
@@ -149,10 +141,6 @@ class LoginController extends GetxController {
 
       debugPrint(
         'Login status code: ${response.statusCode}',
-      );
-
-      debugPrint(
-        'Login response: ${response.data}',
       );
 
       final data = response.data;
@@ -191,14 +179,8 @@ class LoginController extends GetxController {
       }
 
       _showError(message);
-    } catch (e, stackTrace) {
-      debugPrint(
-        'LOGIN EXCEPTION: $e',
-      );
-
-      debugPrint(
-        '$stackTrace',
-      );
+    } catch (e) {
+      debugPrint('LOGIN EXCEPTION: ${e.runtimeType}');
 
       _showError(
         'Unable to login. Please try again.',

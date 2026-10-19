@@ -2,15 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../controllers/purchaseinvoice/purchase_invoice_controller.dart';
+import '../../custome_widgets/app_status_badge.dart';
 import '../../custome_widgets/custome_confirmation_dialog.dart';
 import '../../models/purchase_invoice.dart';
 import '../../routes/app_routes.dart';
+import '../../theme/app_theme.dart';
 
-const _kInk = Color(0xFF14342B);
-const _kMuted = Color(0xFF5C6B66);
-const _kLine = Color(0xFFE4EBE4);
-const _kGreen = Color(0xFF2D8135);
-const _kMint = Color(0xFFE7F3E4);
+const _kInk = AppColors.textDefaultLight;
+const _kMuted = AppColors.textLightGrayLight;
+const _kLine = AppColors.borderLightGrayLight;
+const _kGreen = AppColors.primaryLight;
+const _kMint = AppColors.surfaceTint;
 
 /// Saved Purchase Invoices list screen (mobile adaptation of the web
 /// Purchase Invoice table), opened from the Operations dashboard.
@@ -47,11 +49,7 @@ class _SavedPurchaseInvoicesViewState extends State<SavedPurchaseInvoicesView> {
       body: SizedBox.expand(
         child: Container(
           decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFFE9F3E6), Color(0xFFFDFEFC)],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
+            gradient: AppGradients.pageBackground,
           ),
           child: SafeArea(
             child: SingleChildScrollView(
@@ -396,21 +394,7 @@ class _SavedPurchaseInvoicesViewState extends State<SavedPurchaseInvoicesView> {
 
   Widget _buildPaymentBadge(PurchaseInvoice invoice) {
     final received = invoice.supplierPaymentReceiptStatus;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: received ? const Color(0xFFE7F3E4) : const Color(0xFFFDF2E2),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        received ? 'Received' : 'Pending',
-        style: TextStyle(
-          fontSize: 11.5,
-          fontWeight: FontWeight.w700,
-          color: received ? const Color(0xFF2D8135) : const Color(0xFFE9A23B),
-        ),
-      ),
-    );
+    return AppStatusBadge(status: received ? 'Received' : 'Pending');
   }
 
   Widget _buildAction(
@@ -482,37 +466,7 @@ class _SavedPurchaseInvoicesViewState extends State<SavedPurchaseInvoicesView> {
   }
 
   Widget _buildStatusBadge(String status) {
-    final text = status.trim().isEmpty ? 'Draft' : status;
-
-    Color color;
-    Color tint;
-
-    switch (text.toLowerCase()) {
-      case 'approved':
-        color = const Color(0xFF2D8135);
-        tint = const Color(0xFFE7F3E4);
-        break;
-      case 'draft':
-      default:
-        color = const Color(0xFFE9A23B);
-        tint = const Color(0xFFFDF2E2);
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: tint,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          fontSize: 11.5,
-          fontWeight: FontWeight.w700,
-          color: color,
-        ),
-      ),
-    );
+    return AppStatusBadge(status: status, emptyLabel: 'Draft');
   }
 
   Widget _buildErrorState() {

@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../custome_widgets/app_status_badge.dart';
 import '../../models/purchase_invoice.dart';
 import '../../models/purchase_invoice_line.dart';
+import '../../theme/app_theme.dart';
 
-const _kInk = Color(0xFF14342B);
-const _kMuted = Color(0xFF5C6B66);
-const _kLine = Color(0xFFE4EBE4);
-const _kGreen = Color(0xFF2D8135);
-const _kMint = Color(0xFFE7F3E4);
+const _kInk = AppColors.textDefaultLight;
+const _kMuted = AppColors.textLightGrayLight;
+const _kLine = AppColors.borderLightGrayLight;
+const _kGreen = AppColors.primaryLight;
+const _kMint = AppColors.surfaceTint;
 
 /// Read-only Purchase Invoice detail screen.
 ///
@@ -38,11 +40,7 @@ class PurchaseInvoiceDetailView extends StatelessWidget {
       body: SizedBox.expand(
         child: Container(
           decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFFE9F3E6), Color(0xFFFDFEFC)],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
+            gradient: AppGradients.pageBackground,
           ),
           child: SafeArea(
             child: Column(
@@ -348,34 +346,7 @@ class PurchaseInvoiceDetailView extends StatelessWidget {
   }
 
   Widget _buildStatusBadge(String status) {
-    Color color;
-    Color tint;
-
-    switch (status.toLowerCase()) {
-      case 'approved':
-        color = const Color(0xFF2D8135);
-        tint = const Color(0xFFE7F3E4);
-        break;
-      default:
-        color = const Color(0xFFE9A23B);
-        tint = const Color(0xFFFDF2E2);
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: tint,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        status.isEmpty ? 'Draft' : status,
-        style: TextStyle(
-          fontSize: 11.5,
-          fontWeight: FontWeight.w700,
-          color: color,
-        ),
-      ),
-    );
+    return AppStatusBadge(status: status, emptyLabel: 'Draft');
   }
 
   String _modeLabel(String mode) {

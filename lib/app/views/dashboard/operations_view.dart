@@ -3,11 +3,12 @@ import 'package:get/get.dart';
 
 import '../../controllers/dashboard/dashboard_controller.dart';
 import '../../routes/app_routes.dart';
+import '../../theme/app_theme.dart';
 
-const _kInk = Color(0xFF14342B);
-const _kMuted = Color(0xFF14342B);
-const _kLine = Color(0xFFE4EBE4);
-const _kGreen = Color(0xFF2D8135);
+const _kInk = AppColors.textDefaultLight;
+const _kMuted = AppColors.textLightGrayLight;
+const _kLine = AppColors.borderLightGrayLight;
+const _kGreen = AppColors.primaryLight;
 
 class OperationsView extends GetView<DashboardController> {
   const OperationsView({super.key});
@@ -25,8 +26,8 @@ class OperationsView extends GetView<DashboardController> {
       title: 'Purchase Order',
       subtitle: 'Create and track purchase orders',
       icon: Icons.receipt_long_outlined,
-      color: Color(0xFF2D8135),
-      tint: Color(0xFFE7F3E4),
+      color: AppColors.primaryLight,
+      tint: AppColors.surfaceTint,
       route: Routes.purchaseOrder,
     ),
     _TransactionModule(
@@ -100,11 +101,7 @@ class OperationsView extends GetView<DashboardController> {
       backgroundColor: Colors.transparent,
       body: Container(
         decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFFE9F3E6), Color(0xFFFDFEFC)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
+          gradient: AppGradients.pageBackground,
         ),
         child: SafeArea(
           bottom: false,

@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 
 import '../../controllers/bagpurchase/bag_purchase_controller.dart';
 import '../../models/bag_purchase.dart';
+import '../../theme/app_theme.dart';
 import 'newbagpurchase_view.dart';
 
 class EditBagPurchaseView extends StatefulWidget {
@@ -33,12 +34,14 @@ class _EditBagPurchaseViewState extends State<EditBagPurchaseView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F8F3),
+      backgroundColor: AppColors.scaffoldBackground,
       body: SafeArea(
         child: Obx(() {
           if (_controller.isLoadingDetail.value) {
             return const Center(
-              child: CircularProgressIndicator(color: Color(0xFF2D8135)),
+              child: CircularProgressIndicator(
+                color: AppColors.primaryLight,
+              ),
             );
           }
           if (_controller.detailError.value.isNotEmpty) {

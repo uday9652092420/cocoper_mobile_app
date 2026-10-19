@@ -1,6 +1,7 @@
 import 'package:cocoper_mobile/app/controllers/auth/login_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../theme/app_theme.dart';
 
 class LoginPageView extends GetView<LoginController> {
   const LoginPageView({super.key});
@@ -144,7 +145,7 @@ class LoginPageView extends GetView<LoginController> {
               style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF14342B),
+                color: AppColors.textDefaultLight,
               ),
             ),
             const SizedBox(height: 7),
@@ -152,7 +153,7 @@ class LoginPageView extends GetView<LoginController> {
               'Sign in with your administrator credentials.',
               style: TextStyle(
                 fontSize: 12,
-                color: Color(0xFF14342B),
+                color: AppColors.textDefaultLight,
               ),
             ),
             const SizedBox(height: 25),
@@ -173,9 +174,9 @@ class LoginPageView extends GetView<LoginController> {
                   onPressed:
                       controller.isLoading.value ? null : controller.submit,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2D8135),
+                    backgroundColor: AppColors.primaryLight,
                     disabledBackgroundColor:
-                        const Color(0xFF2D8135).withValues(alpha: 0.6),
+                        AppColors.primaryLight.withValues(alpha: 0.6),
                     elevation: 2,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(2),
@@ -213,7 +214,7 @@ class LoginPageView extends GetView<LoginController> {
       style: const TextStyle(
         fontSize: 12,
         fontWeight: FontWeight.w600,
-        color: Color(0xFF14342B),
+        color: AppColors.textDefaultLight,
       ),
     );
   }
@@ -231,7 +232,7 @@ class LoginPageView extends GetView<LoginController> {
         prefixIcon: const Icon(
           Icons.mail_outline,
           size: 19,
-          color: Color(0xFF14342B),
+          color: AppColors.textDefaultLight,
         ),
       ),
     );
@@ -254,7 +255,7 @@ class LoginPageView extends GetView<LoginController> {
           prefixIcon: const Icon(
             Icons.lock_outline,
             size: 19,
-            color: Color(0xFF14342B),
+            color: AppColors.textDefaultLight,
           ),
           suffixIcon: IconButton(
             onPressed: controller.togglePasswordVisibility,
@@ -263,7 +264,7 @@ class LoginPageView extends GetView<LoginController> {
                   ? Icons.visibility_outlined
                   : Icons.visibility_off_outlined,
               size: 19,
-              color: const Color(0xFF14342B),
+              color: AppColors.textDefaultLight,
             ),
           ),
         ),
@@ -281,7 +282,7 @@ class LoginPageView extends GetView<LoginController> {
             child: Checkbox(
               value: controller.rememberMe.value,
               onChanged: controller.toggleRememberMe,
-              activeColor: const Color(0xFF2D8135),
+              activeColor: AppColors.primaryLight,
               materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
           ),
@@ -291,7 +292,7 @@ class LoginPageView extends GetView<LoginController> {
           'Remember me',
           style: TextStyle(
             fontSize: 12,
-            color: Color(0xFF14342B),
+            color: AppColors.textDefaultLight,
           ),
         ),
         const Spacer(),
@@ -301,7 +302,7 @@ class LoginPageView extends GetView<LoginController> {
         //     padding: EdgeInsets.zero,
         //     minimumSize: const Size(0, 0),
         //     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        //     foregroundColor: const Color(0xFF2D8135),
+        //     foregroundColor: AppColors.primaryLight,
         //   ),
         //   child: const Text(
         //     'Forgot password?',
@@ -324,7 +325,7 @@ class LoginPageView extends GetView<LoginController> {
       hintText: hintText,
       hintStyle: const TextStyle(
         fontSize: 12,
-        color: Color(0xFF14342B),
+        color: AppColors.textDefaultLight,
       ),
       prefixIcon: prefixIcon,
       suffixIcon: suffixIcon,
@@ -343,7 +344,7 @@ class LoginPageView extends GetView<LoginController> {
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(2),
         borderSide: const BorderSide(
-          color: Color(0xFF2D8135),
+          color: AppColors.primaryLight,
           width: 1.2,
         ),
       ),

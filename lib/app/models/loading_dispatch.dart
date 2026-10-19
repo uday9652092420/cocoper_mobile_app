@@ -52,7 +52,6 @@ class LoadingDispatch {
 
   Map<String, dynamic> toRequestJson() => <String, dynamic>{
         if (id.isNotEmpty) 'id': id,
-        'dispatchNumber': dispatchNumber.trim(),
         'customerId': customerId,
         'lorryNumber': lorryNumber.trim(),
         'driverName': driverName.trim(),

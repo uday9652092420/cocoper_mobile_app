@@ -23,18 +23,17 @@ class CommonPageSearch extends StatelessWidget {
     final customTheme = CustomTheme.of(context);
     final textTheme = Theme.of(context).textTheme;
     return Container(
-      // margin: Constants.paddingSymmetric1020,
-      padding: const EdgeInsets.symmetric(vertical: 0, horizontal: 8),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
       decoration: BoxDecoration(
         color: customTheme.bgColor,
-        borderRadius: const BorderRadius.all(Radius.circular(15)),
+        borderRadius: BorderRadius.circular(AppRadii.md),
+        border: Border.all(color: customTheme.borderLightGray),
         boxShadow: showShadow == true
             ? const [
                 BoxShadow(
-                  color: Color.fromRGBO(184, 200, 224, 0.22),
-                  offset: Offset(0, 1), // Horizontal and vertical offset
-                  blurRadius: 2.0, // Blur radius
-                  spreadRadius: 0.0, // Spread radius
+                  color: Color.fromRGBO(24, 40, 33, 0.05),
+                  offset: Offset(0, 2),
+                  blurRadius: 8,
                 ),
               ]
             : null,
@@ -46,25 +45,29 @@ class CommonPageSearch extends StatelessWidget {
         textAlign: TextAlign.start,
         decoration: InputDecoration(
           hintText: txtHintValue,
-          hintStyle: TextStyle(fontSize: textTheme.bodySmall?.fontSize, color: customTheme.textLightGray),
-          contentPadding: const EdgeInsets.symmetric(vertical: 15, horizontal: 15),
-          disabledBorder: const OutlineInputBorder(
-            borderSide: BorderSide(color: Colors.grey, width: 1.5),
-            borderRadius: BorderRadius.all(Radius.circular(15)),
+          hintStyle: TextStyle(
+            fontSize: textTheme.bodyMedium?.fontSize,
+            color: customTheme.textLightGray,
           ),
-          enabledBorder: const OutlineInputBorder(
-            borderSide: BorderSide(color: Colors.transparent, width: 1.5),
-            borderRadius: BorderRadius.all(Radius.circular(15)),
+          contentPadding: const EdgeInsets.symmetric(
+            vertical: AppSpacing.md,
+            horizontal: AppSpacing.md,
           ),
-          focusedBorder: const OutlineInputBorder(
-            borderSide: BorderSide(color: Colors.transparent, width: 1.5),
-            borderRadius: BorderRadius.all(Radius.circular(15)),
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          disabledBorder: InputBorder.none,
+          errorBorder: InputBorder.none,
+          focusedErrorBorder: InputBorder.none,
+          suffixIconConstraints: const BoxConstraints(
+            minWidth: 48,
+            minHeight: 48,
           ),
           suffixIcon: IconButton(
             onPressed: searchEvent,
             icon: Icon(
               Icons.search_outlined,
-              size: 30,
+              size: 24,
               color: customTheme.textLightGray,
             ),
           ),

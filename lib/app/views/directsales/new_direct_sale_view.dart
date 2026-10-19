@@ -7,13 +7,14 @@ import '../../controllers/salesorders/sales_order_controller.dart';
 import '../../helpers/shared_preferences.dart';
 import '../../models/direct_sale.dart';
 import '../../models/lookup_option.dart';
+import '../../theme/app_theme.dart';
 
-const _kInk = Color(0xFF14342B);
-const _kMuted = Color(0xFF5C6B66);
-const _kLine = Color(0xFFE4EBE4);
-const _kGreen = Color(0xFF2D8135);
-const _kMint = Color(0xFFE7F3E4);
-const _kFieldFill = Color(0xFFF6F8F6);
+const _kInk = AppColors.textDefaultLight;
+const _kMuted = AppColors.textLightGrayLight;
+const _kLine = AppColors.borderLightGrayLight;
+const _kGreen = AppColors.primaryLight;
+const _kMint = AppColors.surfaceTint;
+const _kFieldFill = AppColors.fieldFill;
 
 class NewDirectSaleView extends StatefulWidget {
   const NewDirectSaleView({super.key, this.sale});
@@ -228,11 +229,7 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
       body: SizedBox.expand(
         child: Container(
           decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFFE9F3E6), Color(0xFFFDFEFC)],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
+            gradient: AppGradients.pageBackground,
           ),
           child: SafeArea(
             child: Column(

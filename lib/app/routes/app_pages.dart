@@ -46,6 +46,13 @@ import 'package:cocoper_mobile/app/views/supplierpayments/savedsupplierpayments_
 import 'package:cocoper_mobile/app/views/supplierpayments/viewsupplierpayment_view.dart';
 import 'package:get/get.dart';
 import 'package:cocoper_mobile/app/views/directsales/new_direct_sale_view.dart';
+import 'package:cocoper_mobile/app/models/statements_report.dart';
+import 'package:cocoper_mobile/app/views/reportsstatements/customerstatement_view.dart';
+import 'package:cocoper_mobile/app/views/reportsstatements/pending&dispatch_view.dart';
+import 'package:cocoper_mobile/app/views/reportsstatements/purchaseregister_view.dart';
+import 'package:cocoper_mobile/app/views/reportsstatements/salesregister_view.dart';
+import 'package:cocoper_mobile/app/views/reportsstatements/statements_report_view.dart';
+import 'package:cocoper_mobile/app/views/reportsstatements/supplierstatement_view.dart';
 
 import 'app_routes.dart';
 
@@ -311,6 +318,31 @@ class AppPages {
       name: Routes.purchaseInvoiceDetail,
       page: () => const PurchaseInvoiceDetailView(),
       binding: PurchaseInvoiceBinding(),
+    ),
+    GetPage(
+      name: Routes.purchaseRegisterReport,
+      page: () => const PurchaseRegisterView(),
+      binding: StatementsReportBinding(StatementsReportType.purchaseRegister),
+    ),
+    GetPage(
+      name: Routes.salesRegisterReport,
+      page: () => const SalesRegisterView(),
+      binding: StatementsReportBinding(StatementsReportType.salesRegister),
+    ),
+    GetPage(
+      name: Routes.supplierStatementReport,
+      page: () => const SupplierStatementView(),
+      binding: StatementsReportBinding(StatementsReportType.supplierStatement),
+    ),
+    GetPage(
+      name: Routes.customerStatementReport,
+      page: () => const CustomerStatementView(),
+      binding: StatementsReportBinding(StatementsReportType.customerStatement),
+    ),
+    GetPage(
+      name: Routes.pendingDispatchReport,
+      page: () => const PendingDispatchView(),
+      binding: StatementsReportBinding(StatementsReportType.pendingDispatch),
     ),
   ];
 }

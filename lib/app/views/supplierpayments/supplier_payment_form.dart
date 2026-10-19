@@ -11,11 +11,12 @@ import '../../controllers/supplierpayments/supplier_payment_controller.dart';
 import '../../models/lookup_option.dart';
 import '../../models/purchase_invoice.dart';
 import '../../models/supplier_payment.dart';
+import '../../theme/app_theme.dart';
 
-const _ink = Color(0xFF14342B);
-const _muted = Color(0xFF5C6B66);
-const _line = Color(0xFFE4EBE4);
-const _green = Color(0xFF2D8135);
+const _ink = AppColors.textDefaultLight;
+const _muted = AppColors.textLightGrayLight;
+const _line = AppColors.borderLightGrayLight;
+const _green = AppColors.primaryLight;
 const _maxAttachmentBytes = 10 * 1024 * 1024;
 
 class SupplierPaymentFormView extends StatefulWidget {
@@ -139,7 +140,7 @@ class _SupplierPaymentFormViewState extends State<SupplierPaymentFormView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6F4),
+      backgroundColor: AppColors.scaffoldBackground,
       appBar: AppBar(
         title: Text(
           widget.isEdit ? 'Edit Supplier Payment' : 'New Supplier Payment',

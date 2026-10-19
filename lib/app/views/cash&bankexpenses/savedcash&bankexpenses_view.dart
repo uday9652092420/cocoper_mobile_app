@@ -5,13 +5,15 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 
 import '../../controllers/cash&bankexpenses/cash_bank_expenses_controller.dart';
+import '../../custome_widgets/app_status_badge.dart';
 import '../../models/cash_bank_expense_model.dart';
 import '../../routes/app_routes.dart';
+import '../../theme/app_theme.dart';
 
-const _ink = Color(0xFF14342B);
-const _muted = Color(0xFF5C6B66);
-const _line = Color(0xFFE4EBE4);
-const _green = Color(0xFF2D8135);
+const _ink = AppColors.textDefaultLight;
+const _muted = AppColors.textLightGrayLight;
+const _line = AppColors.borderLightGrayLight;
+const _green = AppColors.primaryLight;
 
 class SavedCashBankExpensesView extends StatefulWidget {
   const SavedCashBankExpensesView({super.key});
@@ -44,11 +46,7 @@ class _SavedCashBankExpensesViewState extends State<SavedCashBankExpensesView> {
         body: SizedBox.expand(
           child: Container(
             decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFFE9F3E6), Color(0xFFFDFEFC)],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
+              gradient: AppGradients.pageBackground,
             ),
             child: SafeArea(
               child: RefreshIndicator(
@@ -399,21 +397,8 @@ class _SavedCashBankExpensesViewState extends State<SavedCashBankExpensesView> {
     if (confirmed == true) await _controller.deleteExpense(expense);
   }
 
-  Widget _status(bool approved) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-        decoration: BoxDecoration(
-          color: approved ? const Color(0xFFE7F3E4) : const Color(0xFFFDF2E2),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(
-          approved ? 'Approved' : 'Draft',
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            color: approved ? _green : const Color(0xFF8A5B00),
-          ),
-        ),
-      );
+  Widget _status(bool approved) =>
+      AppStatusBadge(status: approved ? 'Approved' : 'Draft');
 
   Widget _stateCard(Widget child) => Container(
         width: double.infinity,

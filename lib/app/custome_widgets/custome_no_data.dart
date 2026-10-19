@@ -10,35 +10,38 @@ Widget noDataAvailable({
   return Column(
     crossAxisAlignment: CrossAxisAlignment.center,
     mainAxisAlignment: MainAxisAlignment.center,
+    mainAxisSize: MainAxisSize.min,
     children: [
-      // const SizedBox(height: 10),
+      const SizedBox(height: AppSpacing.md),
       Image.asset(
         imagePath,
-        width: 200,
-        height: 200,
+        width: 144,
+        height: 144,
         errorBuilder: (_, __, ___) => const Icon(
           Icons.inbox_outlined,
-          size: 100,
+          size: 72,
           color: AppColors.textLightGrayLight,
         ),
       ),
-      // const SizedBox(height: 10),
+      const SizedBox(height: AppSpacing.md),
       Text(
         title.tr,
         textAlign: TextAlign.center,
         style: const TextStyle(
-          fontSize: 14,
-          color: AppColors.textLightGrayLight,
+          color: AppColors.textDefaultLight,
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
         ),
       ),
-      const SizedBox(height: 10),
+      const SizedBox(height: AppSpacing.xs),
       Text(
         "cons_no_data_body".tr,
+        textAlign: TextAlign.center,
         style: const TextStyle(
           color: AppColors.textLightGrayLight,
         ),
       ),
-      const SizedBox(height: 85),
+      const SizedBox(height: AppSpacing.xl),
     ],
   );
 }
