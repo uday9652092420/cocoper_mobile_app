@@ -21,7 +21,7 @@ This new implementation is based on **mobile prompt flutter.docx**, **26 web scr
 
 Also included: mobile-client login, session expiry, organization/branch selection, dashboard, profile edit, password change, logout, searchable lookup selectors, filters/pagination, CSV/PDF/share/print, loading/error/empty states and confirmation before destructive actions.
 
-There are **no master maintenance, setup, configuration, user/role administration, employee check-in/out, geofencing, iOS or web targets**. Read-only lookup selectors are not master screens. Earlier multilingual and employee-tracking requests are not silently mixed into this latest English-only brief.
+There are **no master maintenance, setup, configuration, user/role administration, employee check-in/out, geofencing, iOS or web targets**. The Labour Attendance Details report and labour payment APIs do not provide employee check-in/check-out. The Operations shortcut is not shown while the dedicated attendance workflow awaits a permission and punch API contract; see [API gaps](docs/GAPS_AND_HANDOFF.md). Read-only lookup selectors are not master screens. Earlier multilingual and employee-tracking requests are not silently mixed into this latest English-only brief.
 
 ## Run and build
 
@@ -44,6 +44,8 @@ The VS Code **Staging** launch uses Flutter profile mode with the staging enviro
 flutter run --profile --dart-define-from-file=env/staging.json
 flutter build apk --profile --dart-define-from-file=env/staging.json
 ```
+
+The VS Code **Production** launch uses Flutter release mode with `env/production.json`. Release mode does not support hot reload or an attached Dart debugger; use the signed release build commands below when producing a distributable APK/AAB.
 
 Use debug mode during development when hot reload and debugging are needed; it is slower to launch. Environment values are defined in `env/` and read by `lib/app/config/environment.dart`.
 

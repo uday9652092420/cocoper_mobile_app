@@ -157,7 +157,7 @@ class LoginPageView extends GetView<LoginController> {
               ),
             ),
             const SizedBox(height: 25),
-            _buildFieldLabel('Email'),
+            _buildFieldLabel('Email or username'),
             const SizedBox(height: 7),
             _buildEmailField(),
             const SizedBox(height: 18),
@@ -222,13 +222,15 @@ class LoginPageView extends GetView<LoginController> {
   Widget _buildEmailField() {
     return TextFormField(
       controller: controller.emailController,
-      keyboardType: TextInputType.emailAddress,
+      keyboardType: TextInputType.text,
       textInputAction: TextInputAction.next,
+      autocorrect: false,
+      enableSuggestions: false,
       textAlign: TextAlign.start,
       textDirection: TextDirection.ltr,
       validator: controller.validateEmail,
       decoration: _buildInputDecoration(
-        hintText: 'Enter email',
+        hintText: 'Enter email or username',
         prefixIcon: const Icon(
           Icons.mail_outline,
           size: 19,

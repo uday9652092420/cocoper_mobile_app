@@ -7,6 +7,7 @@ import '../../helpers/secure_store.dart';
 import '../../helpers/shared_preferences.dart';
 import '../../localization/localization.dart';
 import '../../routes/app_routes.dart';
+import '../../services/mobile_app_permissions.dart';
 import '../../theme/app_theme.dart';
 
 const _kInk = AppColors.textDefaultLight;
@@ -201,6 +202,7 @@ class HomeView extends GetView<DashboardController> {
 
     await FlutterSecureStore().deleteAllData();
     await SharedPrefsHelper.clearAll();
+    MobileAppPermissions.clear();
 
     await SharedPrefsHelper.setString(
       SharedPrefsHelper.languageCode,

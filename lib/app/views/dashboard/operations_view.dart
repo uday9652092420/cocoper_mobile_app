@@ -79,13 +79,6 @@ class OperationsView extends GetView<DashboardController> {
       route: Routes.savedSupplierPayments,
     ),
     _TransactionModule(
-      title: 'Labour Attendance',
-      subtitle: 'Mark daily labour attendance',
-      icon: Icons.badge_outlined,
-      color: Color(0xFF9A6B00),
-      tint: Color(0xFFFBF3DD),
-    ),
-    _TransactionModule(
       title: 'Cash & Bank',
       subtitle: 'Record cash/bank expenses',
       icon: Icons.savings_outlined,

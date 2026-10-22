@@ -2,6 +2,7 @@ import 'package:cocoper_mobile/app/bindings/auth/login_binding.dart';
 import 'package:cocoper_mobile/app/bindings/bagpurchase/bag_purchase_binding.dart';
 import 'package:cocoper_mobile/app/bindings/cash&bankexpenses/cash_bank_expenses_binding.dart';
 import 'package:cocoper_mobile/app/bindings/dashboard/dashboard_bindings.dart';
+import 'package:cocoper_mobile/app/bindings/labourattendance/labour_attendance_binding.dart';
 import 'package:cocoper_mobile/app/bindings/loading&dispatch/loading_dispatch_binding.dart';
 import 'package:cocoper_mobile/app/bindings/customerreceipt/customer_receipt_binding.dart';
 import 'package:cocoper_mobile/app/bindings/directsales/direct_sales_binding.dart';
@@ -9,6 +10,7 @@ import 'package:cocoper_mobile/app/bindings/purchaseinvoice/purchase_invoice_bin
 import 'package:cocoper_mobile/app/bindings/purchaseorder/purchase_order_binding.dart';
 import 'package:cocoper_mobile/app/bindings/salesorders/sales_order_binding.dart';
 import 'package:cocoper_mobile/app/bindings/supplierpayments/supplier_payment_binding.dart';
+import 'package:cocoper_mobile/app/bindings/splash_screen_bindings.dart';
 import 'package:cocoper_mobile/app/views/auth/login_page_view.dart';
 import 'package:cocoper_mobile/app/views/bagpurchase/savedbagpurchases_view.dart';
 import 'package:cocoper_mobile/app/views/bagpurchase/newbagpurchase_view.dart';
@@ -44,6 +46,9 @@ import 'package:cocoper_mobile/app/views/supplierpayments/editsupplierpayments_v
 import 'package:cocoper_mobile/app/views/supplierpayments/newsupplierpayments_view.dart';
 import 'package:cocoper_mobile/app/views/supplierpayments/savedsupplierpayments_view.dart';
 import 'package:cocoper_mobile/app/views/supplierpayments/viewsupplierpayment_view.dart';
+import 'package:cocoper_mobile/app/views/labourattendance/labourattendancedashboard_view.dart';
+import 'package:cocoper_mobile/app/views/splash_screen_view.dart';
+import 'package:cocoper_mobile/app/services/mobile_app_permissions.dart';
 import 'package:get/get.dart';
 import 'package:cocoper_mobile/app/views/directsales/new_direct_sale_view.dart';
 import 'package:cocoper_mobile/app/models/statements_report.dart';
@@ -53,13 +58,20 @@ import 'package:cocoper_mobile/app/views/reportsstatements/purchaseregister_view
 import 'package:cocoper_mobile/app/views/reportsstatements/salesregister_view.dart';
 import 'package:cocoper_mobile/app/views/reportsstatements/statements_report_view.dart';
 import 'package:cocoper_mobile/app/views/reportsstatements/supplierstatement_view.dart';
+import 'package:cocoper_mobile/app/views/reportsstatements/profit_loss_statement_view.dart';
 
 import 'app_routes.dart';
 
 class AppPages {
-  static const initialPage = Routes.loginPage;
+  static const initialPage = Routes.splash;
 
   static final routes = <GetPage<dynamic>>[
+    GetPage(
+      name: Routes.splash,
+      page: () => const SplashScreenView(),
+      binding: SplashScreenBindings(),
+    ),
+
     // ============================================================
     // LOGIN
     // ============================================================
@@ -78,6 +90,11 @@ class AppPages {
       name: Routes.dashboard,
       page: () => DashboardView(),
       binding: DashboardBindings(),
+    ),
+    GetPage(
+      name: Routes.labourAttendance,
+      page: () => const LabourAttendanceDashboardView(),
+      binding: LabourAttendanceBinding(),
     ),
 
     // ============================================================
@@ -344,5 +361,17 @@ class AppPages {
       page: () => const PendingDispatchView(),
       binding: StatementsReportBinding(StatementsReportType.pendingDispatch),
     ),
-  ];
+    GetPage(
+      name: Routes.profitLossStatementReport,
+      page: () => const ProfitLossStatementView(),
+    ),
+  ].map((page) {
+    final existing = page.middlewares ?? const <GetMiddleware>[];
+    return page.copy(
+      middlewares: [
+        ...existing,
+        MobileAppPermissionMiddleware(),
+      ],
+    );
+  }).toList(growable: false);
 }

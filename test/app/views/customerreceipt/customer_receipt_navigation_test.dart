@@ -1,5 +1,6 @@
 import 'package:cocoper_mobile/app/routes/app_pages.dart';
 import 'package:cocoper_mobile/app/routes/app_routes.dart';
+import 'package:cocoper_mobile/app/services/mobile_app_permissions.dart';
 import 'package:cocoper_mobile/app/controllers/customerreceipt/customer_receipt_controller.dart';
 import 'package:cocoper_mobile/app/views/customerreceipt/savedcustomerreceipt_view.dart';
 import 'package:cocoper_mobile/app/views/dashboard/operations_view.dart';
@@ -7,6 +8,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 
 void main() {
+  setUp(() {
+    MobileAppPermissions.beginSession(
+      const MobileAppPermissions(
+        mobileAppLogin: true,
+        mobileAppLabourAttendance: false,
+      ),
+    );
+  });
+
   tearDown(Get.reset);
 
   testWidgets('Operations opens the registered saved customer receipts view', (

@@ -1,12 +1,22 @@
 import 'package:cocoper_mobile/app/controllers/supplierpayments/supplier_payment_controller.dart';
 import 'package:cocoper_mobile/app/routes/app_pages.dart';
 import 'package:cocoper_mobile/app/routes/app_routes.dart';
+import 'package:cocoper_mobile/app/services/mobile_app_permissions.dart';
 import 'package:cocoper_mobile/app/views/dashboard/operations_view.dart';
 import 'package:cocoper_mobile/app/views/supplierpayments/savedsupplierpayments_view.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 
 void main() {
+  setUp(() {
+    MobileAppPermissions.beginSession(
+      const MobileAppPermissions(
+        mobileAppLogin: true,
+        mobileAppLabourAttendance: false,
+      ),
+    );
+  });
+
   tearDown(Get.reset);
 
   testWidgets('Operations opens the registered Supplier Payments screen', (

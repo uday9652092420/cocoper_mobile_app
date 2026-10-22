@@ -1,5 +1,5 @@
 abstract class Routes {
-  static const splash = '/';
+  static const splash = '/splash';
 
   static const langeSelection = '/lange_selection';
 
@@ -8,6 +8,8 @@ abstract class Routes {
   static const otpPage = '/otp_view_page';
 
   static const dashboard = '/dashboard_view';
+
+  static const labourAttendance = '/labour-attendance-dashboard';
 
   static const purchaseOrder = '/purchase_order_view';
 
@@ -66,4 +68,5 @@ abstract class Routes {
   static const supplierStatementReport = '/supplier_statement_report_view';
   static const customerStatementReport = '/customer_statement_report_view';
   static const pendingDispatchReport = '/pending_dispatch_report_view';
+  static const profitLossStatementReport = '/profit_loss_statement_report_view';
 }

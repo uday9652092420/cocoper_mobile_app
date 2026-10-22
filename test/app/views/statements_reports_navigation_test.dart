@@ -1,8 +1,24 @@
 import 'package:cocoper_mobile/app/routes/app_pages.dart';
 import 'package:cocoper_mobile/app/routes/app_routes.dart';
+import 'package:cocoper_mobile/app/views/dashboard/statements_view.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:get/get.dart';
 
 void main() {
+  testWidgets('Statements list includes the Profit & Loss report', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const GetMaterialApp(
+        home: Scaffold(body: StatementsView()),
+      ),
+    );
+
+    expect(find.text('Profit & Loss Statement'), findsOneWidget);
+    expect(find.text('Review income, expenses and net profit'), findsOneWidget);
+  });
+
   test('all statement report destinations are registered once', () {
     final routeNames = AppPages.routes.map((route) => route.name).toList();
     const reportRoutes = [
@@ -11,6 +27,7 @@ void main() {
       Routes.supplierStatementReport,
       Routes.customerStatementReport,
       Routes.pendingDispatchReport,
+      Routes.profitLossStatementReport,
     ];
 
     for (final route in reportRoutes) {

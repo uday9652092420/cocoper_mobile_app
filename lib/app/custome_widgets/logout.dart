@@ -1,6 +1,7 @@
 import 'package:get/get.dart';
 
 import '../helpers/secure_store.dart';
+import '../services/mobile_app_permissions.dart';
 import '../routes/app_routes.dart';
 
 Future<void> logout({bool forceLogout = true}) async {
@@ -27,6 +28,7 @@ Future<void> logout({bool forceLogout = true}) async {
 
 Future<void> deleteDataAndRedirectLoginPage() async {
   await FlutterSecureStore().deleteAllData();
+  MobileAppPermissions.clear();
 
   // Remove other stored data if required:
   // Storage.remove(Storage.loginResponse);

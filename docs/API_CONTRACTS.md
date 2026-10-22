@@ -5,13 +5,50 @@ Paths below are relative to the configured /api base URL. These mappings come fr
 ## Authentication and scope
 
 - POST /auth/login: {email, password, client: "mobile"}. The email input also accepts the username value supported by the server.
-- Response: token, expiresAt (epoch seconds), user containing id, username, full_name, role, is_super_admin and organization_id.
+- Response: token, expiresAt (epoch seconds), and user containing id, username, full_name, role, is_super_admin, organization_id, and, when returned by the deployed API, mobile_app_login and mobile_app_labour_attendance.
 - Header: Authorization: Bearer <token>. No refresh endpoint exists.
 - GET /mobile/bootstrap uses Bearer only; response includes organization, branches and default_branch_id.
+- Bootstrap's authenticated `user` also contains the Boolean
+  `mobile_app_login` and `mobile_app_labour_attendance` permission fields.
 - POST /auth/logout revokes the current session; local credentials are cleared even if the network fails.
 - Scoped requests send x-organization-id and, if selected, x-branch-id. This does not imply every server module filters by branch.
 - Super-admin bootstrap is incompatible with the mobile endpoint in the supplied code. The verified /organizations and /branches reads are used to select scope instead.
 - Profile: GET /profile/me, PUT /profile/me with full_name, email, mobile_no, profile_picture, and PUT /profile/password with old_password/new_password.
+
+Flutter reads the Boolean `mobile_app_login` and
+`mobile_app_labour_attendance` fields from `response.user`. Mobile login is
+allowed when either permission is enabled; normal dashboard access still
+requires `mobile_app_login: true`. Missing, null, or non-Boolean permissions do
+not grant access. Session restoration fetches `/mobile/bootstrap` before
+selecting a destination.
+
+Employee attendance API (backend source contract):
+
+- GET `/mobile/labour-attendance/today` with `Authorization: Bearer <token>`,
+  `x-organization-id`, and assigned `x-branch-id`. Returns today's
+  organization-timezone date, authenticated employee details, organization,
+  branch, optional attendance record, and server timestamp.
+- POST `/mobile/labour-attendance/check-in` with the same headers and an empty
+  JSON object. The server resolves employee and branch, stamps the check-in,
+  and rejects a second check-in for that user and organization-local day.
+- POST `/mobile/labour-attendance/check-out` with the same headers and an empty
+  JSON object. The server stamps checkout for the active same-day record and
+  rejects missing or already-closed attendance with HTTP 409.
+- All three routes enforce the explicit `mobile-app.labour-attendance`
+  permission, including for owner-role accounts. Check-in/check-out use
+  transaction-scoped per-user locking and server-generated timestamps.
+
+These operations reuse `mobile_labour_attendance`; this is distinct from the
+labour-payment table. The backend Labour Attendance repository merges mobile
+rows into its listing as `Temporary` records, with no `labour_id`. No user to
+master-labour mapping or COPPER Web frontend source was available to verify
+master-labour association or rendered UI behavior. The live database and
+deployed API have not been exercised. The `/labour-attendance` transaction
+routes remain for labour payment records and reports, not employee punches.
+
+No Profit & Loss statement endpoint or accounting calculation contract is
+verified. The Statements screen exposes the report entry, but the report page
+does not calculate totals from unrelated purchase, sales, or expense records.
 
 HTTP 401 on an authenticated request clears the session. HTTP 403 retains the exact server message; a permission message disables that module action for the current session. The API layer handles wrapped {success,data}, bare arrays/objects and ad-hoc auth/bootstrap responses. Global, local and 404 errors retain their message. No guessed server pagination parameters are sent.
 

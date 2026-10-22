@@ -5,6 +5,7 @@ import '../../controllers/dashboard/profile_controller.dart';
 import '../../helpers/secure_store.dart';
 import '../../helpers/shared_preferences.dart';
 import '../../routes/app_routes.dart';
+import '../../services/mobile_app_permissions.dart';
 import '../../theme/app_theme.dart';
 
 const _kInk = AppColors.textDefaultLight;
@@ -42,6 +43,7 @@ class ProfileView extends GetView<ProfileController> {
   Future<void> _logout() async {
     await FlutterSecureStore().deleteAllData();
     await SharedPrefsHelper.clearAll();
+    MobileAppPermissions.clear();
 
     Get.offAllNamed<void>(Routes.loginPage);
   }

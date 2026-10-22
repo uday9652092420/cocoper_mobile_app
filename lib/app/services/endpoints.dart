@@ -36,6 +36,12 @@ class EndPoints {
   ///
   /// GET /mobile/bootstrap  (Authorization: Bearer <token>)
   static const String mobileBootstrap = 'mobile/bootstrap';
+  static const String mobileLabourAttendanceToday =
+      'mobile/labour-attendance/today';
+  static const String mobileLabourAttendanceCheckIn =
+      'mobile/labour-attendance/check-in';
+  static const String mobileLabourAttendanceCheckOut =
+      'mobile/labour-attendance/check-out';
 
   // ============================================================
   // DASHBOARD

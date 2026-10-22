@@ -55,6 +55,13 @@ class _StatementsViewState extends State<StatementsView> {
       tint: Color(0xFFF5E3E7),
       route: Routes.pendingDispatchReport,
     ),
+    _Statement(
+      title: 'Profit & Loss Statement',
+      description: 'Review income, expenses and net profit',
+      icon: Icons.account_balance_wallet_outlined,
+      tint: Color(0xFFEAE4F5),
+      route: Routes.profitLossStatementReport,
+    ),
   ];
 
   @override
