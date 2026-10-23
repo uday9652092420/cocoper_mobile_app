@@ -24,6 +24,7 @@ class LabourAttendanceController extends GetxController
   final hasLoaded = false.obs;
   final hasAttendancePermission = true.obs;
   final isStateVerified = false.obs;
+  String? _unreconciledAttendanceId;
 
   bool get canCheckIn =>
       today.value?.attendance == null &&
@@ -61,17 +62,30 @@ class LabourAttendanceController extends GetxController
     }
   }
 
-  Future<void> loadToday({
-    bool showLoading = true,
-    bool allowWhileProcessing = false,
-  }) async {
-    if (isLoading.value || (isProcessing.value && !allowWhileProcessing)) {
+  Future<void> loadToday({bool showLoading = true}) async {
+    if (isLoading.value || isProcessing.value) {
       return;
     }
     isLoading.value = showLoading;
     errorMessage.value = null;
     try {
-      today.value = await _repository.getToday();
+      final refreshed = await _repository.getToday();
+      if (_unreconciledAttendanceId != null) {
+        if (refreshed.attendance?.id == _unreconciledAttendanceId) {
+          _unreconciledAttendanceId = null;
+        } else if (refreshed.lastAttendance?.id == _unreconciledAttendanceId) {
+          today.value = refreshed;
+          errorMessage.value =
+              'The saved attendance is visible in history, but the server has not confirmed today’s attendance status. Refresh before trying again.';
+          isStateVerified.value = false;
+          return;
+        } else {
+          throw const LabourAttendanceException(
+            'A saved attendance record is still missing from the latest history response.',
+          );
+        }
+      }
+      today.value = refreshed;
       hasAttendancePermission.value = true;
       isStateVerified.value = true;
     } on LabourAttendanceException catch (error) {
@@ -104,7 +118,10 @@ class LabourAttendanceController extends GetxController
     final record = today.value?.attendance;
     if (record == null || !record.isWorking || isProcessing.value) return;
     await _perform(
-      operation: () => _repository.checkOut(branchId: record.branchId),
+      operation: () => _repository.checkOut(
+        attendanceId: record.id,
+        branchId: record.branchId,
+      ),
       actionName: 'check out',
     );
   }
@@ -127,7 +144,7 @@ class LabourAttendanceController extends GetxController
         result.attendance,
         result.serverTimestamp,
       );
-      await loadToday(showLoading: false, allowWhileProcessing: true);
+      await _reconcileAfterSuccessfulAction(result.attendance);
     } on LabourAttendanceException catch (error) {
       errorMessage.value = error.message;
       if (error.statusCode == 401) {
@@ -163,6 +180,47 @@ class LabourAttendanceController extends GetxController
     } catch (error) {
       errorMessage.value =
           '${errorMessage.value}\nCurrent attendance could not be verified (${error.runtimeType}).';
+      isStateVerified.value = false;
+    }
+  }
+
+  Future<void> _reconcileAfterSuccessfulAction(
+    LabourAttendanceRecord savedAttendance,
+  ) async {
+    _unreconciledAttendanceId = savedAttendance.id;
+    try {
+      final refreshed = await _repository.getToday();
+      if (refreshed.attendance?.id == savedAttendance.id) {
+        _unreconciledAttendanceId = null;
+        today.value = refreshed;
+        hasAttendancePermission.value = true;
+        isStateVerified.value = true;
+        return;
+      }
+      if (refreshed.lastAttendance?.id == savedAttendance.id) {
+        today.value = refreshed;
+        errorMessage.value =
+            'The saved attendance is visible in history, but the server has not confirmed today’s attendance status. Refresh before trying again.';
+        isStateVerified.value = false;
+        return;
+      } else {
+        errorMessage.value =
+            'The attendance action was saved, but today’s status could not be reconciled. Refresh before trying again.';
+        isStateVerified.value = false;
+        return;
+      }
+    } on LabourAttendanceException catch (error) {
+      errorMessage.value =
+          'The attendance action was saved, but the latest status could not be verified: ${error.message}';
+      if (error.statusCode == 401) {
+        await _handleExpiredSession();
+      } else if (error.statusCode == 403) {
+        hasAttendancePermission.value = false;
+      }
+      isStateVerified.value = false;
+    } catch (error) {
+      errorMessage.value =
+          'The attendance action was saved, but the latest status could not be verified (${error.runtimeType}).';
       isStateVerified.value = false;
     }
   }

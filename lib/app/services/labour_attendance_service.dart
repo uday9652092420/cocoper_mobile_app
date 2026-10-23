@@ -4,8 +4,10 @@ import 'package:dio/dio.dart';
 
 import '../helpers/shared_preferences.dart';
 import '../models/labour_attendance.dart';
+import 'attendance_location_provider.dart';
 import 'api_service.dart';
 import 'endpoints.dart';
+import 'mobile_app_permissions.dart';
 
 class LabourAttendanceException implements Exception {
   const LabourAttendanceException(this.message, {this.statusCode});
@@ -22,72 +24,353 @@ abstract interface class LabourAttendanceRepository {
 
   Future<LabourAttendanceActionResult> checkIn();
 
-  Future<LabourAttendanceActionResult> checkOut({required String branchId});
+  Future<LabourAttendanceActionResult> checkOut({
+    required String attendanceId,
+    required String branchId,
+  });
+}
+
+abstract interface class LabourAttendanceApi {
+  Future<Response<dynamic>?> get(
+    String endpoint, {
+    required Map<String, String> headers,
+    required String diagnosticLabel,
+  });
+
+  Future<Response<dynamic>?> post(
+    String endpoint,
+    Map<String, dynamic> body, {
+    required Map<String, String> headers,
+    required String diagnosticLabel,
+  });
+
+  Future<Response<dynamic>?> patch(
+    String endpoint, {
+    required Map<String, dynamic> body,
+    required Map<String, String> headers,
+    required String diagnosticLabel,
+  });
+}
+
+class _ApiServiceLabourAttendanceApi implements LabourAttendanceApi {
+  const _ApiServiceLabourAttendanceApi();
+
+  @override
+  Future<Response<dynamic>?> get(
+    String endpoint, {
+    required Map<String, String> headers,
+    required String diagnosticLabel,
+  }) =>
+      ApiService.get(
+        endpoint,
+        headers: headers,
+        diagnosticLabel: diagnosticLabel,
+      );
+
+  @override
+  Future<Response<dynamic>?> post(
+    String endpoint,
+    Map<String, dynamic> body, {
+    required Map<String, String> headers,
+    required String diagnosticLabel,
+  }) =>
+      ApiService.post(
+        endpoint,
+        body,
+        headers: headers,
+        diagnosticLabel: diagnosticLabel,
+      );
+
+  @override
+  Future<Response<dynamic>?> patch(
+    String endpoint, {
+    required Map<String, dynamic> body,
+    required Map<String, String> headers,
+    required String diagnosticLabel,
+  }) =>
+      ApiService.patch(
+        endpoint,
+        body: body,
+        headers: headers,
+        diagnosticLabel: diagnosticLabel,
+      );
 }
 
 class LabourAttendanceService implements LabourAttendanceRepository {
+  LabourAttendanceService({
+    LabourAttendanceApi? api,
+    AttendanceLocationProvider? locationProvider,
+  })  : _api = api ?? const _ApiServiceLabourAttendanceApi(),
+        _locationProvider =
+            locationProvider ?? const GeolocatorAttendanceLocationProvider();
+
+  final LabourAttendanceApi _api;
+  final AttendanceLocationProvider _locationProvider;
+
   Future<Map<String, String>> _branchHeaders({String? branchId}) async {
     final selectedBranchId = branchId ??
         await SharedPrefsHelper.getString(
           SharedPrefsHelper.selectedBranchId,
         );
-    if (selectedBranchId.isEmpty) {
+    if (selectedBranchId.trim().isEmpty) {
       throw const LabourAttendanceException(
         'No assigned branch is available for attendance. Contact your administrator.',
       );
     }
-    return {'x-branch-id': selectedBranchId};
+    return {'x-branch-id': selectedBranchId.trim()};
+  }
+
+  Future<({String userId, String organizationId})> _identity() async {
+    final userId = await SharedPrefsHelper.getString(SharedPrefsHelper.userId);
+    final organizationId = await SharedPrefsHelper.getString(
+      SharedPrefsHelper.organizationId,
+    );
+    if (userId.trim().isEmpty || organizationId.trim().isEmpty) {
+      throw const LabourAttendanceException(
+        'Your signed-in user or organization could not be verified. Sign in again.',
+      );
+    }
+    return (userId: userId.trim(), organizationId: organizationId.trim());
+  }
+
+  void _requirePermissions() {
+    final permissions = MobileAppPermissions.current;
+    if (!MobileAppPermissions.hasAuthenticatedSession ||
+        permissions?.mobileAppLogin != true ||
+        permissions?.canUseLabourAttendance != true) {
+      throw const LabourAttendanceException(
+        'Your account is not authorized to use Labour Attendance.',
+        statusCode: 403,
+      );
+    }
   }
 
   @override
   Future<LabourAttendanceToday> getToday() async {
-    final response = await ApiService.get(
+    _requirePermissions();
+    final identity = await _identity();
+    final headers = await _branchHeaders();
+    final serverTodayResponse = await _api.get(
       EndPoints.mobileLabourAttendanceToday,
-      headers: await _branchHeaders(),
+      headers: headers,
       diagnosticLabel: 'labour_attendance_today',
     );
-    final data = _readData(
-      response,
+    final serverTodayData = _readObject(
+      serverTodayResponse,
       endpoint: EndPoints.mobileLabourAttendanceToday,
     );
-    return LabourAttendanceToday.fromJson(data);
+    late final LabourAttendanceToday serverToday;
+    try {
+      serverToday = LabourAttendanceToday.fromJson(serverTodayData);
+    } on FormatException catch (error) {
+      throw LabourAttendanceException(error.message);
+    }
+    _validateTodayScope(
+      serverToday,
+      userId: identity.userId,
+      organizationId: identity.organizationId,
+      branchId: headers['x-branch-id']!,
+    );
+    const endpoint = EndPoints.mobileLabourAttendance;
+    final response = await _api.get(
+      endpoint,
+      headers: headers,
+      diagnosticLabel: 'labour_attendance_list',
+    );
+    final rows = _readList(response, endpoint: endpoint);
+    final records = <LabourAttendanceRecord>[];
+    for (final row in rows) {
+      final rowMap = _asMap(row);
+      if (rowMap['user_id']?.toString() == identity.userId) {
+        try {
+          records.add(LabourAttendanceRecord.fromJson(rowMap));
+        } on FormatException {
+          throw const LabourAttendanceException(
+            'The attendance service returned an invalid attendance record.',
+          );
+        }
+      }
+    }
+    try {
+      return serverToday.withHistory(records);
+    } on FormatException catch (error) {
+      throw LabourAttendanceException(error.message);
+    }
   }
 
   @override
   Future<LabourAttendanceActionResult> checkIn() async {
-    final response = await ApiService.post(
-      EndPoints.mobileLabourAttendanceCheckIn,
-      const <String, dynamic>{},
-      headers: await _branchHeaders(),
+    _requirePermissions();
+    final identity = await _identity();
+    final branchHeaders = await _branchHeaders();
+    final location = await _locationForAction(
+      userId: identity.userId,
+      organizationId: identity.organizationId,
+      branchId: branchHeaders['x-branch-id']!,
+    );
+    const endpoint = EndPoints.mobileLabourAttendanceCheckIn;
+    final response = await _api.post(
+      endpoint,
+      location?.toJson() ?? <String, dynamic>{},
+      headers: branchHeaders,
       diagnosticLabel: 'labour_attendance_check_in',
     );
-    return LabourAttendanceActionResult.fromJson(
-      _readData(
-        response,
-        endpoint: EndPoints.mobileLabourAttendanceCheckIn,
-      ),
+    final result = _parseActionResult(response, endpoint);
+    _validateRecordScope(
+      result.attendance,
+      userId: identity.userId,
+      organizationId: identity.organizationId,
+      branchId: branchHeaders['x-branch-id']!,
     );
+    return result;
   }
 
   @override
   Future<LabourAttendanceActionResult> checkOut({
+    required String attendanceId,
     required String branchId,
   }) async {
-    final response = await ApiService.post(
-      EndPoints.mobileLabourAttendanceCheckOut,
-      const <String, dynamic>{},
-      headers: await _branchHeaders(branchId: branchId),
+    _requirePermissions();
+    final identity = await _identity();
+    final location = await _locationForAction(
+      userId: identity.userId,
+      organizationId: identity.organizationId,
+      branchId: branchId,
+    );
+    final endpoint = EndPoints.mobileLabourAttendanceCheckOut(attendanceId);
+    final response = await _api.patch(
+      endpoint,
+      body: location?.toJson() ?? <String, dynamic>{},
+      headers: const <String, String>{},
       diagnosticLabel: 'labour_attendance_check_out',
     );
-    return LabourAttendanceActionResult.fromJson(
-      _readData(
-        response,
-        endpoint: EndPoints.mobileLabourAttendanceCheckOut,
-      ),
+    final result = _parseActionResult(response, endpoint);
+    _validateRecordScope(
+      result.attendance,
+      userId: identity.userId,
+      organizationId: identity.organizationId,
+      branchId: branchId,
     );
+    return result;
   }
 
-  Map<String, dynamic> _readData(
+  Future<AttendanceLocationFix?> _locationForAction({
+    required String userId,
+    required String organizationId,
+    required String branchId,
+  }) async {
+    final response = await _api.get(
+      EndPoints.mobileLabourAttendanceToday,
+      headers: await _branchHeaders(branchId: branchId),
+      diagnosticLabel: 'labour_attendance_geofence',
+    );
+    final data = _readObject(
+      response,
+      endpoint: EndPoints.mobileLabourAttendanceToday,
+    );
+    late final LabourAttendanceToday state;
+    try {
+      state = LabourAttendanceToday.fromJson(data);
+    } on FormatException catch (error) {
+      throw LabourAttendanceException(error.message);
+    }
+    _validateTodayScope(
+      state,
+      userId: userId,
+      organizationId: organizationId,
+      branchId: branchId,
+    );
+    final geofence = state.branchGeofence;
+    if (geofence == null) {
+      throw const LabourAttendanceException(
+        'Branch geofence settings could not be verified. Refresh and retry.',
+      );
+    }
+    if (!geofence.enabled) return null;
+
+    try {
+      return await _locationProvider.getCurrentFix();
+    } on AttendanceLocationException catch (error) {
+      throw LabourAttendanceException(error.message);
+    }
+  }
+
+  void _validateTodayScope(
+    LabourAttendanceToday today, {
+    required String userId,
+    required String organizationId,
+    required String branchId,
+  }) {
+    if (today.employeeId != userId ||
+        today.organizationId != organizationId ||
+        today.branchId != branchId) {
+      throw const LabourAttendanceException(
+        'The attendance service returned a different user or branch scope.',
+      );
+    }
+  }
+
+  LabourAttendanceActionResult _parseActionResult(
+    Response<dynamic>? response,
+    String endpoint,
+  ) {
+    final data = _readObject(response, endpoint: endpoint);
+    try {
+      return LabourAttendanceActionResult.fromJson(data);
+    } on FormatException {
+      _logFailure(
+        endpoint: endpoint,
+        statusCode: response?.statusCode,
+        requestId: response?.headers.value('x-request-id'),
+        errorCode: 'invalid_response',
+      );
+      throw const LabourAttendanceException(
+        'The attendance service returned an invalid attendance record.',
+      );
+    }
+  }
+
+  List<dynamic> _readList(
+    Response<dynamic>? response, {
+    required String endpoint,
+  }) {
+    final body = _readBody(response, endpoint: endpoint);
+    final data = body['data'];
+    if (data is! List) {
+      _logFailure(
+        endpoint: endpoint,
+        statusCode: response?.statusCode,
+        requestId: response?.headers.value('x-request-id'),
+        errorCode: 'invalid_response',
+      );
+      throw const LabourAttendanceException(
+        'The attendance service returned an invalid attendance list.',
+      );
+    }
+    return data;
+  }
+
+  Map<String, dynamic> _readObject(
+    Response<dynamic>? response, {
+    required String endpoint,
+  }) {
+    final body = _readBody(response, endpoint: endpoint);
+    try {
+      return _asMap(body['data']);
+    } on FormatException {
+      _logFailure(
+        endpoint: endpoint,
+        statusCode: response?.statusCode,
+        requestId: response?.headers.value('x-request-id'),
+        errorCode: 'invalid_response',
+      );
+      throw const LabourAttendanceException(
+        'The attendance service returned an invalid attendance record.',
+      );
+    }
+  }
+
+  Map<String, dynamic> _readBody(
     Response<dynamic>? response, {
     required String endpoint,
   }) {
@@ -102,70 +385,141 @@ class LabourAttendanceService implements LabourAttendanceRepository {
         'Unable to reach the attendance service. Check your connection and retry.',
       );
     }
-    final body = _asMap(response.data);
-    if (response.statusCode == 401) {
+    late final Map<String, dynamic> body;
+    try {
+      body = _asMap(response.data);
+    } on FormatException {
       _logFailure(
         endpoint: endpoint,
         statusCode: response.statusCode,
         requestId: response.headers.value('x-request-id'),
-        errorCode: _errorCode(body, response.statusCode),
+        errorCode: 'invalid_response',
+      );
+      throw const LabourAttendanceException(
+        'The attendance service returned an invalid response.',
+      );
+    }
+    final statusCode = response.statusCode;
+    if (statusCode == 401) {
+      _logFailure(
+        endpoint: endpoint,
+        statusCode: statusCode,
+        requestId: response.headers.value('x-request-id'),
+        errorCode: _errorCode(body, statusCode),
       );
       throw const LabourAttendanceException(
         'Your session has expired. Please sign in again.',
         statusCode: 401,
       );
     }
-    if (response.statusCode == 403) {
+    if (statusCode == 403) {
       _logFailure(
         endpoint: endpoint,
-        statusCode: response.statusCode,
+        statusCode: statusCode,
         requestId: response.headers.value('x-request-id'),
-        errorCode: _errorCode(body, response.statusCode),
+        errorCode: _errorCode(body, statusCode),
       );
       throw LabourAttendanceException(
         _message(body, 'You are not authorized to use Labour Attendance.'),
         statusCode: 403,
       );
     }
-    if (response.statusCode == null ||
-        response.statusCode! < 200 ||
-        response.statusCode! >= 300 ||
-        body['success'] != true) {
+    final errorCode = _errorCode(body, statusCode);
+    if (errorCode == 'LABOUR_LINK_REQUIRED') {
       _logFailure(
         endpoint: endpoint,
-        statusCode: response.statusCode,
+        statusCode: statusCode,
         requestId: response.headers.value('x-request-id'),
-        errorCode: _errorCode(body, response.statusCode),
+        errorCode: errorCode,
       );
       throw LabourAttendanceException(
-        _message(
-          body,
-          'Attendance API returned HTTP ${response.statusCode ?? 'unknown'} '
-          '(${_errorCode(body, response.statusCode)}).',
-        ),
-        statusCode: response.statusCode,
+        'This login is not linked to an active labour record. Ask your COPPER '
+        'administrator to link it in User Master, then retry.',
+        statusCode: statusCode,
       );
     }
-    return _asMap(body['data']);
+    if (statusCode == 404 &&
+        endpoint == EndPoints.mobileLabourAttendanceToday) {
+      _logFailure(
+        endpoint: endpoint,
+        statusCode: statusCode,
+        requestId: response.headers.value('x-request-id'),
+        errorCode: 'attendance_today_route_missing',
+      );
+      throw const LabourAttendanceException(
+        'The attendance API on this server is outdated. Update the backend to '
+        'support today’s attendance and branch location settings, then retry.',
+        statusCode: 404,
+      );
+    }
+    if (statusCode == null ||
+        statusCode < 200 ||
+        statusCode >= 300 ||
+        body['success'] != true) {
+      final code = _errorCode(body, statusCode);
+      _logFailure(
+        endpoint: endpoint,
+        statusCode: statusCode,
+        requestId: response.headers.value('x-request-id'),
+        errorCode: code,
+      );
+      throw LabourAttendanceException(
+        '${_message(body, 'Attendance request failed')} (HTTP ${statusCode ?? 'unknown'}, $code).',
+        statusCode: statusCode,
+      );
+    }
+    return body;
   }
 
   Map<String, dynamic> _asMap(dynamic value) {
     if (value is Map<String, dynamic>) return value;
     if (value is Map) return Map<String, dynamic>.from(value);
-    return const <String, dynamic>{};
+    throw const FormatException('Expected a JSON object');
   }
 
   String _message(Map<String, dynamic> body, String fallback) {
-    final message = body['message']?.toString().trim() ?? '';
-    return message.isEmpty ? fallback : message;
+    final nestedError = body['error'];
+    final nestedMessage = nestedError is Map ? nestedError['message'] : null;
+    final message = (body['message'] ?? nestedMessage ?? nestedError)
+            ?.toString()
+            .replaceAll(RegExp(r'[\r\n\t]'), ' ')
+            .trim() ??
+        '';
+    if (message.isEmpty) return fallback;
+    return message.length <= 240 ? message : '${message.substring(0, 240)}...';
   }
 
   String _errorCode(Map<String, dynamic> body, int? statusCode) {
-    final candidate = (body['errorCode'] ?? body['code'])?.toString() ?? '';
+    final details = body['details'];
+    final nestedCode =
+        details is Map ? details['errorCode'] ?? details['code'] : null;
+    final nestedError = body['error'];
+    final nestedErrorCode = nestedError is Map
+        ? nestedError['errorCode'] ?? nestedError['code']
+        : null;
+    final candidate =
+        (body['errorCode'] ?? body['code'] ?? nestedCode ?? nestedErrorCode)
+                ?.toString() ??
+            '';
     if (RegExp(r'^[A-Za-z0-9_-]{1,64}$').hasMatch(candidate)) {
       return candidate;
     }
     return statusCode == null ? 'unknown' : 'http_$statusCode';
+  }
+
+  void _validateRecordScope(
+    LabourAttendanceRecord record, {
+    required String userId,
+    required String organizationId,
+    required String branchId,
+  }) {
+    if (record.userId != userId ||
+        record.organizationId != organizationId ||
+        record.branchId != branchId) {
+      throw const LabourAttendanceException(
+        'The attendance response did not match the signed-in user and branch.',
+      );
+    }
   }
 
   void _logFailure({
@@ -176,8 +530,7 @@ class LabourAttendanceService implements LabourAttendanceRepository {
   }) {
     if (ApiService.isProduction) return;
     developer.log(
-      'endpoint=$endpoint '
-      'status=${statusCode ?? 'none'} '
+      'endpoint=$endpoint status=${statusCode ?? 'none'} '
       'requestId=${requestId ?? 'none'} errorCode=$errorCode',
       name: 'labour_attendance',
     );

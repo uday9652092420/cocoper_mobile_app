@@ -24,27 +24,53 @@ selecting a destination.
 
 Employee attendance API (backend source contract):
 
+- The authenticated organization user must be explicitly linked to one active
+  labour master record in COPPER Web **User Master**. The mobile client never
+  creates or guesses labour records. If the link is absent, the API returns
+  `LABOUR_LINK_REQUIRED` and mobile attendance actions remain unavailable.
+
 - GET `/mobile/labour-attendance/today` with `Authorization: Bearer <token>`,
-  `x-organization-id`, and assigned `x-branch-id`. Returns today's
-  organization-timezone date, authenticated employee details, organization,
-  branch, optional attendance record, server timestamp, and status (`Not
-  Checked In`, `Checked In`, or `Completed`).
-- POST `/mobile/labour-attendance/check-in` with the same headers and an empty
-  JSON object. The server resolves employee and branch, stamps the check-in,
-  and rejects a second check-in for that user and organization-local day.
-- POST `/mobile/labour-attendance/check-out` with the same headers and an empty
-  JSON object. The server stamps checkout for the active same-day record and
-  rejects missing or already-closed attendance with HTTP 409.
-- All three routes enforce the explicit `mobile-app.labour-attendance`
-  permission, including for owner-role accounts. Check-in/check-out use
+  `x-organization-id`, and assigned `x-branch-id`. Returns the authoritative
+  organization-timezone attendance date, authenticated employee details,
+  current attendance/status, server timestamp, and `branch_geofence`
+  (`enabled`, `latitude`, `longitude`, `radius_meters`). Mobile uses this
+  server date, not the device date, to determine today's attendance.
+- A 404 from this route means the deployed backend is older than this API
+  contract. Deploy the backend route and apply `db/branch_geofencing.sql`
+  before enabling mobile attendance; the app intentionally keeps punch actions
+  unavailable until it can verify today's state and the assigned branch fence.
+- GET `/mobile/labour-attendance` retrieves attendance history.
+- POST `/mobile/labour-attendance/check-in` uses the same headers. With
+  geofencing disabled, send `{}`. When enabled, send `latitude`, `longitude`,
+  `accuracy_meters`, and ISO-8601 `captured_at`. The backend resolves the
+  authenticated user and branch, requires a fix no older than two minutes
+  with accuracy no worse than 50 meters, verifies the coordinates against
+  the configured branch radius, and rejects duplicate daily check-ins.
+- PATCH `/mobile/labour-attendance/:id/checkout` sends the same location
+  fields when that branch has geofencing enabled. The server verifies the
+  record's user, organization, and branch before checking its location; open
+  records from a previous organization-local date can still be closed. POST
+  `/mobile/labour-attendance/check-out` also remains available for the current
+  day's record and applies the same location validation.
+- Branch Master administrators configure geofencing per branch. It is
+  disabled by default to preserve existing behavior; enabled fences require
+  latitude/longitude and a radius from 10 to 5000 meters (default 100 meters).
+  Apply `db/branch_geofencing.sql` before deploying the updated backend.
+- When enabled, the server performs the authoritative distance check and
+  stores submitted coordinates and accuracy for check-in/check-out audit.
+  Device-reported GPS is not proof against a rooted device or GPS spoofing;
+  use managed-device attestation if that threat is in scope.
+- Attendance routes enforce the explicit `mobile-app.labour-attendance`
+  permission, including owner-role accounts. Punch operations use
   transaction-scoped per-user locking and server-generated timestamps.
 
 These operations reuse `mobile_labour_attendance`; this is distinct from the
 labour-payment table. The backend Labour Attendance repository merges mobile
 rows into its listing as `Temporary` records, with no `labour_id`. No user to
-master-labour mapping or COPPER Web frontend source was available to verify
-master-labour association or rendered UI behavior. The live database and
-deployed API have not been exercised. The `/labour-attendance` transaction
+master-labour mapping was verified. COPPER Web renders mobile-sourced rows
+in the Labour Attendance module but does not establish a master-labour
+association. The live database and deployed API have not been exercised. The
+`/labour-attendance` transaction
 routes remain for labour payment records and reports, not employee punches.
 
 COPPER Web currently builds Profit & Loss totals in

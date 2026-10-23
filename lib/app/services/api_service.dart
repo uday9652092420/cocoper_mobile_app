@@ -235,6 +235,7 @@ Error type: ${error.type.name}
           'method: POST\n'
           'bearerTokenPresent: '
           '${mergedHeaders['Authorization']?.startsWith('Bearer ') == true}\n'
+          'branchHeaderPresent: ${mergedHeaders.containsKey('x-branch-id')}\n'
           'payloadKeys: ${_safePayloadKeys(body)}',
           name: diagnosticLabel,
         );
@@ -356,7 +357,8 @@ Error type: ${error.type.name}
           'path: ${_endpointPath(endpoint)}\n'
           'method: GET\n'
           'bearerTokenPresent: '
-          '${mergedHeaders['Authorization']?.startsWith('Bearer ') == true}',
+          '${mergedHeaders['Authorization']?.startsWith('Bearer ') == true}\n'
+          'branchHeaderPresent: ${mergedHeaders.containsKey('x-branch-id')}',
           name: diagnosticLabel,
         );
       }
@@ -483,6 +485,72 @@ Error type: ${error.type.name}
         'PUT API EXCEPTION: $e',
       );
 
+      return null;
+    }
+  }
+
+  static Future<Response<dynamic>?> patch(
+    String endpoint, {
+    Map<String, dynamic>? body,
+    Map<String, String>? headers,
+    bool requireAuthToken = true,
+    String? diagnosticLabel,
+  }) async {
+    if (!await isInternet()) {
+      consolePrint('Internet connection unavailable.');
+      await _showNoInternetDialog();
+      return null;
+    }
+
+    _addInterceptors();
+    try {
+      final mergedHeaders = await _mergeHeaders(
+        headers,
+        requireAuthToken: requireAuthToken,
+      );
+      if (!isProduction && diagnosticLabel != null) {
+        log(
+          'HTTP request\n'
+          'path: ${_endpointPath(endpoint)}\n'
+          'method: PATCH\n'
+          'bearerTokenPresent: '
+          '${mergedHeaders['Authorization']?.startsWith('Bearer ') == true}\n'
+          'branchHeaderPresent: ${mergedHeaders.containsKey('x-branch-id')}',
+          name: diagnosticLabel,
+        );
+      }
+
+      final response = await dio.patch<dynamic>(
+        endpoint,
+        data: body,
+        options: Options(headers: mergedHeaders),
+      );
+      if (!isProduction && diagnosticLabel != null) {
+        log(
+          'HTTP response\n'
+          'path: ${_endpointPath(endpoint)}\n'
+          'method: PATCH\n'
+          'status: ${response.statusCode}\n'
+          'requestId: ${response.headers.value('x-request-id') ?? 'none'}',
+          name: diagnosticLabel,
+        );
+      }
+      return response;
+    } on DioException catch (error) {
+      if (!isProduction && diagnosticLabel != null) {
+        log(
+          'HTTP error\n'
+          'path: ${_endpointPath(endpoint)}\n'
+          'method: PATCH\n'
+          'status: ${error.response?.statusCode ?? 'none'}\n'
+          'requestId: ${error.response?.headers.value('x-request-id') ?? 'none'}\n'
+          'errorType: ${error.type.name}',
+          name: diagnosticLabel,
+        );
+      }
+      return error.response;
+    } catch (error) {
+      debugPrint('PATCH API EXCEPTION: ${error.runtimeType}');
       return null;
     }
   }

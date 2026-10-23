@@ -22,6 +22,7 @@ void main() {
       (tester) async {
     await _pumpAttendance(tester, FakeLabourAttendanceRepository());
 
+    expect(find.text('All coconut operations'), findsOneWidget);
     expect(find.text('Not Checked In'), findsOneWidget);
     expect(_checkInButton(tester).onPressed, isNotNull);
     expect(_checkOutButton(tester).onPressed, isNull);
@@ -45,10 +46,71 @@ void main() {
 
     expect(find.text('Completed'), findsOneWidget);
     expect(find.text('5:30 PM'), findsOneWidget);
+    expect(find.text('8.42 hrs'), findsOneWidget);
     expect(_checkInButton(tester).onPressed, isNull);
     expect(_checkOutButton(tester).onPressed, isNull);
     expect(repository.checkInCalls, 1);
     expect(repository.checkOutCalls, 1);
+  });
+
+  testWidgets('shows the saved previous attendance after loading dashboard',
+      (tester) async {
+    final repository = FakeLabourAttendanceRepository();
+    repository._today = LabourAttendanceToday(
+      attendance: null,
+      status: 'Not Checked In',
+      employeeId: 'user-1',
+      employeeName: 'Verified Employee',
+      organizationId: 'org-1',
+      branchId: 'branch-1',
+      attendanceDate: DateTime(2025, 4, 4),
+      serverTimestamp: DateTime(2025, 4, 4, 8),
+      lastAttendance: repository.checkOutResult.attendance,
+    );
+    await _pumpAttendance(tester, repository);
+
+    expect(find.textContaining('Previous attendance'), findsOneWidget);
+    expect(find.textContaining('Thu, Apr 3, 2025'), findsOneWidget);
+    expect(find.text('9:05 AM'), findsOneWidget);
+    expect(find.text('5:30 PM'), findsOneWidget);
+    expect(find.text('8.42 hrs'), findsOneWidget);
+    expect(find.text('Not Checked In'), findsOneWidget);
+    expect(_checkInButton(tester).onPressed, isNotNull);
+  });
+
+  testWidgets('keeps historical saved attendance out of today state',
+      (tester) async {
+    final repository = FakeLabourAttendanceRepository();
+    repository.alwaysLoadOverride = LabourAttendanceToday(
+      attendance: null,
+      status: 'Not Checked In',
+      employeeId: 'user-1',
+      employeeName: 'Verified Employee',
+      organizationId: 'org-1',
+      branchId: 'branch-1',
+      attendanceDate: DateTime(2025, 4, 4),
+      serverTimestamp: DateTime(2025, 4, 4, 8),
+      lastAttendance: repository.checkInResult.attendance,
+    );
+    await _pumpAttendance(tester, repository);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Check-In'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Not Checked In'), findsOneWidget);
+    expect(find.textContaining('Previous attendance'), findsOneWidget);
+    expect(find.text('9:05 AM'), findsOneWidget);
+    expect(
+      find.textContaining('has not confirmed today’s attendance status'),
+      findsOneWidget,
+    );
+    expect(_checkInButton(tester).onPressed, isNull);
+    expect(_checkOutButton(tester).onPressed, isNull);
+
+    await Get.find<LabourAttendanceController>().loadToday();
+    await tester.pumpAndSettle();
+    expect(_checkInButton(tester).onPressed, isNull);
+    expect(_checkOutButton(tester).onPressed, isNull);
   });
 
   testWidgets('disables repeated taps while a check-in is processing',
@@ -67,6 +129,35 @@ void main() {
     repository.checkInCompleter!.complete(repository.checkInResult);
     await tester.pumpAndSettle();
     expect(find.text('Checked In'), findsOneWidget);
+  });
+
+  testWidgets('keeps punches disabled when saved attendance cannot reconcile',
+      (tester) async {
+    final repository = FakeLabourAttendanceRepository();
+    await _pumpAttendance(tester, repository);
+    repository.alwaysLoadOverride = LabourAttendanceToday(
+      attendance: null,
+      status: 'Not Checked In',
+      employeeId: 'user-1',
+      employeeName: 'Verified Employee',
+      organizationId: 'org-1',
+      branchId: 'branch-1',
+      attendanceDate: DateTime(2025, 4, 3),
+      serverTimestamp: DateTime(2025, 4, 3, 9, 5),
+    );
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Check-In'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Checked In'), findsOneWidget);
+    expect(find.textContaining('could not be reconciled'), findsOneWidget);
+    expect(_checkInButton(tester).onPressed, isNull);
+    expect(_checkOutButton(tester).onPressed, isNull);
+
+    await Get.find<LabourAttendanceController>().loadToday();
+    await tester.pumpAndSettle();
+    expect(_checkInButton(tester).onPressed, isNull);
+    expect(_checkOutButton(tester).onPressed, isNull);
   });
 
   testWidgets('shows retrieval errors without enabling punches',
@@ -172,6 +263,8 @@ class FakeLabourAttendanceRepository implements LabourAttendanceRepository {
   int checkInCalls = 0;
   int checkOutCalls = 0;
   int loadCalls = 0;
+  LabourAttendanceToday? nextLoadOverride;
+  LabourAttendanceToday? alwaysLoadOverride;
 
   final checkInResult = LabourAttendanceActionResult(
     attendance: LabourAttendanceRecord(
@@ -207,6 +300,10 @@ class FakeLabourAttendanceRepository implements LabourAttendanceRepository {
   Future<LabourAttendanceToday> getToday() async {
     loadCalls++;
     if (loadError != null) throw loadError!;
+    if (alwaysLoadOverride != null) return alwaysLoadOverride!;
+    final override = nextLoadOverride;
+    nextLoadOverride = null;
+    if (override != null) return override;
     return _today;
   }
 
@@ -221,8 +318,12 @@ class FakeLabourAttendanceRepository implements LabourAttendanceRepository {
   }
 
   @override
-  Future<LabourAttendanceActionResult> checkOut(
-      {required String branchId}) async {
+  Future<LabourAttendanceActionResult> checkOut({
+    required String attendanceId,
+    required String branchId,
+  }) async {
+    expect(attendanceId, 'attendance-1');
+    expect(branchId, 'branch-1');
     checkOutCalls++;
     _today = _today.withAttendance(
       checkOutResult.attendance,

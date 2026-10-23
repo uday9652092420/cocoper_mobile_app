@@ -106,14 +106,27 @@ class LabourAttendanceDashboardView extends StatelessWidget {
                             ),
                             const SizedBox(width: 12),
                             const Expanded(
-                              child: Text(
-                                'COPPER',
-                                style: TextStyle(
-                                  color: AppColors.textDefaultLight,
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 0.5,
-                                ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'COPPER',
+                                    style: TextStyle(
+                                      color: AppColors.textDefaultLight,
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                  Text(
+                                    'All coconut operations',
+                                    style: TextStyle(
+                                      color: AppColors.textLightGrayLight,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                             TextButton.icon(
@@ -213,6 +226,50 @@ class LabourAttendanceDashboardView extends StatelessWidget {
                 fontSize: 14,
               ),
             ),
+            if (today.branchGeofence?.enabled == true) ...[
+              const SizedBox(height: 8),
+              Text(
+                'GPS required within ${today.branchGeofence!.radiusMeters} m of this branch.',
+                style: const TextStyle(
+                  color: AppColors.textLightGrayLight,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+            if (record == null && today.lastAttendance != null) ...[
+              const SizedBox(height: 18),
+              Text(
+                'Previous attendance · ${DateFormat('EEE, MMM d, yyyy').format(today.lastAttendance!.attendanceDate)}',
+                style: const TextStyle(
+                  color: AppColors.textLightGrayLight,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 12),
+              _AttendanceTime(
+                label: 'Check-in',
+                value:
+                    DateFormat('h:mm a').format(today.lastAttendance!.inTime),
+                icon: Icons.login,
+              ),
+              if (today.lastAttendance!.outTime != null) ...[
+                const SizedBox(height: 12),
+                _AttendanceTime(
+                  label: 'Check-out',
+                  value: DateFormat('h:mm a')
+                      .format(today.lastAttendance!.outTime!),
+                  icon: Icons.logout,
+                ),
+                const SizedBox(height: 12),
+                _AttendanceTime(
+                  label: 'Working hours',
+                  value:
+                      '${today.lastAttendance!.displayedWorkingHours.toStringAsFixed(2)} hrs',
+                  icon: Icons.schedule,
+                ),
+              ],
+            ],
             if (record != null) ...[
               const SizedBox(height: 20),
               _AttendanceTime(
@@ -226,6 +283,13 @@ class LabourAttendanceDashboardView extends StatelessWidget {
                   label: 'Check-out',
                   value: DateFormat('h:mm a').format(record.outTime!),
                   icon: Icons.logout,
+                ),
+                const SizedBox(height: 12),
+                _AttendanceTime(
+                  label: 'Working hours',
+                  value:
+                      '${record.displayedWorkingHours.toStringAsFixed(2)} hrs',
+                  icon: Icons.schedule,
                 ),
               ],
             ],

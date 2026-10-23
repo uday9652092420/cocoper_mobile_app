@@ -36,12 +36,16 @@ class EndPoints {
   ///
   /// GET /mobile/bootstrap  (Authorization: Bearer <token>)
   static const String mobileBootstrap = 'mobile/bootstrap';
+  static const String mobileLabourAttendance = 'mobile/labour-attendance';
   static const String mobileLabourAttendanceToday =
       'mobile/labour-attendance/today';
   static const String mobileLabourAttendanceCheckIn =
       'mobile/labour-attendance/check-in';
-  static const String mobileLabourAttendanceCheckOut =
+  static const String mobileLabourAttendanceCheckOutToday =
       'mobile/labour-attendance/check-out';
+
+  static String mobileLabourAttendanceCheckOut(String attendanceId) =>
+      '$mobileLabourAttendance/$attendanceId/checkout';
 
   // ============================================================
   // DASHBOARD
@@ -198,8 +202,7 @@ class EndPoints {
   // ============================================================
 
   static const String cashBankExpenses = 'cash-bank-expenses';
-  static const String profitLossStockSnapshot =
-      'profit-loss/stock-snapshot';
+  static const String profitLossStockSnapshot = 'profit-loss/stock-snapshot';
   static String cashBankExpense(String id) => '$cashBankExpenses/$id';
   static String cashBankExpenseApproval(String id) =>
       '${cashBankExpense(id)}/approve';
