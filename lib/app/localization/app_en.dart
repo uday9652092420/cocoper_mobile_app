@@ -503,7 +503,7 @@ const Map<String, String> enUS = {
   "statements": "Statements",
   "profile": "Profile",
   "active_branch": "Active branch",
-  "role_workspace": "Role workspace",
+  "role": "Role",
   "select_branch": "Select branch",
   "no_branches": "No branches assigned"
 };

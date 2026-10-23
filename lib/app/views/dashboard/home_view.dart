@@ -41,8 +41,6 @@ class HomeView extends GetView<DashboardController> {
                 const SizedBox(height: 16),
                 _buildBanner(),
                 const SizedBox(height: 20),
-                _buildRoleSection(),
-                const SizedBox(height: 18),
                 _buildSearchBar(),
                 const SizedBox(height: 18),
                 _buildStats(),
@@ -245,7 +243,7 @@ class HomeView extends GetView<DashboardController> {
             child: _scopeCard(
               icon: Icons.workspace_premium_outlined,
               iconColor: const Color(0xFFE9A23B),
-              label: 'role_workspace'.tr,
+              label: 'role'.tr,
               value: profile.role.value.isEmpty ? '-' : profile.role.value,
               showCaret: false,
             ),
@@ -467,76 +465,6 @@ class HomeView extends GetView<DashboardController> {
     );
   }
 
-  Widget _buildRoleSection() {
-    final roles = <(String, IconData, bool)>[
-      ('Finance Manager', Icons.eco_outlined, true),
-      ('Warehouse Manager', Icons.grid_view, false),
-      ('Procurement Manager', Icons.arrow_downward, false),
-      ('Sales Manager', Icons.arrow_upward, false),
-    ];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Choose login role',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
-            color: _kInk,
-          ),
-        ),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            for (var i = 0; i < roles.length; i++) ...[
-              if (i != 0) const SizedBox(width: 8),
-              Expanded(
-                child: _roleChip(roles[i].$1, roles[i].$2, roles[i].$3),
-              ),
-            ],
-          ],
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          'Owns vouchers, payments, ledgers and the month-end close.',
-          style: TextStyle(fontSize: 12, color: _kMuted),
-        ),
-      ],
-    );
-  }
-
-  Widget _roleChip(String label, IconData icon, bool selected) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
-      decoration: BoxDecoration(
-        color: selected ? _kMint : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: selected ? const Color(0xFF9ED0A0) : _kLine,
-        ),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, size: 18, color: selected ? _kGreen : _kMuted),
-          const SizedBox(height: 6),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 11,
-              height: 1.2,
-              fontWeight: FontWeight.w600,
-              color: selected ? _kGreen : const Color(0xFF5A6A5F),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildSearchBar() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -671,21 +599,24 @@ class HomeView extends GetView<DashboardController> {
   }
 
   Widget _buildFastTransactions() {
-    final items = <(String, String, IconData)>[
+    final items = <(String, String, IconData, String)>[
       (
         'Purchase entry',
         'Record coconut purchases from farmers',
-        Icons.shopping_cart_outlined
+        Icons.shopping_cart_outlined,
+        Routes.newPurchaseInvoice,
       ),
       (
         'New Sales order',
         'Create and dispatch customer orders',
-        Icons.local_shipping_outlined
+        Icons.local_shipping_outlined,
+        Routes.newSaleOrder,
       ),
       (
         'Payment receipt',
         'Collect and post customer payments',
-        Icons.receipt_long_outlined
+        Icons.receipt_long_outlined,
+        Routes.newCustomerReceipt,
       ),
     ];
 
@@ -704,15 +635,16 @@ class HomeView extends GetView<DashboardController> {
         const SizedBox(height: 6),
         const Row(
           children: [
-            Text(
-              'Fast transactions',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                color: _kInk,
+            Expanded(
+              child: Text(
+                'Fast transactions',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: _kInk,
+                ),
               ),
             ),
-            Spacer(),
             Text(
               'See all',
               style: TextStyle(
@@ -725,55 +657,72 @@ class HomeView extends GetView<DashboardController> {
         ),
         const SizedBox(height: 10),
         for (final item in items) ...[
-          _transactionTile(item.$1, item.$2, item.$3),
+          _transactionTile(
+            item.$1,
+            item.$2,
+            item.$3,
+            onTap: () => Get.toNamed<void>(item.$4),
+          ),
           const SizedBox(height: 10),
         ],
       ],
     );
   }
 
-  Widget _transactionTile(String title, String subtitle, IconData icon) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
+  Widget _transactionTile(
+    String title,
+    String subtitle,
+    IconData icon, {
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _kLine),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: _kMint,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, size: 18, color: _kGreen),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: _kLine),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.w700,
-                    color: _kInk,
-                  ),
+          child: Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: _kMint,
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: const TextStyle(fontSize: 12.5, color: _kMuted),
+                child: Icon(icon, size: 18, color: _kGreen),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w700,
+                        color: _kInk,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(fontSize: 12.5, color: _kMuted),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+              const Icon(Icons.chevron_right, size: 20, color: _kInk),
+            ],
           ),
-          const Icon(Icons.chevron_right, size: 20, color: _kInk),
-        ],
+        ),
       ),
     );
   }

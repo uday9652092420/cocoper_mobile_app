@@ -11,7 +11,7 @@ const Map<String, String> teIN = {
   "statements": "స్టేట్‌మెంట్లు",
   "profile": "ప్రొఫైల్",
   "active_branch": "క్రియాశీల శాఖ",
-  "role_workspace": "పాత్ర వర్క్‌స్పేస్",
+  "role": "పాత్ర",
   "select_branch": "శాఖను ఎంచుకోండి",
   "no_branches": "శాఖలు కేటాయించబడలేదు"
 };

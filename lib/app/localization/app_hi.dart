@@ -11,7 +11,7 @@ const Map<String, String> hiIN = {
   "statements": "विवरण",
   "profile": "प्रोफ़ाइल",
   "active_branch": "सक्रिय शाखा",
-  "role_workspace": "भूमिका कार्यक्षेत्र",
+  "role": "भूमिका",
   "select_branch": "शाखा चुनें",
   "no_branches": "कोई शाखा असाइन नहीं"
 };
