@@ -78,8 +78,13 @@ void main() {
 
     expect(find.text('Attendance unavailable'), findsOneWidget);
     expect(find.text('Permission denied'), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, 'Check-In'), findsNothing);
-    expect(find.widgetWithText(OutlinedButton, 'Check-Out'), findsNothing);
+    expect(_checkInButton(tester).onPressed, isNull);
+    expect(_checkOutButton(tester).onPressed, isNull);
+    expect(
+      find.text(
+          "Punch actions stay disabled until today's status is verified."),
+      findsOneWidget,
+    );
   });
 
   testWidgets('refreshes attendance when the app resumes', (tester) async {
@@ -92,6 +97,24 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(repository.loadCalls, 2);
+  });
+
+  testWidgets('disables punches when a resumed refresh cannot verify state',
+      (tester) async {
+    final repository = FakeLabourAttendanceRepository();
+    await _pumpAttendance(tester, repository);
+    await tester.tap(find.widgetWithText(FilledButton, 'Check-In'));
+    await tester.pumpAndSettle();
+    expect(_checkOutButton(tester).onPressed, isNotNull);
+
+    repository.loadError =
+        const LabourAttendanceException('Attendance service unavailable');
+    Get.find<LabourAttendanceController>()
+        .didChangeAppLifecycleState(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+
+    expect(_checkOutButton(tester).onPressed, isNull);
+    expect(find.text('Attendance service unavailable'), findsOneWidget);
   });
 
   testWidgets('keeps the verified employee name and does not show username',
@@ -134,6 +157,7 @@ class FakeLabourAttendanceRepository implements LabourAttendanceRepository {
   FakeLabourAttendanceRepository()
       : _today = LabourAttendanceToday(
           attendance: null,
+          status: 'Not Checked In',
           employeeId: 'user-1',
           employeeName: 'Verified Employee',
           organizationId: 'org-1',

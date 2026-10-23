@@ -33,8 +33,7 @@ class LabourAttendanceRecord {
       outTime: json['out_time'] == null
           ? null
           : DateTime.parse(json['out_time'].toString()).toLocal(),
-      totalWorkingHours:
-          double.tryParse(json['total_working_hours'].toString()) ?? 0,
+      totalWorkingHours: _requiredDouble(json, 'total_working_hours'),
       organizationId: _requiredString(json, 'organization_id'),
       branchId: _requiredString(json, 'branch_id'),
     );
@@ -47,11 +46,20 @@ class LabourAttendanceRecord {
     }
     return value;
   }
+
+  static double _requiredDouble(Map<String, dynamic> json, String key) {
+    final value = double.tryParse(json[key]?.toString() ?? '');
+    if (value == null || !value.isFinite) {
+      throw FormatException('Attendance response contains invalid $key');
+    }
+    return value;
+  }
 }
 
 class LabourAttendanceToday {
   const LabourAttendanceToday({
     required this.attendance,
+    required this.status,
     required this.employeeId,
     required this.employeeName,
     required this.organizationId,
@@ -61,6 +69,7 @@ class LabourAttendanceToday {
   });
 
   final LabourAttendanceRecord? attendance;
+  final String status;
   final String employeeId;
   final String employeeName;
   final String organizationId;
@@ -71,10 +80,16 @@ class LabourAttendanceToday {
   factory LabourAttendanceToday.fromJson(Map<String, dynamic> json) {
     final employee = _asMap(json['employee']);
     final attendance = json['attendance'];
+    final status = _requiredString(json, 'status');
+    if (!const {'Not Checked In', 'Checked In', 'Completed'}.contains(status)) {
+      throw const FormatException(
+          'Attendance response contains an invalid status');
+    }
     return LabourAttendanceToday(
       attendance: attendance == null
           ? null
           : LabourAttendanceRecord.fromJson(_asMap(attendance)),
+      status: status,
       employeeId: _requiredString(employee, 'id'),
       employeeName: _requiredString(employee, 'full_name'),
       organizationId: _requiredString(json, 'organization_id'),
@@ -94,6 +109,7 @@ class LabourAttendanceToday {
   ) {
     return LabourAttendanceToday(
       attendance: record,
+      status: record.outTime == null ? 'Checked In' : 'Completed',
       employeeId: employeeId,
       employeeName: employeeName,
       organizationId: organizationId,

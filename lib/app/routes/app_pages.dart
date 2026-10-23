@@ -59,6 +59,7 @@ import 'package:cocoper_mobile/app/views/reportsstatements/salesregister_view.da
 import 'package:cocoper_mobile/app/views/reportsstatements/statements_report_view.dart';
 import 'package:cocoper_mobile/app/views/reportsstatements/supplierstatement_view.dart';
 import 'package:cocoper_mobile/app/views/reportsstatements/profit_loss_statement_view.dart';
+import 'package:cocoper_mobile/app/bindings/profit_loss_binding.dart';
 
 import 'app_routes.dart';
 
@@ -364,6 +365,7 @@ class AppPages {
     GetPage(
       name: Routes.profitLossStatementReport,
       page: () => const ProfitLossStatementView(),
+      binding: ProfitLossBinding(),
     ),
   ].map((page) {
     final existing = page.middlewares ?? const <GetMiddleware>[];

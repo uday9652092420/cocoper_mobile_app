@@ -175,6 +175,7 @@ class LabourAttendanceDashboardView extends StatelessWidget {
           message: controller.errorMessage.value ??
               "Today's attendance could not be loaded.",
           onRetry: () => controller.loadToday(),
+          isLoading: controller.isLoading.value,
         );
       }
 
@@ -333,10 +334,12 @@ class _UnavailableCard extends StatelessWidget {
   const _UnavailableCard({
     required this.message,
     required this.onRetry,
+    required this.isLoading,
   });
 
   final String message;
   final VoidCallback onRetry;
+  final bool isLoading;
 
   @override
   Widget build(BuildContext context) {
@@ -377,9 +380,41 @@ class _UnavailableCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           TextButton.icon(
-            onPressed: onRetry,
-            icon: const Icon(Icons.refresh),
+            onPressed: isLoading ? null : onRetry,
+            icon: isLoading
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.refresh),
             label: const Text('Retry'),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: null,
+              icon: const Icon(Icons.login),
+              label: const Text('Check-In'),
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: null,
+              icon: const Icon(Icons.logout),
+              label: const Text('Check-Out'),
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            "Punch actions stay disabled until today's status is verified.",
+            style: TextStyle(
+              color: AppColors.textLightGrayLight,
+              fontSize: 12,
+            ),
           ),
         ],
       ),

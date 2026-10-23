@@ -27,7 +27,8 @@ Employee attendance API (backend source contract):
 - GET `/mobile/labour-attendance/today` with `Authorization: Bearer <token>`,
   `x-organization-id`, and assigned `x-branch-id`. Returns today's
   organization-timezone date, authenticated employee details, organization,
-  branch, optional attendance record, and server timestamp.
+  branch, optional attendance record, server timestamp, and status (`Not
+  Checked In`, `Checked In`, or `Completed`).
 - POST `/mobile/labour-attendance/check-in` with the same headers and an empty
   JSON object. The server resolves employee and branch, stamps the check-in,
   and rejects a second check-in for that user and organization-local day.
@@ -46,9 +47,39 @@ master-labour association or rendered UI behavior. The live database and
 deployed API have not been exercised. The `/labour-attendance` transaction
 routes remain for labour payment records and reports, not employee punches.
 
-No Profit & Loss statement endpoint or accounting calculation contract is
-verified. The Statements screen exposes the report entry, but the report page
-does not calculate totals from unrelated purchase, sales, or expense records.
+COPPER Web currently builds Profit & Loss totals in
+`src/pages/reports/ProfitLossStatementPage.tsx`; the backend does not expose a
+full-statement aggregate. Its existing API data sources are:
+
+- `GET /direct-sales` (`sales.read`), returning sales with `invoiceDate`,
+  `invoiceTotal`, `organizationId`, and `lines`.
+- `GET /purchase-invoices` (`purchase-invoice.read`), returning invoices with
+  `invoiceDate`, `grandTotal`, `organizationId`, and `lines`.
+- `GET /cash-bank-expenses` (`cash-bank-expense.read`), returning
+  `{success:true,data:[...]}` entries with `date`, `transactionType`, `amount`,
+  `approved`, and `organizationId`.
+- `GET /profit-loss/stock-snapshot?fromDate=YYYY-MM-DD&toDate=YYYY-MM-DD`
+  (`profit-loss.read`), returning
+  `{success:true,data:{openingUnits,openingAmount,closingUnits,closingAmount}}`.
+
+The stock snapshot endpoint requires a valid Bearer token and ISO date
+parameters. It resolves organization scope from `x-organization-id`, falling
+back to the token organization, and its SQL sums per-branch stock ledgers for
+that organization. It does not accept or apply a branch filter. The Web report
+also filters only by organization, not branch: it includes sales and purchase
+invoices in the inclusive date range, and only approved cash/bank entries in
+that range. Sales/purchase movement units use `actualQuantity`, then
+`quantityTons`, then `quantity`. COGS is opening stock + purchases − closing
+stock; gross profit is sales − COGS; net profit is gross profit + other income
+− expenses. The mobile report mirrors these existing Web rules and consumes
+the backend-calculated stock values; it must describe its totals as all-branch
+totals.
+
+There is no verified branch-specific P&L filter, full-statement response, or
+server-side Excel/PDF/print endpoint. A branch-specific report requires an
+explicit backend and Web contract that applies the same branch to sales,
+purchase invoices, cash/bank entries, and stock snapshot. Do not infer support
+from `x-branch-id`; the current snapshot SQL does not read that header.
 
 HTTP 401 on an authenticated request clears the session. HTTP 403 retains the exact server message; a permission message disables that module action for the current session. The API layer handles wrapped {success,data}, bare arrays/objects and ad-hoc auth/bootstrap responses. Global, local and 404 errors retain their message. No guessed server pagination parameters are sent.
 
@@ -188,8 +219,8 @@ There are no guessed /reports or /dashboard endpoints.
 | Customer Statement | approved direct sales + customer receipts + customers |
 | Pending Dispatch | loading dispatches + customers + branches |
 | Labour Attendance Details | GET /labour-attendance/details |
-| P&L | invoices + sales + expenses + GET /profit-loss/stock-snapshot?fromDate=YYYY-MM-DD&toDate=YYYY-MM-DD |
+| P&L | GET /direct-sales + GET /purchase-invoices + GET /cash-bank-expenses + GET /profit-loss/stock-snapshot?fromDate=YYYY-MM-DD&toDate=YYYY-MM-DD |
 
 Only the stock snapshot accepts fromDate/toDate query parameters. Date filtering, search and pagination for other lists are local.
 
-Statements merge invoices and settlements in date/createdAt/ID order and begin the filtered running balance at zero. P&L: COGS = opening stock + purchases − closing stock; gross = sales − COGS; net = gross + approved other income − approved expenses. Stock rates divide valuation by units, with zero-unit protection. Purchase/sales movement units use actualQuantity when supplied and their source quantity otherwise.
+Statements merge invoices and settlements in date/createdAt/ID order and begin the filtered running balance at zero. The Web P&L calculation and its current organization-wide scope are documented above. Stock rates divide valuation by units, with zero-unit protection.

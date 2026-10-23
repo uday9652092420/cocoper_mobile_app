@@ -23,22 +23,23 @@ class LabourAttendanceController extends GetxController
   final isProcessing = false.obs;
   final hasLoaded = false.obs;
   final hasAttendancePermission = true.obs;
+  final isStateVerified = false.obs;
 
   bool get canCheckIn =>
       today.value?.attendance == null &&
       hasAttendancePermission.value &&
+      isStateVerified.value &&
+      !isLoading.value &&
       !isProcessing.value;
 
   bool get canCheckOut =>
       today.value?.attendance?.isWorking == true &&
       hasAttendancePermission.value &&
+      isStateVerified.value &&
+      !isLoading.value &&
       !isProcessing.value;
 
-  String get status {
-    final record = today.value?.attendance;
-    if (record == null) return 'Not Checked In';
-    return record.isWorking ? 'Checked In' : 'Completed';
-  }
+  String get status => today.value?.status ?? 'Not Checked In';
 
   @override
   void onInit() {
@@ -72,8 +73,10 @@ class LabourAttendanceController extends GetxController
     try {
       today.value = await _repository.getToday();
       hasAttendancePermission.value = true;
+      isStateVerified.value = true;
     } on LabourAttendanceException catch (error) {
       errorMessage.value = error.message;
+      isStateVerified.value = false;
       if (error.statusCode == 401) {
         await _handleExpiredSession();
       } else if (error.statusCode == 403) {
@@ -82,16 +85,20 @@ class LabourAttendanceController extends GetxController
     } catch (error) {
       errorMessage.value =
           'Attendance could not be loaded (${error.runtimeType}). Retry to check the server state.';
+      isStateVerified.value = false;
     } finally {
       isLoading.value = false;
       hasLoaded.value = true;
     }
   }
 
-  Future<void> checkIn() => _perform(
-        operation: _repository.checkIn,
-        actionName: 'check in',
-      );
+  Future<void> checkIn() async {
+    if (!canCheckIn) return;
+    await _perform(
+      operation: _repository.checkIn,
+      actionName: 'check in',
+    );
+  }
 
   Future<void> checkOut() async {
     final record = today.value?.attendance;
@@ -106,7 +113,12 @@ class LabourAttendanceController extends GetxController
     required Future<LabourAttendanceActionResult> Function() operation,
     required String actionName,
   }) async {
-    if (isProcessing.value || today.value == null) return;
+    if (isProcessing.value ||
+        today.value == null ||
+        !isStateVerified.value ||
+        !hasAttendancePermission.value) {
+      return;
+    }
     isProcessing.value = true;
     errorMessage.value = null;
     try {
@@ -138,6 +150,7 @@ class LabourAttendanceController extends GetxController
     try {
       today.value = await _repository.getToday();
       hasAttendancePermission.value = true;
+      isStateVerified.value = true;
     } on LabourAttendanceException catch (error) {
       errorMessage.value =
           '${errorMessage.value}\nCurrent attendance could not be verified: ${error.message}';
@@ -146,9 +159,11 @@ class LabourAttendanceController extends GetxController
       } else if (error.statusCode == 403) {
         hasAttendancePermission.value = false;
       }
+      isStateVerified.value = false;
     } catch (error) {
       errorMessage.value =
           '${errorMessage.value}\nCurrent attendance could not be verified (${error.runtimeType}).';
+      isStateVerified.value = false;
     }
   }
 

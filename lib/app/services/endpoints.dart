@@ -198,6 +198,8 @@ class EndPoints {
   // ============================================================
 
   static const String cashBankExpenses = 'cash-bank-expenses';
+  static const String profitLossStockSnapshot =
+      'profit-loss/stock-snapshot';
   static String cashBankExpense(String id) => '$cashBankExpenses/$id';
   static String cashBankExpenseApproval(String id) =>
       '${cashBankExpense(id)}/approve';

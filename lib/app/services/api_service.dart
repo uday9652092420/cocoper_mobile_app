@@ -124,7 +124,7 @@ class ApiService {
             log(
               '''
 ========== API REQUEST ==========
-URL: ${options.uri}
+Path: ${options.uri.path}
 Method: ${options.method}
 ==================================
 ''',
@@ -143,7 +143,7 @@ Method: ${options.method}
             log(
               '''
 ========== API RESPONSE =========
-URL: ${response.requestOptions.uri}
+Path: ${response.requestOptions.uri.path}
 Status: ${response.statusCode}
 ==================================
 ''',
@@ -162,10 +162,10 @@ Status: ${response.statusCode}
             log(
               '''
 ========== API ERROR ============
-URL: ${error.requestOptions.uri}
+Path: ${error.requestOptions.uri.path}
 Method: ${error.requestOptions.method}
 Status: ${error.response?.statusCode}
-Message: ${error.message}
+Error type: ${error.type.name}
 =================================
 ''',
             );
@@ -229,18 +229,12 @@ Message: ${error.message}
       );
 
       if (!isProduction && diagnosticLabel != null) {
-        final safeHeaders = Map<String, String>.from(mergedHeaders);
-        if (safeHeaders.containsKey('Authorization')) {
-          safeHeaders['Authorization'] = '<redacted>';
-        }
-        if (safeHeaders.containsKey('x-organization-id')) {
-          safeHeaders['x-organization-id'] = '<redacted>';
-        }
         log(
           'HTTP request\n'
-          'url: ${dio.options.baseUrl}$endpoint\n'
+          'path: ${_endpointPath(endpoint)}\n'
           'method: POST\n'
-          'headers: ${jsonEncode(safeHeaders)}\n'
+          'bearerTokenPresent: '
+          '${mergedHeaders['Authorization']?.startsWith('Bearer ') == true}\n'
           'payloadKeys: ${_safePayloadKeys(body)}',
           name: diagnosticLabel,
         );
@@ -257,7 +251,7 @@ Message: ${error.message}
       if (!isProduction && diagnosticLabel != null) {
         log(
           'HTTP response\n'
-          'url: ${response.requestOptions.uri}\n'
+          'path: ${response.requestOptions.uri.path}\n'
           'method: ${response.requestOptions.method}\n'
           'status: ${response.statusCode}\n'
           'requestId: ${response.headers.value('x-request-id') ?? 'none'}\n'
@@ -270,12 +264,12 @@ Message: ${error.message}
       if (!isProduction && diagnosticLabel != null) {
         log(
           'HTTP error\n'
-          'url: ${e.requestOptions.uri}\n'
+          'path: ${e.requestOptions.uri.path}\n'
           'method: ${e.requestOptions.method}\n'
           'status: ${e.response?.statusCode}\n'
           'requestId: ${e.response?.headers.value('x-request-id') ?? 'none'}\n'
           'body: ${jsonEncode(_safeDiagnosticBody(e.response?.data))}\n'
-          'message: ${e.message}',
+          'errorType: ${e.type.name}',
           name: diagnosticLabel,
         );
       }
@@ -283,13 +277,13 @@ Message: ${error.message}
         '========== POST API ERROR ==========',
       );
       debugPrint(
-        'URL: ${e.requestOptions.uri}',
+        'Path: ${e.requestOptions.uri.path}',
       );
       debugPrint(
         'Status: ${e.response?.statusCode}',
       );
       debugPrint(
-        'Message: ${e.message}',
+        'Error type: ${e.type.name}',
       );
       debugPrint(
         '====================================',
@@ -316,11 +310,9 @@ Message: ${error.message}
     }
     const safeKeys = {
       'success',
-      'message',
-      'error',
+      'code',
+      'errorCode',
       'requestId',
-      'id',
-      'dispatchNumber',
     };
     return <String, dynamic>{
       for (final entry in body.entries)
@@ -338,6 +330,7 @@ Message: ${error.message}
     Map<String, dynamic>? queryParameters,
     Map<String, String>? headers,
     bool requireAuthToken = true,
+    String? diagnosticLabel,
   }) async {
     if (!await isInternet()) {
       consolePrint(
@@ -357,6 +350,17 @@ Message: ${error.message}
         requireAuthToken: requireAuthToken,
       );
 
+      if (!isProduction && diagnosticLabel != null) {
+        log(
+          'HTTP request\n'
+          'path: ${_endpointPath(endpoint)}\n'
+          'method: GET\n'
+          'bearerTokenPresent: '
+          '${mergedHeaders['Authorization']?.startsWith('Bearer ') == true}',
+          name: diagnosticLabel,
+        );
+      }
+
       final response = await dio.get<dynamic>(
         endpoint,
         queryParameters: queryParameters,
@@ -365,8 +369,29 @@ Message: ${error.message}
         ),
       );
 
+      if (!isProduction && diagnosticLabel != null) {
+        log(
+          'HTTP response\n'
+          'path: ${_endpointPath(endpoint)}\n'
+          'method: GET\n'
+          'status: ${response.statusCode}\n'
+          'requestId: ${response.headers.value('x-request-id') ?? 'none'}',
+          name: diagnosticLabel,
+        );
+      }
       return response;
     } on DioException catch (e) {
+      if (!isProduction && diagnosticLabel != null) {
+        log(
+          'HTTP error\n'
+          'path: ${_endpointPath(endpoint)}\n'
+          'method: GET\n'
+          'status: ${e.response?.statusCode ?? 'none'}\n'
+          'requestId: ${e.response?.headers.value('x-request-id') ?? 'none'}\n'
+          'errorType: ${e.type.name}',
+          name: diagnosticLabel,
+        );
+      }
       debugPrint(
         '========== GET API ERROR ==========',
       );
@@ -377,7 +402,7 @@ Message: ${error.message}
         'Status: ${e.response?.statusCode}',
       );
       debugPrint(
-        'Message: ${e.message}',
+        'Error type: ${e.type.name}',
       );
       debugPrint(
         '===================================',
@@ -386,11 +411,16 @@ Message: ${error.message}
       return e.response;
     } catch (e) {
       debugPrint(
-        'GET API EXCEPTION: $e',
+        'GET API EXCEPTION: ${e.runtimeType}',
       );
 
       return null;
     }
+  }
+
+  static String _endpointPath(String endpoint) {
+    final uri = Uri.tryParse(endpoint);
+    return (uri?.hasAuthority == true ? uri!.path : endpoint).split('?').first;
   }
 
   // ============================================================
