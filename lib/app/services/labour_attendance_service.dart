@@ -2,6 +2,7 @@ import 'dart:developer' as developer;
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:geolocator/geolocator.dart';
 
 import '../helpers/shared_preferences.dart';
 import '../models/labour_attendance.dart';
@@ -11,17 +12,44 @@ import 'endpoints.dart';
 import 'mobile_app_permissions.dart';
 
 class LabourAttendanceException implements Exception {
-  const LabourAttendanceException(this.message, {this.statusCode});
+  const LabourAttendanceException(
+    this.message, {
+    this.statusCode,
+    this.isLocationError = false,
+    this.isOutsideGeofence = false,
+  });
 
   final String message;
   final int? statusCode;
+  final bool isLocationError;
+  final bool isOutsideGeofence;
 
   @override
   String toString() => message;
 }
 
+enum AttendanceLocationStatus {
+  notRequired,
+  withinGeofence,
+  outsideGeofence,
+}
+
+class AttendanceLocationVerification {
+  const AttendanceLocationVerification({
+    required this.status,
+    this.distanceMeters,
+  });
+
+  final AttendanceLocationStatus status;
+  final double? distanceMeters;
+}
+
 abstract interface class LabourAttendanceRepository {
   Future<LabourAttendanceToday> getToday();
+
+  Future<AttendanceLocationVerification> verifyCurrentLocation(
+    LabourAttendanceToday today,
+  );
 
   Future<LabourAttendanceActionResult> checkIn();
 
@@ -145,7 +173,6 @@ class LabourAttendanceService implements LabourAttendanceRepository {
   void _requirePermissions() {
     final permissions = MobileAppPermissions.current;
     if (!MobileAppPermissions.hasAuthenticatedSession ||
-        permissions?.mobileAppLogin != true ||
         permissions?.canUseLabourAttendance != true) {
       throw const LabourAttendanceException(
         'Your account is not authorized to use Labour Attendance.',
@@ -210,6 +237,53 @@ class LabourAttendanceService implements LabourAttendanceRepository {
     } on FormatException catch (error) {
       throw LabourAttendanceException(error.message);
     }
+  }
+
+  @override
+  Future<AttendanceLocationVerification> verifyCurrentLocation(
+    LabourAttendanceToday today,
+  ) async {
+    _requirePermissions();
+    final identity = await _identity();
+    final headers = await _branchHeaders(branchId: today.branchId);
+    _validateTodayScope(
+      today,
+      userId: identity.userId,
+      organizationId: identity.organizationId,
+      branchId: headers['x-branch-id']!,
+    );
+
+    final geofence = today.branchGeofence;
+    if (geofence == null) {
+      throw const LabourAttendanceException(
+        'Branch geofence settings could not be verified. Refresh and retry.',
+        isLocationError: true,
+      );
+    }
+    if (!geofence.enabled) {
+      return const AttendanceLocationVerification(
+        status: AttendanceLocationStatus.notRequired,
+      );
+    }
+
+    late final AttendanceLocationFix fix;
+    try {
+      fix = await _locationProvider.getCurrentFix();
+    } on AttendanceLocationException catch (error) {
+      throw LabourAttendanceException(error.message, isLocationError: true);
+    }
+    final distance = Geolocator.distanceBetween(
+      geofence.latitude!,
+      geofence.longitude!,
+      fix.latitude,
+      fix.longitude,
+    );
+    return AttendanceLocationVerification(
+      status: distance <= geofence.radiusMeters
+          ? AttendanceLocationStatus.withinGeofence
+          : AttendanceLocationStatus.outsideGeofence,
+      distanceMeters: distance,
+    );
   }
 
   @override
@@ -313,7 +387,10 @@ class LabourAttendanceService implements LabourAttendanceRepository {
     try {
       return await _locationProvider.getCurrentFix();
     } on AttendanceLocationException catch (error) {
-      throw LabourAttendanceException(error.message);
+      throw LabourAttendanceException(
+        error.message,
+        isLocationError: true,
+      );
     }
   }
 
@@ -480,6 +557,8 @@ class LabourAttendanceService implements LabourAttendanceRepository {
         statusCode >= 300 ||
         body['success'] != true) {
       final code = _errorCode(body, statusCode);
+      final message = _message(body, 'Attendance request failed');
+      final outsideGeofence = _isOutsideGeofence(code, message);
       _logFailure(
         endpoint: endpoint,
         statusCode: statusCode,
@@ -487,8 +566,10 @@ class LabourAttendanceService implements LabourAttendanceRepository {
         errorCode: code,
       );
       throw LabourAttendanceException(
-        '${_message(body, 'Attendance request failed')} (HTTP ${statusCode ?? 'unknown'}, $code).',
+        '$message (HTTP ${statusCode ?? 'unknown'}, $code).',
         statusCode: statusCode,
+        isLocationError: outsideGeofence || _isLocationFailure(code, message),
+        isOutsideGeofence: outsideGeofence,
       );
     }
     return body;
@@ -528,6 +609,28 @@ class LabourAttendanceService implements LabourAttendanceRepository {
       return candidate;
     }
     return statusCode == null ? 'unknown' : 'http_$statusCode';
+  }
+
+  bool _isOutsideGeofence(String code, String message) {
+    final normalizedCode = code.toUpperCase();
+    final normalizedMessage = message.toLowerCase();
+    return normalizedCode.contains('GEOFENCE') ||
+        normalizedCode.contains('OUTSIDE') ||
+        normalizedCode.contains('DISTANCE') ||
+        normalizedMessage.contains('geofence') ||
+        normalizedMessage.contains('outside') ||
+        normalizedMessage.contains('not within') ||
+        normalizedMessage.contains('branch radius') ||
+        normalizedMessage.contains('too far');
+  }
+
+  bool _isLocationFailure(String code, String message) {
+    final normalizedCode = code.toUpperCase();
+    final normalizedMessage = message.toLowerCase();
+    return normalizedCode.contains('LOCATION') ||
+        normalizedCode.contains('GPS') ||
+        normalizedMessage.contains('location') ||
+        normalizedMessage.contains('gps');
   }
 
   void _logResponseShape(

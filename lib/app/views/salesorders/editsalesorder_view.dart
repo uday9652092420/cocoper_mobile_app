@@ -596,7 +596,7 @@ class _EditSalesOrderViewState extends State<EditSalesOrderView> {
             ),
             _computedField(
               'Actual Qty',
-              _formatAmount(_actualQuantity(line)),
+              _formatActualQuantity(_actualQuantity(line)),
             ),
           ),
           const SizedBox(height: 10),
@@ -957,6 +957,9 @@ class _EditSalesOrderViewState extends State<EditSalesOrderView> {
 
   String _formatAmount(double value) =>
       NumberFormat('#,##0.######').format(value);
+
+  String _formatActualQuantity(double value) =>
+      NumberFormat('#,##0').format(value.round());
 
   void _onPiecesPercentageChanged(_EditSalesOrderLine line) {
     final percentage = SalesOrderController.clampNum(

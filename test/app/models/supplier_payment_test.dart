@@ -32,6 +32,25 @@ void main() {
     expect(payment.attachmentNamesJson, '["proof.pdf"]');
   });
 
+  test('uses the backend business date for UTC-serialized payment dates', () {
+    expect(
+      SupplierPayment.fromJson({
+        'date': '2026-10-25T22:00:00.000Z',
+      }).date,
+      '2026-10-26',
+    );
+    expect(
+      SupplierPayment.fromJson({
+        'date': '2026-10-17T00:00:00.000Z',
+      }).date,
+      '2026-10-17',
+    );
+    expect(
+      SupplierPayment.fromJson({'date': '2026-10-26'}).date,
+      '2026-10-26',
+    );
+  });
+
   test(
       'serializes the verified camelCase update payload and nulls cumulative invoice',
       () {

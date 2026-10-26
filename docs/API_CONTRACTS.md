@@ -5,7 +5,7 @@ Paths below are relative to the configured /api base URL. These mappings come fr
 ## Authentication and scope
 
 - POST /auth/login: {email, password, client: "mobile"}. The email input also accepts the username value supported by the server.
-- Response: token, expiresAt (epoch seconds), and user containing id, username, full_name, role, is_super_admin, organization_id, and, when returned by the deployed API, mobile_app_login and mobile_app_labour_attendance.
+- Response: token, expiresAt (epoch seconds), and user containing id, username, full_name, role, is_super_admin, organization_id, and Boolean mobile_app_login and mobile_app_labour_attendance fields.
 - Header: Authorization: Bearer <token>. No refresh endpoint exists.
 - GET /mobile/bootstrap uses Bearer only; response includes organization, branches and default_branch_id.
 - Bootstrap's authenticated `user` also contains the Boolean
@@ -16,11 +16,17 @@ Paths below are relative to the configured /api base URL. These mappings come fr
 - Profile: GET /profile/me, PUT /profile/me with full_name, email, mobile_no, profile_picture, and PUT /profile/password with old_password/new_password.
 
 Flutter reads the Boolean `mobile_app_login` and
-`mobile_app_labour_attendance` fields from `response.user`. Mobile login is
-allowed when either permission is enabled; normal dashboard access still
-requires `mobile_app_login: true`. Missing, null, or non-Boolean permissions do
-not grant access. Session restoration fetches `/mobile/bootstrap` before
-selecting a destination.
+`mobile_app_labour_attendance` fields from `response.user`. Both fields must be
+present and Boolean in both the login and `/mobile/bootstrap` responses.
+`mobile_app_login: true` grants the normal Cocoper dashboard and modules;
+`mobile_app_labour_attendance: true` independently grants Labour Attendance.
+When both are true, the normal dashboard is the initial destination and both
+areas remain available. When only attendance is enabled, the user is routed
+directly to Labour Attendance and cannot open normal modules. When both are
+false, mobile access is denied. Missing, null, non-Boolean, or disagreeing
+permissions do not establish a mobile session. Session restoration fetches
+`/mobile/bootstrap` to verify current permissions before selecting a
+destination.
 
 Employee attendance API (backend source contract):
 
@@ -45,6 +51,10 @@ Employee attendance API (backend source contract):
   non-object employee types and multi-row arrays are rejected.
   `branch_geofence` remains mandatory before attendance state is considered
   verified or any punch action is enabled.
+  When geofencing is enabled, Flutter obtains a current device location when
+  the attendance dashboard loads or resumes and displays whether it is within
+  the configured radius. This pre-check is informational; every punch obtains
+  a fresh fix and the backend remains authoritative for geofence enforcement.
 - Authenticated UAT verification on 2026-10-24 returned HTTP 200
   (`application/json; charset=utf-8`) with `data` keys `branch_id`,
   `business_date`, `status`, and `attendance` (`null`). It omitted
@@ -145,14 +155,26 @@ HTTP 401 on an authenticated request clears the session. HTTP 403 retains the ex
 | Bag Purchase | GET/POST /bag-purchases; GET/PUT /bag-purchases/:id | Not verified | DELETE /bag-purchases/:id |
 
 There is no verified Purchase Order → Sales Order conversion endpoint in the
-supplied backend contract. `POST /sales-orders` is a generic Sales Order create
-route; accepting `sourcePoId` and `poNumber` does not establish safe conversion,
-link persistence, or duplicate protection. Do not use it as a conversion
-operation. Enabling conversion requires a documented authenticated operation
-and payload, permitted Purchase Order status and permissions, an authoritative
-response/detail representation containing the linked Sales Order ID and
-persisted converted state, database-backed atomic/idempotent duplicate
-protection, and confirmed stock, accounting, and audit effects.
+supplied backend contract. `POST /sales-orders` is documented only as a generic
+Sales Order create route. The current Flutter conversion screen posts to that
+route with `sourcePoId`, `poNumber`, `branchId`, Sales Order fields and lines;
+organization ID is omitted from the body, while the shared API client sends the
+authenticated JWT and session organization scope. The mobile client accepts a
+conversion only after HTTP 201 and a subsequent successful `GET /sales-orders`
+returns a record with the same source PO link, database ID and Sales Order
+number. The 201 response parser accepts a direct order object or a `data`,
+`salesOrder`, or `order` object envelope, but that shape is a client-side
+compatibility parser, not a confirmed backend response contract.
+
+For an ambiguous result, the mobile client persistently blocks another
+conversion attempt for that PO and organization until the server link is
+confirmed. This prevents an automatic duplicate retry but is not a substitute
+for server-side atomic/idempotent protection; it can require administrator
+verification to unblock. The backend/Web team must document and verify the
+authenticated conversion operation, exact request/response, permissions and
+allowed PO statuses, durable source relationship, idempotency behavior, and
+stock/accounting/audit effects before this flow can be considered a verified
+conversion integration.
 
 The supplied contract only verifies `GET /sales-orders` as a read-only lookup
 whose list records include line items. The mobile client contains a Sales Order

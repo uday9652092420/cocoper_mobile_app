@@ -69,6 +69,9 @@ class _NewPurchaseInvoiceViewState extends State<NewPurchaseInvoiceView> {
       _controller.prepareCreate().then((invoiceNo) {
         if (!mounted) return;
         setState(() {
+          _branch ??= _controller.branches.isEmpty
+              ? null
+              : _controller.branches.first.id;
           if (_invoiceNoController.text.trim().isEmpty) {
             _invoiceNoController.text = invoiceNo;
           }

@@ -55,7 +55,8 @@ void main() {
     expect(permissions?.canUseLabourAttendance, isTrue);
   });
 
-  test('routes both true permissions to Labour Attendance', () {
+  test('routes both enabled permissions to the normal dashboard by default',
+      () {
     final permissions = MobileAppPermissions.fromLoginResponse({
       'user': {
         'mobile_app_login': true,
@@ -63,7 +64,7 @@ void main() {
       },
     });
 
-    expect(permissions?.destination, MobileAppDestination.labourAttendance);
+    expect(permissions?.destination, MobileAppDestination.normalDashboard);
   });
 
   test('routes normal mobile permissions to the normal dashboard', () {
@@ -100,7 +101,7 @@ void main() {
     expect(permissions?.canUseLabourAttendance, isTrue);
   });
 
-  test('missing attendance permission uses the normal dashboard', () {
+  test('an explicit main-app permission selects the normal dashboard', () {
     final permissions = MobileAppPermissions.fromLoginResponse({
       'user': {'mobile_app_login': true},
     });
@@ -111,7 +112,7 @@ void main() {
     );
   });
 
-  test('does not require permission fields for the normal dashboard', () {
+  test('incomplete permissions are not a valid session configuration', () {
     final permissions = MobileAppPermissions.fromLoginResponse({
       'user': {'mobile_app_login': true},
     });
@@ -137,11 +138,11 @@ void main() {
     expect(permissions?.mobileAppLabourAttendance, isNull);
     expect(
       permissions?.destination,
-      MobileAppDestination.normalDashboard,
+      MobileAppDestination.permissionConfigurationUnavailable,
     );
   });
 
-  test('null permission values fall back to the normal dashboard', () {
+  test('null permission values do not grant access', () {
     final permissions = MobileAppPermissions.fromLoginResponse({
       'user': {
         'mobile_app_login': null,
@@ -151,7 +152,7 @@ void main() {
 
     expect(
       permissions?.destination,
-      MobileAppDestination.normalDashboard,
+      MobileAppDestination.permissionConfigurationUnavailable,
     );
   });
 
@@ -165,12 +166,12 @@ void main() {
 
     expect(
       permissions?.destination,
-      MobileAppDestination.normalDashboard,
+      MobileAppDestination.permissionConfigurationUnavailable,
     );
     expect(permissions?.canUseLabourAttendance, isFalse);
   });
 
-  test('allows normal dashboard routing when backend omits both flags', () {
+  test('blocks routes when backend omits both permission flags', () {
     final permissions = MobileAppPermissions.fromLoginResponse({
       'user': {'role': 'Labour'},
     });
@@ -180,7 +181,7 @@ void main() {
 
     expect(
       MobileAppPermissionMiddleware().redirect(Routes.dashboard)?.name,
-      isNull,
+      Routes.loginPage,
     );
   });
 
@@ -217,7 +218,7 @@ void main() {
     expect(result.status, MobilePermissionReconciliationStatus.verified);
     expect(
       result.permissions?.destination,
-      MobileAppDestination.labourAttendance,
+      MobileAppDestination.normalDashboard,
     );
   });
 
@@ -245,7 +246,7 @@ void main() {
     );
   });
 
-  test('keeps login working when both UAT responses omit permissions', () {
+  test('requires both responses to provide explicit permission flags', () {
     final login = MobileAppPermissions.fromLoginResponse({
       'success': true,
       'user': {'id': 'user-1', 'username': 'bunny'},
@@ -257,13 +258,15 @@ void main() {
 
     final result = MobileAppPermissions.reconcile(login, bootstrap);
 
-    expect(result.status, MobilePermissionReconciliationStatus.verified);
     expect(
-        result.permissions?.destination, MobileAppDestination.normalDashboard);
-    expect(result.permissions?.canUseLabourAttendance, isFalse);
+      result.status,
+      MobilePermissionReconciliationStatus.loginIncomplete,
+    );
+    expect(result.permissions, isNull);
   });
 
-  test('uses available permissions when one response omits a permission', () {
+  test('rejects login and bootstrap responses with missing permission flags',
+      () {
     final complete = MobileAppPermissions.fromLoginResponse({
       'user': {
         'mobile_app_login': true,
@@ -281,20 +284,14 @@ void main() {
 
     expect(
       loginMissing.status,
-      MobilePermissionReconciliationStatus.verified,
+      MobilePermissionReconciliationStatus.loginIncomplete,
     );
     expect(
       bootstrapMissing.status,
-      MobilePermissionReconciliationStatus.verified,
+      MobilePermissionReconciliationStatus.bootstrapIncomplete,
     );
-    expect(
-      loginMissing.permissions?.destination,
-      MobileAppDestination.labourAttendance,
-    );
-    expect(
-      bootstrapMissing.permissions?.destination,
-      MobileAppDestination.labourAttendance,
-    );
+    expect(loginMissing.permissions, isNull);
+    expect(bootstrapMissing.permissions, isNull);
   });
 
   test('rejects disagreeing login and bootstrap permissions', () {
@@ -393,7 +390,7 @@ void main() {
     );
   });
 
-  test('keeps authenticated users on dashboard when UAT omits permissions', () {
+  test('does not grant access when login response omits permissions', () {
     final response = {
       'success': true,
       'message': 'Login successful',
@@ -416,14 +413,14 @@ void main() {
     expect(permissions?.isComplete, isFalse);
     expect(
       permissions?.destination,
-      MobileAppDestination.normalDashboard,
+      MobileAppDestination.permissionConfigurationUnavailable,
     );
     expect(permissions?.canUseLabourAttendance, isFalse);
     expect(diagnostics['parser_decision'],
         'mobile_app_login_missing,mobile_app_labour_attendance_missing');
   });
 
-  test('routes incomplete bootstrap permissions to normal dashboard', () {
+  test('does not grant access when bootstrap response omits permissions', () {
     final response = {
       'success': true,
       'user': {
@@ -444,7 +441,7 @@ void main() {
     expect(permissions?.isComplete, isFalse);
     expect(
       permissions?.destination,
-      MobileAppDestination.normalDashboard,
+      MobileAppDestination.permissionConfigurationUnavailable,
     );
     expect(permissions?.canUseLabourAttendance, isFalse);
     expect(diagnostics['parser_decision'],
@@ -473,6 +470,14 @@ void main() {
   });
 
   test('session restoration uses fresh bootstrap permission values', () {
+    final attendanceOnlyPermissions =
+        MobileAppPermissions.fromBootstrapResponse({
+      'success': true,
+      'user': {
+        'mobile_app_login': false,
+        'mobile_app_labour_attendance': true,
+      },
+    });
     final labourPermissions = MobileAppPermissions.fromBootstrapResponse({
       'success': true,
       'user': {
@@ -501,6 +506,10 @@ void main() {
 
     expect(
       labourPermissions?.destination,
+      MobileAppDestination.normalDashboard,
+    );
+    expect(
+      attendanceOnlyPermissions?.destination,
       MobileAppDestination.labourAttendance,
     );
     expect(
@@ -508,6 +517,7 @@ void main() {
       MobileAppDestination.normalDashboard,
     );
     expect(deniedPermissions?.destination, MobileAppDestination.denied);
+    expect(incompletePermissions?.isComplete, isFalse);
     expect(
       incompletePermissions?.destination,
       MobileAppDestination.normalDashboard,
@@ -552,7 +562,7 @@ void main() {
     );
   });
 
-  test('allows dashboard access when the backend omits permission fields', () {
+  test('denies routes when the backend omits permission fields', () {
     MobileAppPermissions.beginSession(
       MobileAppPermissions.fromBootstrapResponse({
         'success': true,
@@ -561,14 +571,14 @@ void main() {
     );
 
     final middleware = MobileAppPermissionMiddleware();
-    expect(middleware.redirect(Routes.dashboard), isNull);
+    expect(middleware.redirect(Routes.dashboard)?.name, Routes.loginPage);
     expect(
       middleware.redirect(Routes.labourAttendance)?.name,
-      Routes.dashboard,
+      Routes.loginPage,
     );
   });
 
-  test('redirects attendance-enabled users away from normal mobile routes', () {
+  test('restricts attendance-only users to the attendance dashboard', () {
     MobileAppPermissions.beginSession(
       const MobileAppPermissions(
         mobileAppLogin: false,
@@ -579,6 +589,54 @@ void main() {
     expect(
       MobileAppPermissionMiddleware().redirect(Routes.dashboard)?.name,
       Routes.labourAttendance,
+    );
+    expect(
+      MobileAppPermissionMiddleware().redirect(Routes.purchaseOrder)?.name,
+      Routes.labourAttendance,
+    );
+  });
+
+  test('both permissions allow normal modules and Labour Attendance', () {
+    MobileAppPermissions.beginSession(
+      const MobileAppPermissions(
+        mobileAppLogin: true,
+        mobileAppLabourAttendance: true,
+      ),
+    );
+    final middleware = MobileAppPermissionMiddleware();
+
+    expect(middleware.redirect(Routes.dashboard), isNull);
+    expect(middleware.redirect(Routes.purchaseOrder), isNull);
+    expect(middleware.redirect(Routes.labourAttendance), isNull);
+  });
+
+  test('main-app-only users cannot open Labour Attendance', () {
+    MobileAppPermissions.beginSession(
+      const MobileAppPermissions(
+        mobileAppLogin: true,
+        mobileAppLabourAttendance: false,
+      ),
+    );
+
+    expect(
+      MobileAppPermissionMiddleware().redirect(Routes.labourAttendance)?.name,
+      Routes.dashboard,
+    );
+  });
+
+  test('users with neither permission are sent to login', () {
+    MobileAppPermissions.beginSession(
+      const MobileAppPermissions(
+        mobileAppLogin: false,
+        mobileAppLabourAttendance: false,
+      ),
+    );
+
+    final middleware = MobileAppPermissionMiddleware();
+    expect(middleware.redirect(Routes.dashboard)?.name, Routes.loginPage);
+    expect(
+      middleware.redirect(Routes.labourAttendance)?.name,
+      Routes.loginPage,
     );
   });
 
@@ -624,6 +682,28 @@ void main() {
     expect(
       MobileAppPermissionMiddleware().redirect(Routes.labourAttendance)?.name,
       Routes.dashboard,
+    );
+  });
+
+  test('new attendance-only login removes prior normal-module access', () {
+    MobileAppPermissions.beginSession(
+      const MobileAppPermissions(
+        mobileAppLogin: true,
+        mobileAppLabourAttendance: true,
+      ),
+    );
+    MobileAppPermissions.beginSession(
+      const MobileAppPermissions(
+        mobileAppLogin: false,
+        mobileAppLabourAttendance: true,
+      ),
+    );
+
+    final middleware = MobileAppPermissionMiddleware();
+    expect(middleware.redirect(Routes.labourAttendance), isNull);
+    expect(
+      middleware.redirect(Routes.purchaseOrder)?.name,
+      Routes.labourAttendance,
     );
   });
 

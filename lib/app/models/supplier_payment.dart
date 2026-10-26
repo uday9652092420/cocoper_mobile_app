@@ -112,9 +112,11 @@ class SupplierPayment {
     if (text.isEmpty) return '';
     final parsed = DateTime.tryParse(text);
     if (parsed != null) {
-      return '${parsed.year.toString().padLeft(4, '0')}-'
-          '${parsed.month.toString().padLeft(2, '0')}-'
-          '${parsed.day.toString().padLeft(2, '0')}';
+      final businessDate =
+          parsed.isUtc ? parsed.add(_backendDateOffset) : parsed;
+      return '${businessDate.year.toString().padLeft(4, '0')}-'
+          '${businessDate.month.toString().padLeft(2, '0')}-'
+          '${businessDate.day.toString().padLeft(2, '0')}';
     }
     final parts = text.split('/');
     if (parts.length == 3) {
@@ -134,6 +136,8 @@ class SupplierPayment {
     }
     return text;
   }
+
+  static const Duration _backendDateOffset = Duration(hours: 2);
 }
 
 class SupplierPaymentAttachment {

@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
-import 'package:get/get.dart';
+import 'package:dio/dio.dart';
+import 'package:get/get.dart' hide Response;
 
 import '../../helpers/console_print.dart';
 import '../../helpers/flutter_toast.dart';
@@ -14,6 +15,17 @@ import '../../services/endpoints.dart';
 /// Handles the Purchase Order list, lookups and create/save flow against the
 /// existing COCOPER backend using the shared [ApiService].
 class PurchaseOrderController extends GetxController {
+  PurchaseOrderController({
+    Future<Response<dynamic>?> Function(String endpoint)? getRequest,
+    Future<Response<dynamic>?> Function(String endpoint, dynamic body)?
+        postRequest,
+  })  : _getRequest = getRequest,
+        _postRequest = postRequest;
+
+  final Future<Response<dynamic>?> Function(String endpoint)? _getRequest;
+  final Future<Response<dynamic>?> Function(String endpoint, dynamic body)?
+      _postRequest;
+
   // ============================================================
   // LIST STATE
   // ============================================================
@@ -49,7 +61,7 @@ class PurchaseOrderController extends GetxController {
 
     consolePrint('PURCHASE ORDER LIST REQUEST');
 
-    final response = await ApiService.get(EndPoints.purchaseOrders);
+    final response = await _get(EndPoints.purchaseOrders);
 
     consolePrint('PURCHASE ORDER LIST STATUS: ${response?.statusCode}');
 
@@ -325,17 +337,17 @@ class PurchaseOrderController extends GetxController {
         SharedPrefsHelper.organizationId,
       );
 
-      final body = <String, dynamic>{
-        'poNumber': poNumber,
-        'organizationId': organizationId,
-        'supplierId': supplierId,
-        if (branchId.isNotEmpty) 'branchId': branchId,
-        'date': date,
-        if (remarks.isNotEmpty) 'remarks': remarks,
-        'status': status,
-        'mode': mode,
-        'lines': lines.map((line) => line.toJson()).toList(),
-      };
+      final body = PurchaseOrder(
+        poNumber: poNumber,
+        organizationId: organizationId,
+        supplierId: supplierId,
+        branchId: branchId,
+        date: date,
+        remarks: remarks,
+        status: status,
+        mode: mode,
+        lines: lines,
+      ).toRequestJson(organizationId: organizationId);
 
       consolePrint(
         id == null
@@ -345,13 +357,12 @@ class PurchaseOrderController extends GetxController {
       consolePrint('PURCHASE ORDER NUMBER: $poNumber');
 
       final response = id == null
-          ? await ApiService.post(EndPoints.purchaseOrders, body)
+          ? await _post(EndPoints.purchaseOrders, body)
           : await ApiService.put('${EndPoints.purchaseOrders}/$id', body);
 
       consolePrint('PURCHASE ORDER SAVE STATUS: ${response?.statusCode}');
 
-      if (response != null &&
-          (response.statusCode == 200 || response.statusCode == 201)) {
+      if (isSuccessfulSaveResponse(response)) {
         consolePrint('PURCHASE ORDER SAVE SUCCESS');
         successToast(
           id == null
@@ -377,7 +388,7 @@ class PurchaseOrderController extends GetxController {
   // ============================================================
 
   Future<PurchaseOrder?> fetchPurchaseOrderById(String id) async {
-    final response = await ApiService.get('${EndPoints.purchaseOrders}/$id');
+    final response = await _get('${EndPoints.purchaseOrders}/$id');
     final data = response?.data;
 
     if (response?.statusCode == 200) {
@@ -425,6 +436,23 @@ class PurchaseOrderController extends GetxController {
   // ============================================================
   // HELPERS
   // ============================================================
+
+  static bool isSuccessfulSaveResponse(Response<dynamic>? response) =>
+      response != null &&
+      (response.statusCode == 200 || response.statusCode == 201) &&
+      !(response.data is Map && response.data['success'] == false);
+
+  Future<Response<dynamic>?> _get(String endpoint) {
+    final request = _getRequest;
+    return request == null ? ApiService.get(endpoint) : request(endpoint);
+  }
+
+  Future<Response<dynamic>?> _post(String endpoint, dynamic body) {
+    final request = _postRequest;
+    return request == null
+        ? ApiService.post(endpoint, body)
+        : request(endpoint, body);
+  }
 
   String _extractMessage(dynamic data) {
     if (data is Map) {

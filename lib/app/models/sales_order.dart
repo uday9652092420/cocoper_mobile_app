@@ -10,6 +10,7 @@ class SalesOrder {
   final String date;
   final String customerId;
   final String customerName;
+  final String branchId;
   final String remarks;
   final String status;
   final String mode;
@@ -23,6 +24,7 @@ class SalesOrder {
     this.date = '',
     this.customerId = '',
     this.customerName = '',
+    this.branchId = '',
     this.remarks = '',
     this.status = '',
     this.mode = '',
@@ -35,11 +37,11 @@ class SalesOrder {
     final rawLines = json['lines'];
     final parsedLines = rawLines is List
         ? rawLines
-              .whereType<Map<dynamic, dynamic>>()
-              .map((line) => SalesOrderLine.fromJson(
-                    Map<String, dynamic>.from(line),
-                  ))
-              .toList()
+            .whereType<Map<dynamic, dynamic>>()
+            .map((line) => SalesOrderLine.fromJson(
+                  Map<String, dynamic>.from(line),
+                ))
+            .toList()
         : <SalesOrderLine>[];
 
     final rawCustomer = json['customer'];
@@ -60,6 +62,7 @@ class SalesOrder {
             customer['name'] ??
             customer['customer_name'],
       ),
+      branchId: _string(json['branchId'] ?? json['branch_id']),
       remarks: _string(json['remarks']),
       status: _string(json['status']),
       mode: _string(json['mode']),
@@ -69,8 +72,43 @@ class SalesOrder {
     );
   }
 
-  double get totalAmount =>
-      lines.fold(0, (sum, line) => sum + (line.saleAmount != 0 ? line.saleAmount : line.amount));
+  static SalesOrder? fromCreateResponse(dynamic response) {
+    if (response is! Map) return null;
+
+    var payload = Map<String, dynamic>.from(response);
+    for (var depth = 0; depth < 3; depth++) {
+      final nested =
+          payload['data'] ?? payload['salesOrder'] ?? payload['order'];
+      if (nested is! Map) break;
+      payload = Map<String, dynamic>.from(nested);
+    }
+
+    final order = SalesOrder.fromJson(payload);
+    if (order.id.isEmpty &&
+        order.soNumber.isEmpty &&
+        order.sourcePoId.isEmpty) {
+      return null;
+    }
+    return order;
+  }
+
+  double get totalAmount => lines.fold(
+      0,
+      (sum, line) =>
+          sum + (line.saleAmount != 0 ? line.saleAmount : line.amount));
+
+  Map<String, dynamic> toCreateRequestJson() => <String, dynamic>{
+        'soNumber': soNumber,
+        'date': date,
+        if (customerId.isNotEmpty) 'customerId': customerId,
+        if (branchId.isNotEmpty) 'branchId': branchId,
+        if (remarks.isNotEmpty) 'remarks': remarks,
+        'status': status,
+        'mode': mode,
+        if (sourcePoId.isNotEmpty) 'sourcePoId': sourcePoId,
+        if (poNumber.isNotEmpty) 'poNumber': poNumber,
+        'lines': lines.map((line) => line.toJson()).toList(),
+      };
 
   static String _string(dynamic value) => value?.toString().trim() ?? '';
 }

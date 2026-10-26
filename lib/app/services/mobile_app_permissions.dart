@@ -75,17 +75,24 @@ class MobileAppPermissions {
       );
     }
 
+    if (login == null || !login.isComplete) {
+      return const MobilePermissionReconciliation(
+        status: MobilePermissionReconciliationStatus.loginIncomplete,
+      );
+    }
+    if (bootstrap == null || !bootstrap.isComplete) {
+      return const MobilePermissionReconciliation(
+        status: MobilePermissionReconciliationStatus.bootstrapIncomplete,
+      );
+    }
+
     final permissions = MobileAppPermissions(
-      mobileAppLogin: bootstrap?.mobileAppLogin ?? login?.mobileAppLogin,
-      mobileAppLabourAttendance: bootstrap?.mobileAppLabourAttendance ??
-          login?.mobileAppLabourAttendance,
-      hasMobileAppLoginField: login?.hasMobileAppLoginField == true ||
-          bootstrap?.hasMobileAppLoginField == true,
-      hasLabourAttendanceField: login?.hasLabourAttendanceField == true ||
-          bootstrap?.hasLabourAttendanceField == true,
+      mobileAppLogin: bootstrap.mobileAppLogin,
+      mobileAppLabourAttendance: bootstrap.mobileAppLabourAttendance,
+      hasMobileAppLoginField: true,
+      hasLabourAttendanceField: true,
     );
-    if (permissions.mobileAppLogin == false &&
-        permissions.mobileAppLabourAttendance != true) {
+    if (!permissions.canAccessMainApp && !permissions.canUseLabourAttendance) {
       return MobilePermissionReconciliation(
         status: MobilePermissionReconciliationStatus.denied,
         permissions: permissions,
@@ -221,6 +228,7 @@ class MobileAppPermissions {
   }
 
   bool get canUseLabourAttendance => mobileAppLabourAttendance == true;
+  bool get canAccessMainApp => mobileAppLogin == true;
 
   bool get isComplete =>
       hasMobileAppLoginField &&
@@ -229,15 +237,16 @@ class MobileAppPermissions {
       mobileAppLabourAttendance != null;
 
   MobileAppDestination get destination {
+    if (canAccessMainApp) {
+      return MobileAppDestination.normalDashboard;
+    }
     if (canUseLabourAttendance) {
       return MobileAppDestination.labourAttendance;
     }
-    if (mobileAppLogin != true) {
-      return mobileAppLogin == false
-          ? MobileAppDestination.denied
-          : MobileAppDestination.normalDashboard;
+    if (mobileAppLogin == false && mobileAppLabourAttendance == false) {
+      return MobileAppDestination.denied;
     }
-    return MobileAppDestination.normalDashboard;
+    return MobileAppDestination.permissionConfigurationUnavailable;
   }
 
   static void beginSession(MobileAppPermissions? permissions) {
@@ -285,25 +294,32 @@ class MobileAppPermissionMiddleware extends GetMiddleware {
     }
 
     final permissions = MobileAppPermissions.current;
-
-    if (route == Routes.labourAttendance) {
-      if (permissions?.canUseLabourAttendance == true) {
-        return null;
-      }
-      _showAccessDenied();
-      return const RouteSettings(name: Routes.dashboard);
-    }
-
-    if (permissions?.mobileAppLogin == false &&
-        permissions?.canUseLabourAttendance != true) {
+    if (permissions == null || !permissions.isComplete) {
       _showAccessDenied();
       return const RouteSettings(name: Routes.loginPage);
     }
 
-    if (permissions?.destination == MobileAppDestination.labourAttendance) {
+    if (route == Routes.labourAttendance) {
+      if (permissions.canUseLabourAttendance) {
+        return null;
+      }
+      _showAccessDenied();
+      return permissions.canAccessMainApp
+          ? const RouteSettings(name: Routes.dashboard)
+          : const RouteSettings(name: Routes.loginPage);
+    }
+
+    if (permissions.canAccessMainApp) {
+      return null;
+    }
+
+    if (permissions.canUseLabourAttendance) {
+      _showAccessDenied();
       return const RouteSettings(name: Routes.labourAttendance);
     }
-    return null;
+
+    _showAccessDenied();
+    return const RouteSettings(name: Routes.loginPage);
   }
 
   void _showAccessDenied() {

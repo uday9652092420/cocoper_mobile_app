@@ -17,11 +17,12 @@ class _StubSalesOrderController extends SalesOrderController {
   Future<void> loadLookups() async {}
 
   @override
-  Future<void> loadSalesOrders() async {
+  Future<bool> loadSalesOrders() async {
     isLoadingList.value = true;
     hasListError.value = failListLoad;
     if (!failListLoad) salesOrders.assignAll(orders);
     isLoadingList.value = false;
+    return !failListLoad;
   }
 
   @override
@@ -153,7 +154,7 @@ void main() {
             itemName: 'Coconut Bondam',
             quantity: 3000,
             discount: 100,
-            actualQuantity: 2900,
+            actualQuantity: 2900.4,
             saleCost: 45,
             saleAmount: 130500,
             pieces: 10,
@@ -180,6 +181,7 @@ void main() {
     expect(find.text('Coconut Bondam'), findsOneWidget);
     expect(fieldValues, contains('3000'));
     expect(find.text('2,900'), findsOneWidget);
+    expect(find.text('2,900.4'), findsNothing);
     expect(find.text('₹130,500'), findsOneWidget);
     expect(find.text('Approved Sales Orders are read-only.'), findsNothing);
     expect(find.textContaining('saving is unavailable'), findsOneWidget);

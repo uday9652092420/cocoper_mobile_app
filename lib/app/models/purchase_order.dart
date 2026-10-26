@@ -92,5 +92,18 @@ class PurchaseOrder {
             sum + (line.amount != 0 ? line.amount : line.purchaseAmount),
       );
 
+  Map<String, dynamic> toRequestJson({required String organizationId}) =>
+      <String, dynamic>{
+        'poNumber': poNumber,
+        'organizationId': organizationId,
+        'supplierId': supplierId,
+        if (branchId.isNotEmpty) 'branchId': branchId,
+        'date': date,
+        if (remarks.isNotEmpty) 'remarks': remarks,
+        'status': status,
+        'mode': mode,
+        'lines': lines.map((line) => line.toJson()).toList(),
+      };
+
   static String _string(dynamic value) => value?.toString().trim() ?? '';
 }

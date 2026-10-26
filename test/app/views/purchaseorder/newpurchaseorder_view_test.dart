@@ -90,7 +90,7 @@ class _StubSalesOrderController extends SalesOrderController {
   Future<void> loadLookups() async {}
 
   @override
-  Future<void> loadSalesOrders() async {}
+  Future<bool> loadSalesOrders() async => true;
 
   @override
   Future<String> generateSoNumber() async => 'TSO-01';
@@ -186,6 +186,19 @@ void main() {
         reason: '$label direction',
       );
     }
+  });
+
+  testWidgets('new purchase order defaults to the first available branch', (
+    tester,
+  ) async {
+    await _pumpForm(tester);
+
+    final branchDropdown = find.byType(DropdownButtonFormField<String>).first;
+    expect(
+      tester.state<FormFieldState<String>>(branchDropdown).value,
+      'branch-1',
+    );
+    expect(find.text('Warangal'), findsOneWidget);
   });
 
   testWidgets('an empty line item field keeps the caret on the left', (

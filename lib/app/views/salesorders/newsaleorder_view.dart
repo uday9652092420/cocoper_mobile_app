@@ -6,7 +6,6 @@ import '../../controllers/salesorders/sales_order_controller.dart';
 import '../../helpers/flutter_toast.dart';
 import '../../models/purchase_order.dart';
 import '../../models/sales_order_line.dart';
-import '../../routes/app_routes.dart';
 import '../../theme/app_theme.dart';
 
 const _kInk = AppColors.textDefaultLight;
@@ -393,27 +392,39 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
             const SizedBox(width: 10),
             Expanded(
               child: Obx(
-                () => ElevatedButton(
-                  onPressed: _controller.isSaving.value ? null : _onSave,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _kGreen,
-                    foregroundColor: Colors.white,
-                    disabledBackgroundColor: _kGreen.withValues(alpha: 0.6),
-                    disabledForegroundColor: Colors.white,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                () {
+                  final conversionBlocked = _order != null &&
+                      _controller.isPurchaseOrderConversionBlocked(
+                        _order!.id,
+                      );
+                  return ElevatedButton(
+                    onPressed: _controller.isSaving.value || conversionBlocked
+                        ? null
+                        : _onSave,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _kGreen,
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: _kGreen.withValues(alpha: 0.6),
+                      disabledForegroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 15),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
-                  ),
-                  child: Text(
-                    _controller.isSaving.value ? 'Saving…' : 'Save',
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
+                    child: Text(
+                      _controller.isSaving.value
+                          ? 'Saving…'
+                          : (conversionBlocked
+                              ? 'Conversion needs verification'
+                              : 'Save'),
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
-                ),
+                  );
+                },
               ),
             ),
           ],
@@ -496,7 +507,7 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
               left: _labeledNumField('Pieces', item.pieces),
               right: _labeledComputedField(
                 'Actual Qty',
-                _formatQuantity(_actualQuantity(item)),
+                _formatActualQuantity(_actualQuantity(item)),
               ),
             ),
             const SizedBox(height: 12),
@@ -518,7 +529,7 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
             _twoColumnRow(
               left: _labeledComputedField(
                 'Actual Qty',
-                _formatQuantity(_actualQuantity(item)),
+                _formatActualQuantity(_actualQuantity(item)),
               ),
               right: _labeledComputedField(
                 'Sale Amount',
@@ -915,14 +926,14 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
       mode: _apiMode(),
       sourcePoId: order?.id ?? '',
       poNumber: order?.poNumber ?? '',
+      branchId: order?.branchId ?? '',
       lines: lines,
     );
 
     if (success && mounted) {
-      // Return to the Sales Order list after the create request succeeds.
-      Get.offNamedUntil<void>(
-        Routes.savedSalesOrders,
-        (route) => route.isFirst,
+      Get.back<String>(
+        result: _controller.lastCreatedSalesOrderReference ??
+            _soNumberController.text.trim(),
       );
     }
   }
@@ -1133,8 +1144,10 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
     return text;
   }
 
-  /// Actual quantity: keeps up to 6 decimals, trailing zeros trimmed.
   String _formatQuantity(double value) => _formatNumber(value);
+
+  String _formatActualQuantity(double value) =>
+      NumberFormat('#,##0').format(value.round());
 
   String _formatMoney(double value) => value.toStringAsFixed(2);
 }

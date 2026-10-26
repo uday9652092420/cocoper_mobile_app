@@ -22,10 +22,77 @@ void main() {
       (tester) async {
     await _pumpAttendance(tester, FakeLabourAttendanceRepository());
 
+    final logo = tester.widget<Image>(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Image &&
+            widget.image is AssetImage &&
+            (widget.image as AssetImage).assetName == 'assets/cocoper-icon.png',
+      ),
+    );
+    final logoSize = tester.widget<SizedBox>(
+      find
+          .ancestor(
+            of: find.byWidgetPredicate(
+              (widget) =>
+                  widget is Image &&
+                  widget.image is AssetImage &&
+                  (widget.image as AssetImage).assetName ==
+                      'assets/cocoper-icon.png',
+            ),
+            matching: find.byType(SizedBox),
+          )
+          .first,
+    );
+    expect(logo.fit, BoxFit.cover);
+    expect(logoSize.width, 48);
+    expect(logoSize.height, 48);
+    expect(find.text('COPPER'), findsOneWidget);
     expect(find.text('All coconut operations'), findsOneWidget);
+    expect(find.text('Logout'), findsOneWidget);
     expect(find.text('Not Checked In'), findsOneWidget);
     expect(_checkInButton(tester).onPressed, isNotNull);
     expect(_checkOutButton(tester).onPressed, isNull);
+    expect(
+      _checkInButton(tester).style?.shape?.resolve({}),
+      isA<CircleBorder>(),
+    );
+    expect(
+      _checkOutButton(tester).style?.shape?.resolve({}),
+      isA<CircleBorder>(),
+    );
+  });
+
+  testWidgets('verifies location when attendance dashboard opens',
+      (tester) async {
+    final repository = FakeLabourAttendanceRepository()
+      .._today = LabourAttendanceToday(
+        attendance: null,
+        status: 'Not Checked In',
+        employeeId: 'user-1',
+        employeeName: 'Verified Employee',
+        organizationId: 'org-1',
+        branchId: 'branch-1',
+        attendanceDate: DateTime(2025, 4, 3),
+        serverTimestamp: DateTime(2025, 4, 3, 8),
+        branchGeofence: const AttendanceGeofence(
+          enabled: true,
+          latitude: 12.5,
+          longitude: 77.5,
+          radiusMeters: 100,
+        ),
+      )
+      ..locationVerification = const AttendanceLocationVerification(
+        status: AttendanceLocationStatus.outsideGeofence,
+        distanceMeters: 180,
+      );
+    await _pumpAttendance(tester, repository);
+
+    expect(repository.locationVerificationCalls, 1);
+    expect(find.textContaining('You are outside the branch geofence'),
+        findsOneWidget);
+    expect(find.textContaining('180 m away'), findsOneWidget);
+    expect(_checkInButton(tester).onPressed, isNotNull);
   });
 
   testWidgets('does not enable check-in for inconsistent completed state',
@@ -150,6 +217,43 @@ void main() {
     expect(find.text('Checked In'), findsOneWidget);
   });
 
+  testWidgets('invalid location shows a toast and allows another check-in',
+      (tester) async {
+    final repository = FakeLabourAttendanceRepository()
+      ..checkInError = const LabourAttendanceException(
+        'Location is outside the configured branch geofence.',
+        statusCode: 422,
+        isLocationError: true,
+        isOutsideGeofence: true,
+      );
+    final toastMessages = <String>[];
+    await _pumpAttendance(
+      tester,
+      repository,
+      toastMessages: toastMessages,
+    );
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Check-In'));
+    await tester.pumpAndSettle();
+
+    expect(
+      toastMessages,
+      [
+        'You are in an invalid location. Move within the branch geofence and try again.',
+      ],
+    );
+    expect(find.text('Not Checked In'), findsOneWidget);
+    expect(_checkInButton(tester).onPressed, isNotNull);
+    expect(repository.loadCalls, 1);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Check-In'));
+    await tester.pumpAndSettle();
+
+    expect(repository.checkInCalls, 2);
+    expect(toastMessages, hasLength(2));
+    expect(_checkInButton(tester).onPressed, isNotNull);
+  });
+
   testWidgets('keeps punches disabled when saved attendance cannot reconcile',
       (tester) async {
     final repository = FakeLabourAttendanceRepository();
@@ -201,12 +305,14 @@ void main() {
     final repository = FakeLabourAttendanceRepository();
     await _pumpAttendance(tester, repository);
     expect(repository.loadCalls, 1);
+    expect(repository.locationVerificationCalls, 1);
 
     Get.find<LabourAttendanceController>()
         .didChangeAppLifecycleState(AppLifecycleState.resumed);
     await tester.pumpAndSettle();
 
     expect(repository.loadCalls, 2);
+    expect(repository.locationVerificationCalls, 2);
   });
 
   testWidgets('disables punches when a resumed refresh cannot verify state',
@@ -245,11 +351,18 @@ void main() {
 }
 
 Future<void> _pumpAttendance(
-  WidgetTester tester,
-  LabourAttendanceRepository repository,
-) async {
+    WidgetTester tester, LabourAttendanceRepository repository,
+    {List<String>? toastMessages}) async {
   Get.put(
-    LabourAttendanceController(repository: repository),
+    LabourAttendanceController(
+      repository: repository,
+      showErrorToast: toastMessages == null
+          ? null
+          : (message) async {
+              toastMessages.add(message);
+              return true;
+            },
+    ),
   );
   await tester.pumpWidget(
     const GetMaterialApp(home: LabourAttendanceDashboardView()),
@@ -278,6 +391,12 @@ class FakeLabourAttendanceRepository implements LabourAttendanceRepository {
 
   LabourAttendanceToday _today;
   LabourAttendanceException? loadError;
+  LabourAttendanceException? checkInError;
+  AttendanceLocationVerification locationVerification =
+      const AttendanceLocationVerification(
+    status: AttendanceLocationStatus.notRequired,
+  );
+  int locationVerificationCalls = 0;
   Completer<LabourAttendanceActionResult>? checkInCompleter;
   int checkInCalls = 0;
   int checkOutCalls = 0;
@@ -327,8 +446,17 @@ class FakeLabourAttendanceRepository implements LabourAttendanceRepository {
   }
 
   @override
+  Future<AttendanceLocationVerification> verifyCurrentLocation(
+    LabourAttendanceToday today,
+  ) async {
+    locationVerificationCalls++;
+    return locationVerification;
+  }
+
+  @override
   Future<LabourAttendanceActionResult> checkIn() async {
     checkInCalls++;
+    if (checkInError != null) throw checkInError!;
     final result = checkInCompleter == null
         ? checkInResult
         : await checkInCompleter!.future;

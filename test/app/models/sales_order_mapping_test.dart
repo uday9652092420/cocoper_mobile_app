@@ -1,4 +1,5 @@
 import 'package:cocoper_mobile/app/models/sales_order.dart';
+import 'package:cocoper_mobile/app/models/sales_order_line.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -45,5 +46,53 @@ void main() {
       expect(order.lines.single.saleCost, 50);
       expect(order.lines.single.saleAmount, 145);
     });
+  });
+
+  test('conversion payload preserves the original purchase-order reference',
+      () {
+    const order = SalesOrder(
+      soNumber: 'COP-SO-01',
+      date: '2026-10-26',
+      customerId: 'customer-1',
+      remarks: 'Converted from COP-01',
+      status: 'Draft',
+      mode: 'tonage',
+      branchId: 'branch-1',
+      sourcePoId: 'purchase-order-1',
+      poNumber: 'COP-01',
+      lines: [
+        SalesOrderLine(
+          itemId: 'item-1',
+          quantity: 10,
+          actualQuantity: 10,
+          saleCost: 20,
+          saleAmount: 200,
+          amount: 200,
+        ),
+      ],
+    );
+
+    final payload = order.toCreateRequestJson();
+
+    expect(payload['sourcePoId'], 'purchase-order-1');
+    expect(payload['poNumber'], 'COP-01');
+    expect(payload['branchId'], 'branch-1');
+    expect(payload['lines'], hasLength(1));
+    expect(payload.containsKey('organizationId'), isFalse);
+  });
+
+  test('parses the created Sales Order from the response envelope', () {
+    final order = SalesOrder.fromCreateResponse({
+      'success': true,
+      'data': {
+        'id': 'sales-order-1',
+        'soNumber': 'SO-02',
+        'sourcePoId': 'purchase-order-1',
+      },
+    });
+
+    expect(order?.id, 'sales-order-1');
+    expect(order?.soNumber, 'SO-02');
+    expect(order?.sourcePoId, 'purchase-order-1');
   });
 }

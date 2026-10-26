@@ -69,6 +69,9 @@ class _NewPurchaseOrderViewState extends State<NewPurchaseOrderView> {
       _controller.prepareCreate().then((poNumber) {
         if (!mounted) return;
         setState(() {
+          _branch ??= _controller.branches.isEmpty
+              ? null
+              : _controller.branches.first.id;
           if (_poNumberController.text.trim().isEmpty) {
             _poNumberController.text = poNumber;
           }
@@ -77,13 +80,13 @@ class _NewPurchaseOrderViewState extends State<NewPurchaseOrderView> {
     }
   }
 
-  Future<void> _loadAuthoritativeOrder(
+  Future<bool> _loadAuthoritativeOrder(
     String id, {
     bool loadLookups = false,
   }) async {
     if (loadLookups) await _controller.loadLookups();
     final order = await _controller.fetchPurchaseOrderById(id);
-    if (!mounted) return;
+    if (!mounted) return false;
 
     setState(() {
       _isLoadingOrder = false;
@@ -96,6 +99,7 @@ class _NewPurchaseOrderViewState extends State<NewPurchaseOrderView> {
       _savedFormSnapshot = null;
       _prefillFromOrder(order);
     });
+    return order != null;
   }
 
   bool get _canEdit {
@@ -255,6 +259,7 @@ class _NewPurchaseOrderViewState extends State<NewPurchaseOrderView> {
             value: _branch,
             hint: 'Select branch',
             options: _controller.branches,
+            key: ValueKey<String?>(_branch),
             onChanged: (v) => setState(() => _branch = v),
           ),
           const SizedBox(height: 14),
@@ -974,10 +979,12 @@ class _NewPurchaseOrderViewState extends State<NewPurchaseOrderView> {
     required String? value,
     required String hint,
     required RxList<LookupOption> options,
+    Key? key,
     required ValueChanged<String?> onChanged,
   }) {
     return Obx(
       () => DropdownButtonFormField<String>(
+        key: key,
         initialValue: value,
         isExpanded: true,
         hint: Text(
@@ -1246,10 +1253,26 @@ class _NewPurchaseOrderViewState extends State<NewPurchaseOrderView> {
 
     setState(() => _isPreparingSalesOrder = true);
     try {
-      await Get.toNamed<void>(
+      final result = await Get.toNamed<dynamic>(
         Routes.newSaleOrder,
         arguments: order,
       );
+      final salesOrderReference = result is String ? result : null;
+      if (!mounted) return;
+      setState(() {
+        _isLoadingOrder = true;
+        _hasAuthoritativeOrder = false;
+      });
+      final orderRefreshed = await _loadAuthoritativeOrder(order.id);
+      if (salesOrderReference != null && mounted) {
+        successToast(
+          orderRefreshed
+              ? 'Sales Order $salesOrderReference created. Purchase Order '
+                  'status refreshed.'
+              : 'Sales Order $salesOrderReference created. The Purchase Order '
+                  'could not be refreshed; retry loading it to verify status.',
+        );
+      }
     } finally {
       if (mounted) {
         setState(() => _isPreparingSalesOrder = false);

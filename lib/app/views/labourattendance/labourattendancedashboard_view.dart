@@ -139,16 +139,17 @@ class LabourAttendanceDashboardView extends StatelessWidget {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 28),
+                        const SizedBox(height: 30),
                         const Text(
                           'Labour Attendance',
                           style: TextStyle(
                             color: AppColors.textDefaultLight,
-                            fontSize: 25,
+                            fontSize: 26,
                             fontWeight: FontWeight.w800,
+                            letterSpacing: -0.4,
                           ),
                         ),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 8),
                         Text(
                           snapshot.hasError
                               ? 'Employee details could not be loaded.'
@@ -161,9 +162,10 @@ class LabourAttendanceDashboardView extends StatelessWidget {
                           style: const TextStyle(
                             color: AppColors.textLightGrayLight,
                             fontSize: 15,
+                            height: 1.35,
                           ),
                         ),
-                        const SizedBox(height: 22),
+                        const SizedBox(height: 24),
                         _buildAttendanceCard(controller),
                       ],
                     ),
@@ -194,11 +196,18 @@ class LabourAttendanceDashboardView extends StatelessWidget {
 
       final record = today.attendance;
       return Container(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(22),
           border: Border.all(color: AppColors.borderLightGrayLight),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primaryLight.withValues(alpha: 0.04),
+              blurRadius: 18,
+              offset: const Offset(0, 6),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -210,7 +219,7 @@ class LabourAttendanceDashboardView extends StatelessWidget {
                     "Today's attendance",
                     style: TextStyle(
                       color: AppColors.textDefaultLight,
-                      fontSize: 18,
+                      fontSize: 19,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -218,7 +227,7 @@ class LabourAttendanceDashboardView extends StatelessWidget {
                 _StatusLabel(status: controller.status),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             Text(
               DateFormat('EEE, MMM d, yyyy').format(today.attendanceDate),
               style: const TextStyle(
@@ -227,14 +236,70 @@ class LabourAttendanceDashboardView extends StatelessWidget {
               ),
             ),
             if (today.branchGeofence?.enabled == true) ...[
-              const SizedBox(height: 8),
-              Text(
-                'GPS required within ${today.branchGeofence!.radiusMeters} m of this branch.',
-                style: const TextStyle(
-                  color: AppColors.textLightGrayLight,
-                  fontSize: 12,
+              const SizedBox(height: 14),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.fieldFill,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.borderLightGrayLight),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      controller.isCheckingCurrentLocation.value
+                          ? Icons.location_searching
+                          : controller.currentLocationMessage.value
+                                      ?.startsWith('You are outside') ==
+                                  true
+                              ? Icons.location_off_outlined
+                              : Icons.location_on_outlined,
+                      size: 20,
+                      color: controller.currentLocationMessage.value
+                                  ?.startsWith('You are outside') ==
+                              true
+                          ? AppColors.errorLight
+                          : AppColors.primaryLight,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Branch location · ${today.branchGeofence!.radiusMeters} m radius',
+                            style: const TextStyle(
+                              color: AppColors.textDefaultLight,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            controller.currentLocationMessage.value ??
+                                'Your location is checked before attendance actions.',
+                            style: TextStyle(
+                              color: controller.currentLocationMessage.value
+                                          ?.startsWith('You are outside') ==
+                                      true
+                                  ? AppColors.errorLight
+                                  : AppColors.textLightGrayLight,
+                              fontSize: 12,
+                              height: 1.35,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
+              if (controller.isCheckingCurrentLocation.value) ...[
+                const SizedBox(height: 6),
+                const LinearProgressIndicator(minHeight: 2),
+              ],
             ],
             if (record == null && today.lastAttendance != null) ...[
               const SizedBox(height: 18),
@@ -297,43 +362,96 @@ class LabourAttendanceDashboardView extends StatelessWidget {
               const SizedBox(height: 16),
               _InlineError(message: controller.errorMessage.value!),
             ],
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed:
-                    controller.canCheckIn && !controller.isProcessing.value
-                        ? controller.checkIn
-                        : null,
-                icon: controller.isProcessing.value
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Icon(Icons.login),
-                label: const Text('Check-In'),
-              ),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed:
-                    controller.canCheckOut && !controller.isProcessing.value
-                        ? controller.checkOut
-                        : null,
-                icon: const Icon(Icons.logout),
-                label: const Text('Check-Out'),
-              ),
+            const SizedBox(height: 24),
+            _PunchActions(
+              onCheckIn: controller.canCheckIn ? controller.checkIn : null,
+              onCheckOut: controller.canCheckOut ? controller.checkOut : null,
+              isProcessing: controller.isProcessing.value,
             ),
           ],
         ),
       );
     });
+  }
+}
+
+class _PunchActions extends StatelessWidget {
+  const _PunchActions({
+    this.onCheckIn,
+    this.onCheckOut,
+    required this.isProcessing,
+  });
+
+  final VoidCallback? onCheckIn;
+  final VoidCallback? onCheckOut;
+  final bool isProcessing;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final diameter = ((constraints.maxWidth - 16) / 2).clamp(96.0, 124.0);
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            SizedBox.square(
+              dimension: diameter,
+              child: FilledButton(
+                onPressed: isProcessing ? null : onCheckIn,
+                style: FilledButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  shape: const CircleBorder(),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (isProcessing)
+                      const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    else
+                      const Icon(Icons.login, size: 24),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Check-In',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            SizedBox.square(
+              dimension: diameter,
+              child: OutlinedButton(
+                onPressed: isProcessing ? null : onCheckOut,
+                style: OutlinedButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  shape: const CircleBorder(),
+                  side: const BorderSide(color: AppColors.borderGray),
+                  foregroundColor: AppColors.primaryLight,
+                ),
+                child: const Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.logout, size: 24),
+                    SizedBox(height: 8),
+                    Text(
+                      'Check-Out',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 }
 
@@ -455,22 +573,9 @@ class _UnavailableCard extends StatelessWidget {
             label: const Text('Retry'),
           ),
           const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: null,
-              icon: const Icon(Icons.login),
-              label: const Text('Check-In'),
-            ),
-          ),
-          const SizedBox(height: 10),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: null,
-              icon: const Icon(Icons.logout),
-              label: const Text('Check-Out'),
-            ),
+          const SizedBox(height: 18),
+          const _PunchActions(
+            isProcessing: false,
           ),
           const SizedBox(height: 4),
           const Text(

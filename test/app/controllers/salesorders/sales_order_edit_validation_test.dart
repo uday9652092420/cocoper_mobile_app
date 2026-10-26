@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cocoper_mobile/app/controllers/salesorders/sales_order_controller.dart';
 import 'package:cocoper_mobile/app/models/sales_order.dart';
 import 'package:cocoper_mobile/app/models/sales_order_line.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -214,6 +215,50 @@ void main() {
       expect(await firstRequest, isFalse);
       expect(controller.refreshCount, 1);
       expect(controller.isSaving.value, isFalse);
+    });
+  });
+
+  group('Sales Order create response handling', () {
+    test('accepts successful create responses', () {
+      final response = Response<dynamic>(
+        requestOptions: RequestOptions(path: '/sales-orders'),
+        statusCode: 201,
+        data: {'success': true},
+      );
+
+      expect(
+        SalesOrderController.isSuccessfulCreateResponse(response),
+        isTrue,
+      );
+    });
+
+    test('rejects failed HTTP and success-false responses', () {
+      Response<dynamic> response({
+        required int statusCode,
+        dynamic data,
+      }) =>
+          Response<dynamic>(
+            requestOptions: RequestOptions(path: '/sales-orders'),
+            statusCode: statusCode,
+            data: data,
+          );
+
+      expect(
+        SalesOrderController.isSuccessfulCreateResponse(
+          response(statusCode: 200, data: {'success': false}),
+        ),
+        isFalse,
+      );
+      expect(
+        SalesOrderController.isSuccessfulCreateResponse(
+          response(statusCode: 422, data: {'message': 'Invalid PO'}),
+        ),
+        isFalse,
+      );
+      expect(
+        SalesOrderController.isSuccessfulCreateResponse(null),
+        isFalse,
+      );
     });
   });
 }

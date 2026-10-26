@@ -59,6 +59,76 @@ void main() {
     expect(result.employeeId, 'user-1');
   });
 
+  test('verifies current location against the server branch geofence',
+      () async {
+    final api = FakeLabourAttendanceApi()
+      ..getResponse = _success(<dynamic>[])
+      ..todayResponse = _success(
+        _todayPayload(
+          branchGeofence: {
+            'enabled': true,
+            'latitude': 12.5,
+            'longitude': 77.5,
+            'radius_meters': 100,
+          },
+        ),
+      );
+    final location = FakeAttendanceLocationProvider(
+      AttendanceLocationFix(
+        latitude: 12.5,
+        longitude: 77.5,
+        accuracyMeters: 5,
+        capturedAt: DateTime.now().toUtc(),
+      ),
+    );
+    final service = LabourAttendanceService(
+      api: api,
+      locationProvider: location,
+    );
+    final today = await service.getToday();
+
+    final verification = await service.verifyCurrentLocation(today);
+
+    expect(verification.status, AttendanceLocationStatus.withinGeofence);
+    expect(verification.distanceMeters, 0);
+    expect(location.calls, 1);
+  });
+
+  test('reports outside location without disabling attendance permission',
+      () async {
+    final api = FakeLabourAttendanceApi()
+      ..getResponse = _success(<dynamic>[])
+      ..todayResponse = _success(
+        _todayPayload(
+          branchGeofence: {
+            'enabled': true,
+            'latitude': 12.5,
+            'longitude': 77.5,
+            'radius_meters': 100,
+          },
+        ),
+      );
+    final location = FakeAttendanceLocationProvider(
+      AttendanceLocationFix(
+        latitude: 12.6,
+        longitude: 77.6,
+        accuracyMeters: 5,
+        capturedAt: DateTime.now().toUtc(),
+      ),
+    );
+    final service = LabourAttendanceService(
+      api: api,
+      locationProvider: location,
+    );
+    final today = await service.getToday();
+
+    final verification = await service.verifyCurrentLocation(today);
+
+    expect(verification.status, AttendanceLocationStatus.outsideGeofence);
+    expect(verification.distanceMeters, greaterThan(100));
+    expect(MobileAppPermissions.current?.canUseLabourAttendance, isTrue);
+  });
+
   test('GET reports no attendance today when own rows are for another date',
       () async {
     final api = FakeLabourAttendanceApi()
@@ -447,6 +517,52 @@ void main() {
     expect(api.postBody?['captured_at'], isA<String>());
   });
 
+  test('identifies a server geofence rejection as an invalid location',
+      () async {
+    final api = FakeLabourAttendanceApi()
+      ..postResponse = _response(
+        status: 422,
+        data: {
+          'success': false,
+          'message': 'Location is outside the configured branch geofence.',
+          'errorCode': 'GEOFENCE_VIOLATION',
+        },
+      )
+      ..todayResponse = _success(_todayPayload(
+        branchGeofence: {
+          'enabled': true,
+          'latitude': 12.5,
+          'longitude': 77.5,
+          'radius_meters': 100,
+        },
+      ));
+    final location = FakeAttendanceLocationProvider(
+      AttendanceLocationFix(
+        latitude: 12.6,
+        longitude: 77.6,
+        accuracyMeters: 4,
+        capturedAt: DateTime.now().toUtc(),
+      ),
+    );
+
+    await expectLater(
+      LabourAttendanceService(
+        api: api,
+        locationProvider: location,
+      ).checkIn(),
+      throwsA(
+        isA<LabourAttendanceException>()
+            .having((error) => error.statusCode, 'statusCode', 422)
+            .having((error) => error.isLocationError, 'isLocationError', true)
+            .having(
+              (error) => error.isOutsideGeofence,
+              'isOutsideGeofence',
+              true,
+            ),
+      ),
+    );
+  });
+
   test('Check-Out PATCHes the record with captured GPS when enabled', () async {
     final api = FakeLabourAttendanceApi()
       ..patchResponse = _success(
@@ -518,6 +634,22 @@ void main() {
       ),
     );
     expect(api.getEndpoint, isNull);
+  });
+
+  test('attendance permission alone allows attendance requests', () async {
+    MobileAppPermissions.beginSession(
+      const MobileAppPermissions(
+        mobileAppLogin: false,
+        mobileAppLabourAttendance: true,
+      ),
+    );
+    final api = FakeLabourAttendanceApi()
+      ..todayResponse = _success(_todayPayload())
+      ..getResponse = _success(<dynamic>[]);
+
+    await LabourAttendanceService(api: api).getToday();
+
+    expect(api.getEndpoints, contains(EndPoints.mobileLabourAttendanceToday));
   });
 
   test('explains when the today endpoint is missing from the backend',

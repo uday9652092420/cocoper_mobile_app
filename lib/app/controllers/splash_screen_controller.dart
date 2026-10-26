@@ -93,7 +93,15 @@ class SplashScreenController extends GetxController {
         );
         return;
       }
-      if (permissions.mobileAppLogin == false &&
+      if (!permissions.isComplete) {
+        await _navigateToLogin(
+          message: 'The server did not return both mobile permissions. '
+              'Please contact your administrator.',
+          clearStoredSession: false,
+        );
+        return;
+      }
+      if (!permissions.canAccessMainApp &&
           !permissions.canUseLabourAttendance) {
         await _navigateToLogin(
           message: 'Your account is not authorized to use the mobile app.',
