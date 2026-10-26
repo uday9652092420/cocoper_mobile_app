@@ -28,6 +28,25 @@ void main() {
     expect(_checkOutButton(tester).onPressed, isNull);
   });
 
+  testWidgets('does not enable check-in for inconsistent completed state',
+      (tester) async {
+    final repository = FakeLabourAttendanceRepository()
+      .._today = LabourAttendanceToday(
+        attendance: null,
+        status: 'Completed',
+        employeeId: 'user-1',
+        employeeName: 'Verified Employee',
+        organizationId: 'org-1',
+        branchId: 'branch-1',
+        attendanceDate: DateTime(2025, 4, 4),
+        serverTimestamp: null,
+      );
+    await _pumpAttendance(tester, repository);
+
+    expect(_checkInButton(tester).onPressed, isNull);
+    expect(_checkOutButton(tester).onPressed, isNull);
+  });
+
   testWidgets('check-in and check-out display only confirmed server state',
       (tester) async {
     final repository = FakeLabourAttendanceRepository();

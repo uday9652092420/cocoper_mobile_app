@@ -1,6 +1,7 @@
 import 'dart:developer' as developer;
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../helpers/shared_preferences.dart';
 import '../models/labour_attendance.dart';
@@ -120,17 +121,25 @@ class LabourAttendanceService implements LabourAttendanceRepository {
     return {'x-branch-id': selectedBranchId.trim()};
   }
 
-  Future<({String userId, String organizationId})> _identity() async {
+  Future<({String userId, String organizationId, String userName})>
+      _identity() async {
     final userId = await SharedPrefsHelper.getString(SharedPrefsHelper.userId);
     final organizationId = await SharedPrefsHelper.getString(
       SharedPrefsHelper.organizationId,
+    );
+    final userName = await SharedPrefsHelper.getString(
+      SharedPrefsHelper.fullName,
     );
     if (userId.trim().isEmpty || organizationId.trim().isEmpty) {
       throw const LabourAttendanceException(
         'Your signed-in user or organization could not be verified. Sign in again.',
       );
     }
-    return (userId: userId.trim(), organizationId: organizationId.trim());
+    return (
+      userId: userId.trim(),
+      organizationId: organizationId.trim(),
+      userName: userName.trim(),
+    );
   }
 
   void _requirePermissions() {
@@ -161,7 +170,12 @@ class LabourAttendanceService implements LabourAttendanceRepository {
     );
     late final LabourAttendanceToday serverToday;
     try {
-      serverToday = LabourAttendanceToday.fromJson(serverTodayData);
+      serverToday = LabourAttendanceToday.fromJson(
+        serverTodayData,
+        authenticatedUserId: identity.userId,
+        authenticatedUserName: identity.userName,
+        authenticatedOrganizationId: identity.organizationId,
+      );
     } on FormatException catch (error) {
       throw LabourAttendanceException(error.message);
     }
@@ -205,6 +219,7 @@ class LabourAttendanceService implements LabourAttendanceRepository {
     final branchHeaders = await _branchHeaders();
     final location = await _locationForAction(
       userId: identity.userId,
+      userName: identity.userName,
       organizationId: identity.organizationId,
       branchId: branchHeaders['x-branch-id']!,
     );
@@ -234,6 +249,7 @@ class LabourAttendanceService implements LabourAttendanceRepository {
     final identity = await _identity();
     final location = await _locationForAction(
       userId: identity.userId,
+      userName: identity.userName,
       organizationId: identity.organizationId,
       branchId: branchId,
     );
@@ -256,6 +272,7 @@ class LabourAttendanceService implements LabourAttendanceRepository {
 
   Future<AttendanceLocationFix?> _locationForAction({
     required String userId,
+    required String userName,
     required String organizationId,
     required String branchId,
   }) async {
@@ -270,7 +287,12 @@ class LabourAttendanceService implements LabourAttendanceRepository {
     );
     late final LabourAttendanceToday state;
     try {
-      state = LabourAttendanceToday.fromJson(data);
+      state = LabourAttendanceToday.fromJson(
+        data,
+        authenticatedUserId: userId,
+        authenticatedUserName: userName,
+        authenticatedOrganizationId: organizationId,
+      );
     } on FormatException catch (error) {
       throw LabourAttendanceException(error.message);
     }
@@ -354,6 +376,7 @@ class LabourAttendanceService implements LabourAttendanceRepository {
     Response<dynamic>? response, {
     required String endpoint,
   }) {
+    _logResponseShape(response, endpoint);
     final body = _readBody(response, endpoint: endpoint);
     try {
       return _asMap(body['data']);
@@ -505,6 +528,41 @@ class LabourAttendanceService implements LabourAttendanceRepository {
       return candidate;
     }
     return statusCode == null ? 'unknown' : 'http_$statusCode';
+  }
+
+  void _logResponseShape(
+    Response<dynamic>? response,
+    String endpoint,
+  ) {
+    if (ApiService.isProduction) return;
+    debugPrint(
+      '[labour_attendance_response_shape] '
+      'endpoint=$endpoint '
+      'status=${response?.statusCode ?? 'none'} '
+      'contentType=${response?.headers.value('content-type') ?? 'none'} '
+      'bodyShape=${_jsonShape(response?.data)}',
+    );
+  }
+
+  String _jsonShape(dynamic value, {int depth = 0}) {
+    if (value == null) return 'null';
+    if (value is Map) {
+      if (depth >= 3) return 'object';
+      final entries = value.entries.take(40).map((entry) {
+        final key = entry.key.toString();
+        return '$key:${_jsonShape(entry.value, depth: depth + 1)}';
+      });
+      final suffix = value.length > 40 ? ',…' : '';
+      return '{${entries.join(',')}$suffix}';
+    }
+    if (value is List) {
+      if (value.isEmpty) return 'array(length:0)';
+      return 'array(length:${value.length},first:${_jsonShape(value.first, depth: depth + 1)})';
+    }
+    if (value is String) return 'string';
+    if (value is bool) return 'boolean';
+    if (value is num) return 'number';
+    return 'other';
   }
 
   void _validateRecordScope(

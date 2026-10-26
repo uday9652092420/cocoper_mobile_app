@@ -132,28 +132,98 @@ class LabourAttendanceToday {
   final String organizationId;
   final String branchId;
   final DateTime attendanceDate;
-  final DateTime serverTimestamp;
+  final DateTime? serverTimestamp;
   final AttendanceGeofence? branchGeofence;
 
-  factory LabourAttendanceToday.fromJson(Map<String, dynamic> json) {
-    final employee = _asMap(json['employee']);
+  factory LabourAttendanceToday.fromJson(
+    Map<String, dynamic> json, {
+    String? authenticatedUserId,
+    String? authenticatedUserName,
+    String? authenticatedOrganizationId,
+  }) {
+    final rawEmployee = json['employee'];
+    final employeeList = rawEmployee is List &&
+            rawEmployee.length == 1 &&
+            rawEmployee.single is Map
+        ? rawEmployee
+        : null;
+    final employee = rawEmployee is Map
+        ? _asMap(rawEmployee, 'employee')
+        : employeeList == null
+            ? null
+            : _asMap(employeeList.single, 'employee');
+    if (rawEmployee != null &&
+        rawEmployee is! Map &&
+        rawEmployee is! String &&
+        employeeList == null) {
+      throw FormatException(
+        'Attendance response field "employee" has an unsupported type '
+        '(${rawEmployee.runtimeType}).',
+      );
+    }
+    if (employee == null && authenticatedUserId == null) {
+      throw const FormatException(
+        'Attendance response field "employee" must be an object.',
+      );
+    }
+    if (!json.containsKey('attendance')) {
+      throw const FormatException(
+        'Attendance response is missing attendance',
+      );
+    }
     final attendance = json['attendance'];
     final branchGeofence = json['branch_geofence'];
-    final status = _requiredString(json, 'status');
-    if (!const {'Not Checked In', 'Checked In', 'Completed'}.contains(status)) {
+    final status = _normalizeStatus(_requiredString(json, 'status'));
+    if (status == null) {
       throw const FormatException(
-          'Attendance response contains an invalid status');
+        'Attendance response contains an unsupported status.',
+      );
     }
     if (branchGeofence == null) {
       throw const FormatException(
-        'Attendance response is missing branch geofence settings',
+        'This branch geofence could not be verified from the attendance '
+        'service. Contact your COPPER administrator and retry.',
       );
     }
     final parsedAttendance = attendance == null
         ? null
-        : LabourAttendanceRecord.fromJson(_asMap(attendance));
-    final employeeId = _requiredString(employee, 'id');
-    final organizationId = _requiredString(json, 'organization_id');
+        : LabourAttendanceRecord.fromJson(
+            _asMap(attendance, 'attendance'),
+          );
+    final employeeId = employee == null
+        ? authenticatedUserId!.trim()
+        : _requiredString(employee, 'id');
+    if (employeeId.isEmpty) {
+      throw const FormatException(
+        'The authenticated user identity is unavailable.',
+      );
+    }
+    final responseUserId = json['employee_id'] ?? json['user_id'];
+    if (employee == null &&
+        responseUserId != null &&
+        responseUserId.toString().trim() != employeeId) {
+      throw const FormatException(
+        'Attendance response contains a different authenticated user.',
+      );
+    }
+    final employeeName = employee == null
+        ? authenticatedUserName?.trim()
+        : _requiredString(employee, 'full_name');
+    final responseOrganizationId = _normalizedIdentity(json['organization_id']);
+    final organizationId =
+        responseOrganizationId ?? authenticatedOrganizationId?.trim() ?? '';
+    if (organizationId.isEmpty) {
+      throw const FormatException(
+        'The authenticated organization identity is unavailable.',
+      );
+    }
+    if (responseOrganizationId != null &&
+        authenticatedOrganizationId != null &&
+        responseOrganizationId != authenticatedOrganizationId.trim()) {
+      throw const FormatException(
+        'Attendance response contains a different organization.',
+      );
+    }
     final branchId = _requiredString(json, 'branch_id');
     if (parsedAttendance != null &&
         (parsedAttendance.userId != employeeId ||
@@ -167,16 +237,25 @@ class LabourAttendanceToday {
       attendance: parsedAttendance,
       status: status,
       employeeId: employeeId,
-      employeeName: _requiredString(employee, 'full_name'),
+      employeeName: employeeName == null || employeeName.isEmpty
+          ? 'Employee'
+          : employeeName,
       organizationId: organizationId,
       branchId: branchId,
       attendanceDate: DateTime.parse(
-        _requiredString(json, 'attendance_date'),
+        _requiredStringValue(
+          json['attendance_date'] ?? json['business_date'],
+          'attendance_date or business_date',
+        ),
       ),
-      serverTimestamp: DateTime.parse(
-        _requiredString(json, 'server_timestamp'),
-      ).toLocal(),
-      branchGeofence: AttendanceGeofence.fromJson(_asMap(branchGeofence)),
+      serverTimestamp: json['server_timestamp'] == null
+          ? null
+          : DateTime.parse(
+              _requiredString(json, 'server_timestamp'),
+            ).toLocal(),
+      branchGeofence: AttendanceGeofence.fromJson(
+        _asMap(branchGeofence, 'branch_geofence'),
+      ),
     );
   }
 
@@ -242,19 +321,43 @@ class LabourAttendanceToday {
     );
   }
 
-  static Map<String, dynamic> _asMap(dynamic value) {
+  static Map<String, dynamic> _asMap(dynamic value, String field) {
     if (value is Map<String, dynamic>) return value;
     if (value is Map) return Map<String, dynamic>.from(value);
-    throw const FormatException(
-        'Attendance response contains an invalid object');
+    throw FormatException(
+      'Attendance response field "$field" must be an object.',
+    );
   }
 
   static String _requiredString(Map<String, dynamic> json, String key) {
-    final value = json[key]?.toString().trim() ?? '';
+    return _requiredStringValue(json[key], key);
+  }
+
+  static String _requiredStringValue(dynamic rawValue, String key) {
+    final value = rawValue?.toString().trim() ?? '';
     if (value.isEmpty || value == 'null') {
       throw FormatException('Attendance response is missing $key');
     }
     return value;
+  }
+
+  static String? _normalizedIdentity(dynamic rawValue) {
+    final value = rawValue?.toString().trim() ?? '';
+    return value.isEmpty || value == 'null' ? null : value;
+  }
+
+  static String? _normalizeStatus(String value) {
+    final normalized = value
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'[_-]+'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ');
+    return switch (normalized) {
+      'not checked in' => 'Not Checked In',
+      'checked in' => 'Checked In',
+      'completed' || 'checked out' => 'Completed',
+      _ => null,
+    };
   }
 
   static int _compareAttendanceRecency(
@@ -277,7 +380,7 @@ class LabourAttendanceActionResult {
 
   factory LabourAttendanceActionResult.fromJson(Map<String, dynamic> json) {
     final record = json['attendance'] ?? json;
-    final attendanceJson = _asMap(record);
+    final attendanceJson = _asMap(record, 'attendance');
     return LabourAttendanceActionResult(
       attendance: LabourAttendanceRecord.fromJson(attendanceJson),
       serverTimestamp: json['server_timestamp'] == null
@@ -293,11 +396,12 @@ class LabourAttendanceActionResult {
     );
   }
 
-  static Map<String, dynamic> _asMap(dynamic value) {
+  static Map<String, dynamic> _asMap(dynamic value, String field) {
     if (value is Map<String, dynamic>) return value;
     if (value is Map) return Map<String, dynamic>.from(value);
-    throw const FormatException(
-        'Attendance response contains an invalid record');
+    throw FormatException(
+      'Attendance response field "$field" must be an object.',
+    );
   }
 
   static String _requiredString(Map<String, dynamic> json, String key) {

@@ -34,7 +34,28 @@ Employee attendance API (backend source contract):
   organization-timezone attendance date, authenticated employee details,
   current attendance/status, server timestamp, and `branch_geofence`
   (`enabled`, `latitude`, `longitude`, `radius_meters`). Mobile uses this
-  server date, not the device date, to determine today's attendance.
+  server date, not the device date, to determine today's attendance. The
+  canonical employee shape is an object with `id` and `full_name`. Flutter
+  also accepts a one-row employee array, or an omitted/null/display-string
+  employee descriptor for an authenticated response. In those cases it binds
+  the state to the current signed-in user ID and saved profile name; any
+  attendance record and organization/branch scope must still match the signed-in
+  session. `business_date` is accepted as the server attendance-date field,
+  and `server_timestamp` is optional for this read-only state response. Other
+  non-object employee types and multi-row arrays are rejected.
+  `branch_geofence` remains mandatory before attendance state is considered
+  verified or any punch action is enabled.
+- Authenticated UAT verification on 2026-10-24 returned HTTP 200
+  (`application/json; charset=utf-8`) with `data` keys `branch_id`,
+  `business_date`, `status`, and `attendance` (`null`). It omitted
+  `branch_geofence`; bootstrap also omitted `user.organization_id` while
+  returning `organization.id`. Flutter now restores organization scope from
+  `organization.id` and tolerates the documented today-state field variants,
+  but the missing branch geofence remains a backend response blocker. The API
+  must return `branch_geofence` for the selected authorized branch; bootstrap
+  branch objects contain only identity/status fields, not geofence settings.
+  Do not enable punches or substitute local/hardcoded coordinates until the
+  attendance API returns the verified branch geofence.
 - A 404 from this route means the deployed backend is older than this API
   contract. Deploy the backend route and apply `db/branch_geofencing.sql`
   before enabling mobile attendance; the app intentionally keeps punch actions

@@ -130,13 +130,22 @@ class SplashScreenController extends GetxController {
       await _storeIfPresent(SharedPrefsHelper.username, user['username']);
       await _storeIfPresent(SharedPrefsHelper.fullName, user['full_name']);
       await _storeIfPresent(SharedPrefsHelper.userRole, user['role']);
-      await _storeIfPresent(
-        SharedPrefsHelper.organizationId,
-        user['organization_id'],
-      );
     }
 
     final organization = _asMap(bootstrap['organization']);
+    final userOrganizationId = _normalizedValue(user?['organization_id']);
+    final bootstrapOrganizationId = _normalizedValue(organization?['id']);
+    if (userOrganizationId != null &&
+        bootstrapOrganizationId != null &&
+        userOrganizationId != bootstrapOrganizationId) {
+      throw const FormatException(
+        'Bootstrap user and organization scopes do not match.',
+      );
+    }
+    await _storeIfPresent(
+      SharedPrefsHelper.organizationId,
+      userOrganizationId ?? bootstrapOrganizationId,
+    );
     if (organization != null) {
       await _storeIfPresent(
         SharedPrefsHelper.organizationName,
@@ -171,10 +180,15 @@ class SplashScreenController extends GetxController {
   }
 
   Future<void> _storeIfPresent(String key, dynamic value) async {
-    final text = value?.toString().trim() ?? '';
-    if (text.isNotEmpty && text != 'null') {
+    final text = _normalizedValue(value);
+    if (text != null) {
       await SharedPrefsHelper.setString(key, text);
     }
+  }
+
+  String? _normalizedValue(dynamic value) {
+    final text = value?.toString().trim() ?? '';
+    return text.isEmpty || text == 'null' ? null : text;
   }
 
   Future<void> _navigateToLogin({
@@ -234,6 +248,10 @@ class SplashScreenController extends GetxController {
     final responseMap = _asMap(body);
     final dataMap = _asMap(responseMap?['data']);
     final resultMap = _asMap(responseMap?['result']);
+    final organization = _asMap(responseMap?['organization']);
+    final branches = responseMap?['branches'];
+    final firstBranch =
+        branches is List && branches.isNotEmpty ? _asMap(branches.first) : null;
     final candidates = <String, Map<String, dynamic>?>{
       'user': _asMap(responseMap?['user']),
       'data.user': _asMap(dataMap?['user']),
@@ -257,6 +275,9 @@ class SplashScreenController extends GetxController {
       'top_level_keys=${responseMap?.keys.toList() ?? const []} '
       'data_keys=${dataMap?.keys.toList() ?? const []} '
       'result_keys=${resultMap?.keys.toList() ?? const []} '
+      'organization_keys=${organization?.keys.toList() ?? const []} '
+      'branch_count=${branches is List ? branches.length : 'none'} '
+      'branch_keys=${firstBranch?.keys.toList() ?? const []} '
       'permission_field_occurrences='
       '${_permissionFieldOccurrences(responseMap)} '
       'permission_candidates={$candidateDetails}',

@@ -107,6 +107,242 @@ void main() {
     expect(result.status, 'Completed');
   });
 
+  test('normalizes backend enum statuses without weakening unknown statuses',
+      () async {
+    for (final (serverStatus, expectedStatus) in [
+      ('not_checked_in', 'Not Checked In'),
+      ('CHECKED_IN', 'Checked In'),
+      ('checked-out', 'Completed'),
+    ]) {
+      final api = FakeLabourAttendanceApi()
+        ..todayResponse = _success(_todayPayload(status: serverStatus))
+        ..getResponse = _success(<dynamic>[]);
+
+      final result = await LabourAttendanceService(api: api).getToday();
+
+      expect(result.status, expectedStatus);
+    }
+  });
+
+  test('accepts a null attendance record when no check-in exists today',
+      () async {
+    final api = FakeLabourAttendanceApi()
+      ..todayResponse = _success(_todayPayload())
+      ..getResponse = _success(<dynamic>[]);
+
+    final result = await LabourAttendanceService(api: api).getToday();
+
+    expect(result.status, 'Not Checked In');
+    expect(result.attendance, isNull);
+  });
+
+  test('parses backend business date and authenticated scope fields', () async {
+    final payload = _todayPayload()
+      ..remove('employee')
+      ..remove('organization_id')
+      ..remove('attendance_date')
+      ..remove('server_timestamp')
+      ..['business_date'] = '2026-10-23';
+    final api = FakeLabourAttendanceApi()
+      ..todayResponse = _success(payload)
+      ..getResponse = _success(<dynamic>[]);
+
+    final result = await LabourAttendanceService(api: api).getToday();
+
+    expect(result.employeeId, 'user-1');
+    expect(result.organizationId, 'org-1');
+    expect(result.attendanceDate, DateTime(2026, 10, 23));
+    expect(result.serverTimestamp, isNull);
+    expect(result.branchGeofence?.enabled, isFalse);
+  });
+
+  test('does not verify attendance or enable punches when geofence is absent',
+      () async {
+    final payload = _todayPayload()..remove('branch_geofence');
+    final api = FakeLabourAttendanceApi()..todayResponse = _success(payload);
+
+    await expectLater(
+      LabourAttendanceService(api: api).getToday(),
+      throwsA(
+        isA<LabourAttendanceException>().having(
+          (error) => error.message,
+          'message',
+          contains('branch geofence could not be verified'),
+        ),
+      ),
+    );
+  });
+
+  test('accepts one employee object in a backend join array', () async {
+    final payload = _todayPayload()
+      ..['employee'] = [
+        {'id': 'user-1', 'full_name': 'Authenticated User'}
+      ];
+    final api = FakeLabourAttendanceApi()
+      ..todayResponse = _success(payload)
+      ..getResponse = _success(<dynamic>[]);
+
+    final result = await LabourAttendanceService(api: api).getToday();
+
+    expect(result.employeeId, 'user-1');
+    expect(result.status, 'Not Checked In');
+  });
+
+  test('accepts an open attendance record scoped to the authenticated user',
+      () async {
+    final payload = _todayPayload(
+      status: 'Checked In',
+      attendance: _record(userId: 'user-1'),
+    )..['employee'] = 'Server Employee Name';
+    final api = FakeLabourAttendanceApi()
+      ..todayResponse = _success(payload)
+      ..getResponse = _success(<dynamic>[]);
+
+    final result = await LabourAttendanceService(api: api).getToday();
+
+    expect(result.status, 'Checked In');
+    expect(result.attendance?.userId, 'user-1');
+    expect(result.attendance?.isWorking, isTrue);
+  });
+
+  test('accepts the backend employee name string using authenticated identity',
+      () async {
+    final payload = _todayPayload()..['employee'] = 'Server Employee Name';
+    final api = FakeLabourAttendanceApi()
+      ..todayResponse = _success(payload)
+      ..getResponse = _success(<dynamic>[]);
+
+    final result = await LabourAttendanceService(api: api).getToday();
+
+    expect(result.employeeId, 'user-1');
+    expect(result.employeeName, 'Authenticated User');
+    expect(result.status, 'Not Checked In');
+    expect(result.attendance, isNull);
+  });
+
+  test('accepts omitted employee details only with authenticated identity',
+      () async {
+    final payload = _todayPayload()..remove('employee');
+    final api = FakeLabourAttendanceApi()
+      ..todayResponse = _success(payload)
+      ..getResponse = _success(<dynamic>[]);
+
+    final result = await LabourAttendanceService(api: api).getToday();
+
+    expect(result.employeeId, 'user-1');
+    expect(result.status, 'Not Checked In');
+  });
+
+  test('rejects attendance for a different user if employee is omitted',
+      () async {
+    final payload = _todayPayload()
+      ..remove('employee')
+      ..['attendance'] = _record(userId: 'different-user');
+    final api = FakeLabourAttendanceApi()..todayResponse = _success(payload);
+
+    await expectLater(
+      LabourAttendanceService(api: api).getToday(),
+      throwsA(
+        isA<LabourAttendanceException>().having(
+          (error) => error.message,
+          'message',
+          contains('outside the authenticated scope'),
+        ),
+      ),
+    );
+  });
+
+  test('reports which response field has an unexpected array shape', () async {
+    final malformedPayload = _todayPayload()..['employee'] = <dynamic>[];
+    final api = FakeLabourAttendanceApi()
+      ..todayResponse = _success(malformedPayload);
+
+    await expectLater(
+      LabourAttendanceService(api: api).getToday(),
+      throwsA(
+        isA<LabourAttendanceException>().having(
+          (error) => error.message,
+          'message',
+          contains('"employee" has an unsupported type (List<dynamic>)'),
+        ),
+      ),
+    );
+  });
+
+  test('rejects an attendance array with a field-specific diagnostic',
+      () async {
+    final malformedPayload = _todayPayload()..['attendance'] = <dynamic>[];
+    final api = FakeLabourAttendanceApi()
+      ..todayResponse = _success(malformedPayload);
+
+    await expectLater(
+      LabourAttendanceService(api: api).getToday(),
+      throwsA(
+        isA<LabourAttendanceException>().having(
+          (error) => error.message,
+          'message',
+          contains('"attendance" must be an object'),
+        ),
+      ),
+    );
+  });
+
+  test('rejects a non-object geofence with a field-specific diagnostic',
+      () async {
+    final malformedPayload = _todayPayload()..['branch_geofence'] = <dynamic>[];
+    final api = FakeLabourAttendanceApi()
+      ..todayResponse = _success(malformedPayload);
+
+    await expectLater(
+      LabourAttendanceService(api: api).getToday(),
+      throwsA(
+        isA<LabourAttendanceException>().having(
+          (error) => error.message,
+          'message',
+          contains('"branch_geofence" must be an object'),
+        ),
+      ),
+    );
+  });
+
+  test('rejects a missing attendance field but accepts explicit null',
+      () async {
+    final malformedPayload = _todayPayload()..remove('attendance');
+    final api = FakeLabourAttendanceApi()
+      ..todayResponse = _success(malformedPayload);
+
+    await expectLater(
+      LabourAttendanceService(api: api).getToday(),
+      throwsA(
+        isA<LabourAttendanceException>().having(
+          (error) => error.message,
+          'message',
+          contains('missing attendance'),
+        ),
+      ),
+    );
+  });
+
+  test('rejects a non-JSON attendance response without treating it as data',
+      () async {
+    final api = FakeLabourAttendanceApi()
+      ..todayResponse = _response(
+        status: 200,
+        data: 'not-json',
+      );
+
+    await expectLater(
+      LabourAttendanceService(api: api).getToday(),
+      throwsA(
+        isA<LabourAttendanceException>().having(
+          (error) => error.message,
+          'message',
+          contains('invalid response'),
+        ),
+      ),
+    );
+  });
+
   test('GET identifies a completed attendance record', () async {
     final api = FakeLabourAttendanceApi()
       ..getResponse = _success([

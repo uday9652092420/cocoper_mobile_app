@@ -28,6 +28,7 @@ class LabourAttendanceController extends GetxController
 
   bool get canCheckIn =>
       today.value?.attendance == null &&
+      today.value?.status == 'Not Checked In' &&
       hasAttendancePermission.value &&
       isStateVerified.value &&
       !isLoading.value &&
