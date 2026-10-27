@@ -40,6 +40,8 @@ class SalesOrderController extends GetxController {
   final conversionReferences = <String, String>{}.obs;
   final conversionSalesOrderIds = <String, String>{}.obs;
   final _persistedConversionPoIds = <String>{};
+  final _refreshableConversionPoIds = <String>{};
+  final _acceptedUnconfirmedConversionPoIds = <String>{};
   String? _loadedLockOrganizationId;
 
   // ============================================================
@@ -57,6 +59,8 @@ class SalesOrderController extends GetxController {
   final isSaving = false.obs;
   String? lastCreatedSalesOrderReference;
   String? lastCreatedSalesOrderId;
+  String? lastExistingSalesOrderReference;
+  String? lastExistingSalesOrderId;
 
   // ============================================================
   // LIST
@@ -88,14 +92,50 @@ class SalesOrderController extends GetxController {
           .whereType<Map<String, dynamic>>()
           .map(SalesOrder.fromJson)
           .toList();
-      blockedConversionPoIds.addAll(
-        salesOrders
-            .map((order) => order.sourcePoId.trim())
-            .where((id) => id.isNotEmpty),
-      );
+      final linkedPurchaseOrderIds = salesOrders
+          .map((order) => order.sourcePoId.trim())
+          .where((id) => id.isNotEmpty)
+          .toSet();
+      final unconfirmedLocks =
+          _refreshableConversionPoIds.difference(linkedPurchaseOrderIds);
+      if (unconfirmedLocks.isNotEmpty) {
+        _refreshableConversionPoIds.removeAll(unconfirmedLocks);
+        _persistedConversionPoIds.removeAll(unconfirmedLocks);
+        try {
+          await _saveConversionLocks();
+        } on StateError {
+          _refreshableConversionPoIds.addAll(unconfirmedLocks);
+          _persistedConversionPoIds.addAll(unconfirmedLocks);
+          rethrow;
+        }
+      }
+      final confirmedLocks = _acceptedUnconfirmedConversionPoIds
+          .intersection(linkedPurchaseOrderIds);
+      if (confirmedLocks.isNotEmpty) {
+        _acceptedUnconfirmedConversionPoIds.removeAll(confirmedLocks);
+        _persistedConversionPoIds.removeAll(confirmedLocks);
+        try {
+          await _saveConversionLocks();
+        } on StateError {
+          _acceptedUnconfirmedConversionPoIds.addAll(confirmedLocks);
+          _persistedConversionPoIds.addAll(confirmedLocks);
+          rethrow;
+        }
+      }
+      blockedConversionPoIds
+        ..removeWhere(
+          (id) =>
+              !linkedPurchaseOrderIds.contains(id) &&
+              !_persistedConversionPoIds.contains(id),
+        )
+        ..addAll(linkedPurchaseOrderIds);
       return true;
     } on DioException {
       hasListError.value = true;
+      return false;
+    } on StateError catch (error) {
+      hasListError.value = true;
+      errorToast(error.message.toString());
       return false;
     } finally {
       isLoadingList.value = false;
@@ -104,15 +144,23 @@ class SalesOrderController extends GetxController {
 
   /// Sales Orders are available through the verified list read only. Refresh
   /// that list before resolving the selected ID so detail views never reuse a
-  /// stale order or accidentally select by its former list position.
+  /// stale order or accidentally select by its former list position. A server-
+  /// returned create/conflict DTO remains usable if the list refresh is delayed.
   Future<SalesOrder?> fetchSalesOrderById(String id) async {
+    SalesOrder? cachedOrder;
+    for (final order in salesOrders) {
+      if (order.id == id) {
+        cachedOrder = order;
+        break;
+      }
+    }
     await loadSalesOrders();
-    if (hasListError.value) return null;
+    if (hasListError.value) return cachedOrder;
 
     for (final order in salesOrders) {
       if (order.id == id) return order;
     }
-    return null;
+    return cachedOrder;
   }
 
   static String normalizedStatus(String status) => status.trim().toLowerCase();
@@ -126,6 +174,15 @@ class SalesOrderController extends GetxController {
     return blockedConversionPoIds.contains(id) ||
         salesOrders.any((order) => order.sourcePoId == id);
   }
+
+  SalesOrder? salesOrderForPurchaseOrder(String purchaseOrderId) {
+    final id = purchaseOrderId.trim();
+    if (id.isEmpty) return null;
+    return _salesOrderForPurchaseOrder(id);
+  }
+
+  bool isAcceptedConversionUnconfirmed(String purchaseOrderId) =>
+      _acceptedUnconfirmedConversionPoIds.contains(purchaseOrderId.trim());
 
   /// Validates the fields that are present in the verified Sales Order model.
   /// The server write is intentionally not enabled without an update contract.
@@ -468,8 +525,11 @@ class SalesOrderController extends GetxController {
     try {
       lastCreatedSalesOrderReference = null;
       lastCreatedSalesOrderId = null;
+      lastExistingSalesOrderReference = null;
+      lastExistingSalesOrderId = null;
       if (conversionPoId.isNotEmpty) {
         _persistedConversionPoIds.add(conversionPoId);
+        _refreshableConversionPoIds.add(conversionPoId);
         blockedConversionPoIds.add(conversionPoId);
         await _saveConversionLocks();
       }
@@ -495,16 +555,41 @@ class SalesOrderController extends GetxController {
       consolePrint('SALES ORDER SAVE STATUS: ${response?.statusCode}');
 
       if (conversionPoId.isNotEmpty && response?.statusCode == 409) {
+        final responseOrder = _extractExistingSalesOrder(response?.data);
+        SalesOrder? existing;
+        if (responseOrder != null &&
+            (responseOrder.sourcePoId.isEmpty ||
+                responseOrder.sourcePoId == conversionPoId)) {
+          existing = responseOrder;
+          await _rememberExistingConversion(conversionPoId, existing);
+        }
         await loadSalesOrders();
-        final existing = _salesOrderForPurchaseOrder(conversionPoId);
+        existing ??= _salesOrderForPurchaseOrder(conversionPoId);
+        if (existing != null) {
+          await _rememberExistingConversion(conversionPoId, existing);
+        }
         final reference = existing?.soNumber ?? '';
         if (reference.isNotEmpty) {
           conversionReferences[conversionPoId] = reference;
         }
+        if (response?.data is Map &&
+            response?.data['code'] == 'PURCHASE_ORDER_ALREADY_CONVERTED' &&
+            existing?.id.isNotEmpty == true) {
+          lastExistingSalesOrderId = existing!.id;
+          lastExistingSalesOrderReference = existing.soNumber;
+        }
+        final serverMessage = _extractMessage(response?.data);
         errorToast(
           reference.isEmpty
-              ? 'This Purchase Order has a conversion conflict. Refresh its '
-                  'status before trying again.'
+              ? serverMessage.isNotEmpty
+                  ? 'Conversion rejected: $serverMessage'
+                  : hasListError.value
+                      ? 'The server reported a conversion conflict, but the '
+                          'Sales Orders list could not be refreshed. Try '
+                          'refreshing before converting again.'
+                      : 'The server reported a conversion conflict, but no '
+                          'linked Sales Order was found. Ask an administrator '
+                          'to verify this Purchase Order before retrying.'
               : 'This Purchase Order is already converted to Sales Order '
                   '$reference.',
         );
@@ -517,34 +602,49 @@ class SalesOrderController extends GetxController {
       )) {
         consolePrint('SALES ORDER SAVE SUCCESS');
         if (conversionPoId.isNotEmpty) {
-          final refreshed = await loadSalesOrders();
-          final created =
-              refreshed ? _salesOrderForPurchaseOrder(conversionPoId) : null;
+          _refreshableConversionPoIds.remove(conversionPoId);
+          _acceptedUnconfirmedConversionPoIds.add(conversionPoId);
+          await _saveConversionLocks();
           final responseOrder = SalesOrder.fromCreateResponse(response?.data);
-          final responseLinkMatches = responseOrder == null ||
-              responseOrder.sourcePoId.isEmpty ||
-              responseOrder.sourcePoId == conversionPoId;
-          final responseIdMatches = responseOrder == null ||
-              responseOrder.id.isEmpty ||
-              responseOrder.id == created?.id;
-
-          if (created == null ||
-              created.id.isEmpty ||
-              created.soNumber.isEmpty ||
-              !responseLinkMatches ||
-              !responseIdMatches) {
+          if (responseOrder != null &&
+              responseOrder.sourcePoId.isNotEmpty &&
+              responseOrder.sourcePoId != conversionPoId) {
             errorToast(
-              'The server accepted the conversion, but the refreshed Sales '
-              'Orders list did not confirm the saved record and Purchase '
-              'Order link. Do not retry; refresh or contact your administrator.',
+              'The server accepted a Sales Order with a different Purchase '
+              'Order link. Do not retry; contact your administrator.',
             );
             return false;
           }
 
+          final refreshed = await loadSalesOrders();
+          final listedOrder =
+              refreshed ? _salesOrderForPurchaseOrder(conversionPoId) : null;
+          final created = listedOrder ??
+              (responseOrder != null &&
+                      responseOrder.id.isNotEmpty &&
+                      responseOrder.soNumber.isNotEmpty
+                  ? responseOrder
+                  : null);
+          if (created == null ||
+              created.id.isEmpty ||
+              created.soNumber.isEmpty) {
+            errorToast(
+              'The server accepted the conversion, but its Sales Order ID '
+              'was not returned. Do not retry; refresh or contact your administrator.',
+            );
+            return false;
+          }
+          _upsertSalesOrder(created);
           lastCreatedSalesOrderId = created.id;
           lastCreatedSalesOrderReference = created.soNumber;
           conversionReferences[conversionPoId] = created.soNumber;
           conversionSalesOrderIds[conversionPoId] = created.id;
+          if (listedOrder != null) {
+            await _removeConversionLock(conversionPoId);
+          } else {
+            blockedConversionPoIds.add(conversionPoId);
+            await _saveConversionLocks();
+          }
         } else {
           await loadSalesOrders();
         }
@@ -575,10 +675,10 @@ class SalesOrderController extends GetxController {
         await _removeConversionLock(conversionPoId);
       }
 
-      final message = conversionPoId.isNotEmpty
-          ? conversionErrorMessage(statusCode) ??
-              _extractMessage(response?.data)
-          : _extractMessage(response?.data);
+      final serverMessage = _extractMessage(response?.data);
+      final message = serverMessage.isNotEmpty
+          ? serverMessage
+          : conversionErrorMessage(statusCode) ?? '';
       errorToast(
         message.isNotEmpty
             ? message
@@ -616,23 +716,37 @@ class SalesOrderController extends GetxController {
     conversionReferences.clear();
     conversionSalesOrderIds.clear();
     _persistedConversionPoIds.clear();
+    _refreshableConversionPoIds.clear();
+    _acceptedUnconfirmedConversionPoIds.clear();
 
     final lockMap = Map<String, dynamic>.from(
       await SharedPrefsHelper.getMap(_conversionLocksPreferenceKey),
     );
-    final ids = lockMap[_organizationLockKey(organizationId)];
-    if (ids is List) {
-      _persistedConversionPoIds.addAll(
-        ids.whereType<String>().map((id) => id.trim()).where(
-              (id) => id.isNotEmpty,
-            ),
-      );
-      blockedConversionPoIds.addAll(_persistedConversionPoIds);
+    final lockState = lockMap[_organizationLockKey(organizationId)];
+    if (lockState is List) {
+      final legacyIds =
+          lockState.whereType<String>().map((id) => id.trim()).where(
+                (id) => id.isNotEmpty,
+              );
+      _persistedConversionPoIds.addAll(legacyIds);
+      _refreshableConversionPoIds.addAll(legacyIds);
+    } else if (lockState is Map) {
+      final refreshableIds = _readConversionLockIds(lockState['refreshable']);
+      final acceptedUnconfirmedIds =
+          _readConversionLockIds(lockState['acceptedUnconfirmed']);
+      _refreshableConversionPoIds.addAll(refreshableIds);
+      _acceptedUnconfirmedConversionPoIds.addAll(acceptedUnconfirmedIds);
+      _persistedConversionPoIds
+        ..addAll(refreshableIds)
+        ..addAll(acceptedUnconfirmedIds);
     }
+    blockedConversionPoIds.addAll(_persistedConversionPoIds);
   }
 
   Future<void> _removeConversionLock(String purchaseOrderId) async {
     _persistedConversionPoIds.remove(purchaseOrderId);
+    _refreshableConversionPoIds.remove(purchaseOrderId);
+    _acceptedUnconfirmedConversionPoIds.remove(purchaseOrderId);
     blockedConversionPoIds.remove(purchaseOrderId);
     await _saveConversionLocks();
   }
@@ -647,7 +761,11 @@ class SalesOrderController extends GetxController {
     if (_persistedConversionPoIds.isEmpty) {
       lockMap.remove(key);
     } else {
-      lockMap[key] = _persistedConversionPoIds.toList(growable: false);
+      lockMap[key] = <String, dynamic>{
+        'refreshable': _refreshableConversionPoIds.toList(growable: false),
+        'acceptedUnconfirmed':
+            _acceptedUnconfirmedConversionPoIds.toList(growable: false),
+      };
     }
 
     final saved = lockMap.isEmpty
@@ -663,6 +781,16 @@ class SalesOrderController extends GetxController {
 
   String _organizationLockKey(String organizationId) =>
       organizationId.isEmpty ? _unscopedOrganizationKey : organizationId;
+
+  List<String> _readConversionLockIds(dynamic value) => value is List
+      ? value
+          .whereType<String>()
+          .map((id) => id.trim())
+          .where(
+            (id) => id.isNotEmpty,
+          )
+          .toList()
+      : const [];
 
   // ============================================================
   // HELPERS
@@ -722,5 +850,41 @@ class SalesOrderController extends GetxController {
       }
     }
     return '';
+  }
+
+  SalesOrder? _extractExistingSalesOrder(dynamic data) {
+    if (data is! Map) return null;
+    final details = data['details'];
+    if (details is! Map) return null;
+    final order = details['salesOrder'];
+    if (order is! Map) return null;
+    final mapped = SalesOrder.fromJson(Map<String, dynamic>.from(order));
+    return mapped.id.isEmpty ? null : mapped;
+  }
+
+  Future<void> _rememberExistingConversion(
+    String purchaseOrderId,
+    SalesOrder order,
+  ) async {
+    _upsertSalesOrder(order);
+    if (order.soNumber.isNotEmpty) {
+      conversionReferences[purchaseOrderId] = order.soNumber;
+    }
+    if (order.id.isNotEmpty) {
+      conversionSalesOrderIds[purchaseOrderId] = order.id;
+    }
+    _persistedConversionPoIds.add(purchaseOrderId);
+    _acceptedUnconfirmedConversionPoIds.add(purchaseOrderId);
+    blockedConversionPoIds.add(purchaseOrderId);
+    await _saveConversionLocks();
+  }
+
+  void _upsertSalesOrder(SalesOrder order) {
+    salesOrders.removeWhere(
+      (saved) =>
+          saved.id == order.id ||
+          (order.sourcePoId.isNotEmpty && saved.sourcePoId == order.sourcePoId),
+    );
+    salesOrders.insert(0, order);
   }
 }

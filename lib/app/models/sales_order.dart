@@ -66,7 +66,9 @@ class SalesOrder {
       remarks: _string(json['remarks']),
       status: _string(json['status']),
       mode: _string(json['mode']),
-      sourcePoId: _string(json['sourcePoId'] ?? json['source_po_id']),
+      sourcePoId: _string(
+        json['sourcePOId'] ?? json['sourcePoId'] ?? json['source_po_id'],
+      ),
       poNumber: _string(json['poNumber'] ?? json['po_number']),
       lines: parsedLines,
     );

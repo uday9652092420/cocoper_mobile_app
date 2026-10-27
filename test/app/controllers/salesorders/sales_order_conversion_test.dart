@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   const toastChannel = MethodChannel('PonnamKarthik/fluttertoast');
+  var lastToastMessage = '';
 
   setUpAll(() async {
     SharedPreferences.setMockInitialValues({});
@@ -18,8 +19,15 @@ void main() {
 
   setUp(() async {
     await SharedPrefsHelper.clearAll();
+    lastToastMessage = '';
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(toastChannel, (_) async => true);
+        .setMockMethodCallHandler(toastChannel, (call) async {
+      final arguments = call.arguments;
+      if (arguments is Map) {
+        lastToastMessage = arguments['msg']?.toString() ?? '';
+      }
+      return true;
+    });
   });
 
   tearDown(() {
@@ -72,7 +80,7 @@ void main() {
           'data': {
             'id': 'sales-order-1',
             'soNumber': 'COP-SO-01',
-            'sourcePoId': 'purchase-order-1',
+            'sourcePOId': 'purchase-order-1',
             'poNumber': 'COP-01',
           },
         });
@@ -83,7 +91,7 @@ void main() {
           {
             'id': 'sales-order-1',
             'soNumber': 'COP-SO-01',
-            'sourcePoId': 'purchase-order-1',
+            'sourcePOId': 'purchase-order-1',
             'poNumber': 'COP-01',
             'branchId': 'branch-1',
             'status': 'Draft',
@@ -221,8 +229,29 @@ void main() {
     );
   });
 
+  test('finds an existing Sales Order using the backend sourcePOId field',
+      () async {
+    final controller = SalesOrderController(
+      getRequest: (endpoint) async => response(200, [
+        {
+          'id': 'sales-order-existing',
+          'soNumber': 'COP-SO-01',
+          'sourcePOId': 'purchase-order-1',
+        },
+      ]),
+    );
+
+    expect(await controller.loadSalesOrders(), isTrue);
+    expect(
+      controller.salesOrderForPurchaseOrder('purchase-order-1')?.id,
+      'sales-order-existing',
+    );
+    expect(controller.isPurchaseOrderConversionBlocked('purchase-order-1'),
+        isTrue);
+  });
+
   test(
-      'does not report success unless refreshed server list confirms the PO link',
+      'uses the successful response and preserves the conversion link when list refresh is empty',
       () async {
     var postCount = 0;
     final controller = SalesOrderController(
@@ -240,12 +269,21 @@ void main() {
       getRequest: (endpoint) async => response(200, <dynamic>[]),
     );
 
-    expect(await convert(controller), isFalse);
-    expect(controller.lastCreatedSalesOrderId, isNull);
-    expect(controller.lastCreatedSalesOrderReference, isNull);
+    expect(await convert(controller), isTrue);
+    expect(controller.lastCreatedSalesOrderId, 'sales-order-1');
+    expect(controller.lastCreatedSalesOrderReference, 'COP-SO-01');
     expect(controller.isPurchaseOrderConversionBlocked('purchase-order-1'),
         isTrue);
-    expect(await convert(controller), isFalse);
+    var retryPostCount = 0;
+    final restoredController = SalesOrderController(
+      postRequest: (endpoint, body) async {
+        retryPostCount++;
+        return response(201, {'success': true});
+      },
+      getRequest: (endpoint) async => response(200, <dynamic>[]),
+    );
+    expect(await convert(restoredController), isFalse);
+    expect(retryPostCount, 0);
     expect(postCount, 1);
   });
 
@@ -269,33 +307,166 @@ void main() {
     expect(secondPostCount, 0);
   });
 
-  test('a conflict refreshes Sales Orders and blocks another conversion',
+  test('a successful list refresh clears an ambiguous conversion lock',
       () async {
     var postCount = 0;
     var getCount = 0;
     final controller = SalesOrderController(
       postRequest: (endpoint, body) async {
         postCount++;
-        return response(409, {'message': 'Purchase Order already converted'});
-      },
-      getRequest: (endpoint) async {
-        getCount++;
-        return response(200, [
-          {
+        if (postCount == 1) return null;
+        return response(201, {
+          'success': true,
+          'data': {
             'id': 'sales-order-1',
             'soNumber': 'COP-SO-01',
             'sourcePoId': 'purchase-order-1',
-            'poNumber': 'COP-01',
           },
-        ]);
+        });
+      },
+      getRequest: (endpoint) async {
+        getCount++;
+        return response(
+          200,
+          getCount == 1
+              ? <dynamic>[]
+              : [
+                  {
+                    'id': 'sales-order-1',
+                    'soNumber': 'COP-SO-01',
+                    'sourcePoId': 'purchase-order-1',
+                  },
+                ],
+        );
+      },
+    );
+
+    expect(await convert(controller), isFalse);
+    expect(controller.isPurchaseOrderConversionBlocked('purchase-order-1'),
+        isTrue);
+
+    expect(await controller.loadSalesOrders(), isTrue);
+    expect(controller.isPurchaseOrderConversionBlocked('purchase-order-1'),
+        isFalse);
+    expect(await convert(controller), isTrue);
+    expect(postCount, 2);
+    expect(getCount, 2);
+  });
+
+  test('a conflict shows the server reason and blocks another conversion',
+      () async {
+    var postCount = 0;
+    var getCount = 0;
+    final controller = SalesOrderController(
+      postRequest: (endpoint, body) async {
+        postCount++;
+        return response(409, {'message': 'Purchase Order is not approved'});
+      },
+      getRequest: (endpoint) async {
+        getCount++;
+        return response(200, <dynamic>[]);
       },
     );
 
     expect(await convert(controller), isFalse);
     expect(getCount, 1);
+    expect(lastToastMessage,
+        'Conversion rejected: Purchase Order is not approved');
+    expect(controller.conversionReferences, isEmpty);
+    expect(postCount, 1);
+  });
+
+  test('a conflict with a linked Sales Order names the existing order',
+      () async {
+    final controller = SalesOrderController(
+      postRequest: (endpoint, body) async =>
+          response(409, {'message': 'Purchase Order already converted'}),
+      getRequest: (endpoint) async => response(200, [
+        {
+          'id': 'sales-order-1',
+          'soNumber': 'COP-SO-01',
+          'sourcePoId': 'purchase-order-1',
+          'poNumber': 'COP-01',
+        },
+      ]),
+    );
+
+    expect(await convert(controller), isFalse);
     expect(controller.conversionReferences['purchase-order-1'], 'COP-SO-01');
+    expect(
+      lastToastMessage,
+      'This Purchase Order is already converted to Sales Order COP-SO-01.',
+    );
+  });
+
+  test(
+      'duplicate conversion response records the linked order and exposes it for navigation',
+      () async {
+    var postCount = 0;
+    final controller = SalesOrderController(
+      postRequest: (endpoint, body) async {
+        postCount++;
+        return response(409, {
+          'status': 'error',
+          'code': 'PURCHASE_ORDER_ALREADY_CONVERTED',
+          'message':
+              'This purchase order has already been converted to a sales order.',
+          'details': {
+            'sourcePOId': 'purchase-order-1',
+            'salesOrder': {
+              'id': 'sales-order-existing',
+              'soNumber': 'COP-SO-01',
+              'sourcePOId': 'purchase-order-1',
+              'poNumber': 'COP-01',
+              'status': 'Draft',
+              'lines': [
+                {'itemId': 'item-1', 'quantity': 10, 'saleAmount': 200},
+              ],
+            },
+          },
+        });
+      },
+      getRequest: (endpoint) async => response(200, <dynamic>[]),
+    );
+
+    expect(await convert(controller), isFalse);
+    expect(controller.lastExistingSalesOrderId, 'sales-order-existing');
+    expect(controller.lastExistingSalesOrderReference, 'COP-SO-01');
+    expect(controller.salesOrders.single.id, 'sales-order-existing');
+    expect(controller.salesOrders.single.lines.single.saleAmount, 200);
+    expect(controller.isPurchaseOrderConversionBlocked('purchase-order-1'),
+        isTrue);
+    expect(
+      (await controller.fetchSalesOrderById('sales-order-existing'))?.soNumber,
+      'COP-SO-01',
+    );
     expect(await convert(controller), isFalse);
     expect(postCount, 1);
+  });
+
+  test('successful conversion uses response ID even if the list refresh fails',
+      () async {
+    final controller = SalesOrderController(
+      postRequest: (endpoint, body) async => response(201, {
+        'id': 'sales-order-created',
+        'soNumber': 'COP-SO-01',
+        'sourcePOId': 'purchase-order-1',
+        'poNumber': 'COP-01',
+        'status': 'Draft',
+        'lines': [
+          {'itemId': 'item-1', 'quantity': 10, 'saleAmount': 200},
+        ],
+      }),
+      getRequest: (endpoint) async =>
+          response(503, {'message': 'Temporarily unavailable'}),
+    );
+
+    expect(await convert(controller), isTrue, reason: lastToastMessage);
+    expect(controller.lastCreatedSalesOrderId, 'sales-order-created');
+    expect(controller.lastCreatedSalesOrderReference, 'COP-SO-01');
+    expect(controller.salesOrders.single.id, 'sales-order-created');
+    expect(controller.isPurchaseOrderConversionBlocked('purchase-order-1'),
+        isTrue);
   });
 
   test('ambiguous network outcome is not retried by another save tap',

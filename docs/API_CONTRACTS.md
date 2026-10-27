@@ -154,42 +154,48 @@ HTTP 401 on an authenticated request clears the session. HTTP 403 retains the ex
 | Cash & Bank Expenses | GET/POST /cash-bank-expenses; PUT /cash-bank-expenses/:id | POST /cash-bank-expenses/:id/approve | DELETE /cash-bank-expenses/:id |
 | Bag Purchase | GET/POST /bag-purchases; GET/PUT /bag-purchases/:id | Not verified | DELETE /bag-purchases/:id |
 
-There is no verified Purchase Order → Sales Order conversion endpoint in the
-supplied backend contract. `POST /sales-orders` is documented only as a generic
-Sales Order create route. The current Flutter conversion screen posts to that
-route with `sourcePoId`, `poNumber`, `branchId`, Sales Order fields and lines;
-organization ID is omitted from the body, while the shared API client sends the
-authenticated JWT and session organization scope. The mobile client accepts a
-conversion only after HTTP 201 and a subsequent successful `GET /sales-orders`
-returns a record with the same source PO link, database ID and Sales Order
-number. The 201 response parser accepts a direct order object or a `data`,
-`salesOrder`, or `order` object envelope, but that shape is a client-side
-compatibility parser, not a confirmed backend response contract.
+Purchase Order to Sales Order conversion uses the authenticated `POST
+/sales-orders` route and its source relationship, duplicate handling, and
+transactional behavior are verified in the backend code. The request sends a
+JWT and `x-organization-id`; organization scope is resolved by the backend,
+not trusted from the body. Mobile conversion checks that the source PO belongs
+to that organization, is approved, and has a branch assigned to the user when
+branch-scoped. The JSON body contains `soNumber`, `date`, optional `customerId`,
+`remarks`, `status` (normally `Draft`), `mode`, `sourcePoId` (the
+`purchase_orders.id`; `sourcePOId` is also accepted), optional `branchId`,
+`poNumber`, and `lines`.
+Each line contains `itemId`, `quantity`, `discount`, optional
+`piecesPercentage` and `pieces`, `actualQuantity`, `saleCost`, `saleAmount`,
+and `amount`. The backend takes authoritative PO number and branch from the
+locked source PO; request `branchId` is not the relationship key.
 
-For an ambiguous result, the mobile client persistently blocks another
-conversion attempt for that PO and organization until the server link is
-confirmed. This prevents an automatic duplicate retry but is not a substitute
-for server-side atomic/idempotent protection; it can require administrator
-verification to unblock. The backend/Web team must document and verify the
-authenticated conversion operation, exact request/response, permissions and
-allowed PO statuses, durable source relationship, idempotency behavior, and
-stock/accounting/audit effects before this flow can be considered a verified
-conversion integration.
+Successful conversion returns HTTP 201 and the Sales Order row directly as
+JSON, including `id`, `soNumber`, `organizationId`, `branchId`, `customerId`,
+`date`, `remarks`, `sourcePOId`, `poNumber`, `mode`, `status`,
+`totalAmount`, and persisted `lines`. A duplicate returns HTTP 409 with
+`{status:"error", code:"PURCHASE_ORDER_ALREADY_CONVERTED", message, details}`
+and `details.salesOrder` when the existing order belongs to the requesting
+organization. Flutter offers to open that returned Sales Order instead of
+retrying.
+After a successful but unconfirmed conversion, Flutter preserves a retry lock
+across app restarts until a refreshed Sales Order list confirms the PO-to-SO
+link. An existing-order response also blocks another create and exposes the
+linked Sales Order ID for navigation.
 
-The supplied contract only verifies `GET /sales-orders` as a read-only lookup
-whose list records include line items. The mobile client contains a Sales Order
-creation request, but no verified Sales Order update, delete, detail, or
-approval route is documented. The Edit screen refreshes the list and resolves
-the selected order by ID; it displays Draft fields and locally edits supported
+`GET /sales-orders` returns the organization-scoped raw Sales Order array with
+line items and `sourcePOId`; `GET /sales-orders/:id` returns organization-scoped
+details. The Web Sales Orders page consumes this list, while Purchase Order
+list/detail return the related Sales Order through the same
+`sales_orders.source_po_id` relationship. The Flutter Edit screen continues to
+refresh the list and resolves the selected order by ID; it edits supported
 basic fields and lines only for the verified `tonage` and `lessing` calculation
 modes. Pieces-percentage and unknown modes preserve their existing values and
-keep line editing disabled. Save Changes remains disabled because no update
-request schema is verified. Approved and unrecognized statuses are read-only.
-Approval and deletion remain unavailable; the list does not expose Delete until
-a verified delete endpoint and Draft-deletion rule are available.
+keep line editing disabled. Approved and unrecognized statuses are read-only.
+Approval and deletion remain unavailable in the Flutter UI.
 Do not infer an update/approval/delete route or reuse the create endpoint for
 any of these operations. The View screen also refreshes the list and resolves
-the selected order by ID because a detail endpoint is not documented.
+the selected order by ID; the backend also provides the organization-scoped
+`GET /sales-orders/:id` detail endpoint.
 
 Bag Purchase contract verified from the supplied TypeScript source: the list
 accepts optional `organizationId` and `branchId` query parameters and can be

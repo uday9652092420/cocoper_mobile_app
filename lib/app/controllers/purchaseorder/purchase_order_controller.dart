@@ -109,7 +109,7 @@ class PurchaseOrderController extends GetxController {
 
   Future<void> _loadSuppliers() async {
     // NOTE: /suppliers uses the {success, data: []} envelope.
-    final response = await ApiService.get(EndPoints.suppliers);
+    final response = await _get(EndPoints.suppliers);
     final data = response?.data;
 
     if (response?.statusCode == 200 && data is Map) {
@@ -125,7 +125,7 @@ class PurchaseOrderController extends GetxController {
 
   Future<void> _loadItems() async {
     // NOTE: /items returns a raw array.
-    final response = await ApiService.get(EndPoints.items);
+    final response = await _get(EndPoints.items);
     final data = response?.data;
 
     if (response?.statusCode == 200 && data is List) {
@@ -137,13 +137,16 @@ class PurchaseOrderController extends GetxController {
   }
 
   Future<void> _loadBranches() async {
-    // NOTE: /branches returns a raw array.
-    final response = await ApiService.get(EndPoints.branches);
+    // Bootstrap returns the branches assigned to the authenticated user.
+    final response = await _get(EndPoints.mobileBootstrap);
     final data = response?.data;
 
-    if (response?.statusCode == 200 && data is List) {
-      branches.value = data
-          .map((e) => LookupOption.fromDynamic(e))
+    if (response?.statusCode == 200 &&
+        data is Map &&
+        data['success'] == true &&
+        data['branches'] is List) {
+      branches.value = (data['branches'] as List)
+          .map(LookupOption.fromDynamic)
           .where((o) => o.id.isNotEmpty)
           .toList();
     }

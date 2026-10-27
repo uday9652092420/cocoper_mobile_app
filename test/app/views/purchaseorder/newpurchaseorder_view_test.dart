@@ -1,5 +1,6 @@
 import 'package:cocoper_mobile/app/controllers/purchaseorder/purchase_order_controller.dart';
 import 'package:cocoper_mobile/app/controllers/salesorders/sales_order_controller.dart';
+import 'package:cocoper_mobile/app/helpers/shared_preferences.dart';
 import 'package:cocoper_mobile/app/models/lookup_option.dart';
 import 'package:cocoper_mobile/app/models/purchase_order.dart';
 import 'package:cocoper_mobile/app/models/purchase_order_line.dart';
@@ -8,6 +9,7 @@ import 'package:cocoper_mobile/app/routes/app_pages.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 const _items = <LookupOption>[
   LookupOption(id: 'item-1', label: 'Coconut Bondam'),
@@ -155,7 +157,9 @@ double _caretX(WidgetTester tester, Finder field, {int? offset}) {
 }
 
 void main() {
-  setUp(() {
+  setUp(() async {
+    SharedPreferences.setMockInitialValues({});
+    await SharedPrefsHelper.init();
     Get.testMode = true;
     _stub = _StubPurchaseOrderController();
     Get.put<PurchaseOrderController>(_stub);
@@ -199,6 +203,28 @@ void main() {
       'branch-1',
     );
     expect(find.text('Warangal'), findsOneWidget);
+  });
+
+  testWidgets('new purchase order prefers the saved assigned branch', (
+    tester,
+  ) async {
+    _stub.branches.assignAll(const [
+      LookupOption(id: 'branch-1', label: 'Warangal'),
+      LookupOption(id: 'branch-2', label: 'Hyderabad'),
+    ]);
+    await SharedPrefsHelper.setString(
+      SharedPrefsHelper.selectedBranchId,
+      'branch-2',
+    );
+
+    await _pumpForm(tester);
+
+    final branchDropdown = find.byType(DropdownButtonFormField<String>).first;
+    expect(
+      tester.state<FormFieldState<String>>(branchDropdown).value,
+      'branch-2',
+    );
+    expect(find.text('Hyderabad'), findsOneWidget);
   });
 
   testWidgets('an empty line item field keeps the caret on the left', (

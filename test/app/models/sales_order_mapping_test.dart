@@ -95,4 +95,14 @@ void main() {
     expect(order?.soNumber, 'SO-02');
     expect(order?.sourcePoId, 'purchase-order-1');
   });
+
+  test('maps canonical backend sourcePOId into the mobile conversion link', () {
+    final order = SalesOrder.fromJson({
+      'id': 'sales-order-2',
+      'soNumber': 'SO-03',
+      'sourcePOId': 'purchase-order-2',
+    });
+
+    expect(order.sourcePoId, 'purchase-order-2');
+  });
 }

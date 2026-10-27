@@ -6,6 +6,7 @@ import 'package:intl/intl.dart' hide TextDirection;
 
 import '../../controllers/purchaseorder/purchase_order_controller.dart';
 import '../../helpers/flutter_toast.dart';
+import '../../helpers/shared_preferences.dart';
 import '../../models/lookup_option.dart';
 import '../../models/purchase_order.dart';
 import '../../models/purchase_order_line.dart';
@@ -66,12 +67,19 @@ class _NewPurchaseOrderViewState extends State<NewPurchaseOrderView> {
       _isLoadingOrder = true;
       _loadAuthoritativeOrder(order.id, loadLookups: true);
     } else {
-      _controller.prepareCreate().then((poNumber) {
+      _controller.prepareCreate().then((poNumber) async {
         if (!mounted) return;
+        final selectedBranchId = await SharedPrefsHelper.getString(
+          SharedPrefsHelper.selectedBranchId,
+        );
         setState(() {
-          _branch ??= _controller.branches.isEmpty
-              ? null
-              : _controller.branches.first.id;
+          _branch ??= _controller.branches.any(
+            (branch) => branch.id == selectedBranchId,
+          )
+              ? selectedBranchId
+              : _controller.branches.isEmpty
+                  ? null
+                  : _controller.branches.first.id;
           if (_poNumberController.text.trim().isEmpty) {
             _poNumberController.text = poNumber;
           }
@@ -1220,6 +1228,15 @@ class _NewPurchaseOrderViewState extends State<NewPurchaseOrderView> {
     final poNumber = _poNumberController.text.trim();
     final supplierId = _supplier?.trim() ?? '';
 
+    if (_branch == null ||
+        !_controller.branches.any((branch) => branch.id == _branch)) {
+      errorToast(
+        _controller.branches.isEmpty
+            ? 'No branches are assigned to your user.'
+            : 'Please select an assigned branch.',
+      );
+      return false;
+    }
     if (poNumber.isEmpty) {
       errorToast('Please enter the PO number.');
       return false;
@@ -1257,7 +1274,11 @@ class _NewPurchaseOrderViewState extends State<NewPurchaseOrderView> {
         Routes.newSaleOrder,
         arguments: order,
       );
-      final salesOrderReference = result is String ? result : null;
+      final resultMap = result is Map ? result : null;
+      final salesOrderId = resultMap?['salesOrderId']?.toString();
+      final salesOrderReference = result is String
+          ? result
+          : resultMap?['salesOrderReference']?.toString();
       if (!mounted) return;
       setState(() {
         _isLoadingOrder = true;
@@ -1271,6 +1292,12 @@ class _NewPurchaseOrderViewState extends State<NewPurchaseOrderView> {
                   'status refreshed.'
               : 'Sales Order $salesOrderReference created. The Purchase Order '
                   'could not be refreshed; retry loading it to verify status.',
+        );
+      }
+      if (salesOrderId != null && salesOrderId.isNotEmpty && mounted) {
+        await Get.toNamed<void>(
+          Routes.viewSalesOrder,
+          arguments: salesOrderId,
         );
       }
     } finally {

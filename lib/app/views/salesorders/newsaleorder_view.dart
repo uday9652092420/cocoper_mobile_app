@@ -6,6 +6,7 @@ import '../../controllers/salesorders/sales_order_controller.dart';
 import '../../helpers/flutter_toast.dart';
 import '../../models/purchase_order.dart';
 import '../../models/sales_order_line.dart';
+import '../../routes/app_routes.dart';
 import '../../theme/app_theme.dart';
 
 const _kInk = AppColors.textDefaultLight;
@@ -397,10 +398,25 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
                       _controller.isPurchaseOrderConversionBlocked(
                         _order!.id,
                       );
+                  final existingSalesOrder = _order == null
+                      ? null
+                      : _controller.salesOrderForPurchaseOrder(_order!.id);
+                  final existingSalesOrderId = existingSalesOrder?.id ??
+                      (_order == null
+                          ? null
+                          : _controller.conversionSalesOrderIds[_order!.id]);
+                  final isCheckingStatus =
+                      _controller.isLoadingList.value && conversionBlocked;
                   return ElevatedButton(
-                    onPressed: _controller.isSaving.value || conversionBlocked
+                    onPressed: _controller.isSaving.value || isCheckingStatus
                         ? null
-                        : _onSave,
+                        : conversionBlocked
+                            ? existingSalesOrderId?.isNotEmpty == true
+                                ? () => _openExistingSalesOrder(
+                                      existingSalesOrderId!,
+                                    )
+                                : _checkConversionStatus
+                            : _onSave,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _kGreen,
                       foregroundColor: Colors.white,
@@ -415,9 +431,13 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
                     child: Text(
                       _controller.isSaving.value
                           ? 'Saving…'
-                          : (conversionBlocked
-                              ? 'Conversion needs verification'
-                              : 'Save'),
+                          : isCheckingStatus
+                              ? 'Checking…'
+                              : conversionBlocked
+                                  ? existingSalesOrderId?.isNotEmpty == true
+                                      ? 'View Sales Order'
+                                      : 'Check status'
+                                  : 'Save',
                       style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
@@ -911,6 +931,52 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
   // Actions
   // ------------------------------------------------------------
 
+  Future<void> _checkConversionStatus() async {
+    final order = _order;
+    if (order == null) return;
+
+    final refreshed = await _controller.loadSalesOrders();
+    if (!mounted) return;
+    if (!refreshed) {
+      errorToast(
+        'Unable to verify this conversion. Check your connection and try again.',
+      );
+      return;
+    }
+
+    final existing = _controller.salesOrderForPurchaseOrder(order.id);
+    if (existing?.id.isNotEmpty == true) {
+      await _openExistingSalesOrder(existing!.id);
+      return;
+    }
+
+    if (!_controller.isPurchaseOrderConversionBlocked(order.id)) {
+      errorToast(
+        'No linked Sales Order was found. You can try saving the conversion again.',
+      );
+      return;
+    }
+
+    if (_controller.isAcceptedConversionUnconfirmed(order.id)) {
+      errorToast(
+        'The server previously accepted this conversion, but no linked Sales '
+        'Order is visible yet. Do not retry; contact your administrator to verify it.',
+      );
+    } else {
+      errorToast(
+        'This Purchase Order is blocked from conversion, but no linked Sales '
+        'Order could be opened. Contact your administrator to verify its status.',
+      );
+    }
+  }
+
+  Future<void> _openExistingSalesOrder(String id) async {
+    await Get.offNamed<void>(
+      Routes.viewSalesOrder,
+      arguments: id,
+    );
+  }
+
   Future<void> _onSave() async {
     if (!_validate()) return;
 
@@ -931,10 +997,45 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
     );
 
     if (success && mounted) {
-      Get.back<String>(
-        result: _controller.lastCreatedSalesOrderReference ??
-            _soNumberController.text.trim(),
+      final salesOrderId = _controller.lastCreatedSalesOrderId;
+      final salesOrderReference = _controller.lastCreatedSalesOrderReference ??
+          _soNumberController.text.trim();
+      Get.back<Map<String, String>>(
+        result: {
+          if (salesOrderId != null) 'salesOrderId': salesOrderId,
+          'salesOrderReference': salesOrderReference,
+        },
       );
+      return;
+    }
+
+    final existingId = _controller.lastExistingSalesOrderId;
+    if (!success && mounted && existingId != null && existingId.isNotEmpty) {
+      final openExisting = await Get.dialog<bool>(
+        AlertDialog(
+          title: const Text('Purchase Order already converted'),
+          content: Text(
+            'Sales Order ${_controller.lastExistingSalesOrderReference ?? ''} '
+            'already exists for this Purchase Order. Open it instead?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Get.back(result: false),
+              child: const Text('Stay here'),
+            ),
+            FilledButton(
+              onPressed: () => Get.back(result: true),
+              child: const Text('Open Sales Order'),
+            ),
+          ],
+        ),
+      );
+      if (openExisting == true && mounted) {
+        await Get.offNamed<void>(
+          Routes.viewSalesOrder,
+          arguments: existingId,
+        );
+      }
     }
   }
 

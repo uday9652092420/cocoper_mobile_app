@@ -71,6 +71,51 @@ void main() {
     );
   });
 
+  test('loads only branches assigned to the authenticated user', () async {
+    final controller = PurchaseOrderController(
+      getRequest: (endpoint) async {
+        if (endpoint == EndPoints.suppliers) {
+          return response(
+            statusCode: 200,
+            data: {
+              'success': true,
+              'data': <dynamic>[
+                {'id': 'supplier-1', 'supplier_name': 'Supplier One'},
+              ],
+            },
+          );
+        }
+        if (endpoint == EndPoints.items) {
+          return response(
+            statusCode: 200,
+            data: <dynamic>[
+              {'id': 'item-1', 'item_name': 'Coconut'},
+            ],
+          );
+        }
+        if (endpoint == EndPoints.mobileBootstrap) {
+          return response(
+            statusCode: 200,
+            data: {
+              'success': true,
+              'branches': <dynamic>[
+                {'id': 'assigned-branch', 'branch_name': 'Assigned Branch'},
+              ],
+            },
+          );
+        }
+        return null;
+      },
+    );
+
+    await controller.loadLookups();
+
+    expect(
+      controller.branches.map((branch) => branch.id),
+      ['assigned-branch'],
+    );
+  });
+
   test('creates a PO in organization scope and refreshes the saved list',
       () async {
     final requests = <String>[];
