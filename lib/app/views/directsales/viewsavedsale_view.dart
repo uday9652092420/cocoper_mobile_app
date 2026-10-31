@@ -236,10 +236,13 @@ class ViewSavedSaleView extends StatelessWidget {
             _formatAmount(line.discount),
           ),
           _detailRow('Pieces %', '${_formatAmount(line.piecesPercentage)}%'),
-          _detailRow('Actual Quantity', _formatAmount(line.actualQuantity)),
+          _detailRow(
+            'Actual Quantity',
+            _formatActualQuantity(line.actualQuantity),
+          ),
           _detailRow('Sales Price', _currency(line.salesPrice)),
           _detailRow('Pieces', _formatAmount(line.pieces)),
-          _detailRow('Sales Amount', _currency(line.salesAmount)),
+          _detailRow('Sales Amount', _formatSalesAmount(line.salesAmount)),
           _detailRow('Base Cost', _currency(line.baseCost)),
         ],
       ),
@@ -442,6 +445,16 @@ class ViewSavedSaleView extends StatelessWidget {
   String _formatAmount(double value) {
     if (!value.isFinite) return '—';
     return NumberFormat('#,##0.######', 'en_IN').format(value);
+  }
+
+  String _formatActualQuantity(double value) {
+    if (!value.isFinite) return '—';
+    return NumberFormat('#,##0', 'en_IN').format(value.round());
+  }
+
+  String _formatSalesAmount(double value) {
+    if (!value.isFinite) return '—';
+    return '₹${NumberFormat('#,##,##0', 'en_IN').format(value.round())}';
   }
 
   String _currency(double value) {

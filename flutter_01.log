@@ -1,0 +1,66 @@
+Flutter crash report.
+Please report a bug at https://github.com/flutter/flutter/issues.
+
+## command
+
+flutter debug_adapter
+
+## exception
+
+FileSystemException: FileSystemException: writeFrom failed, path = '' (OS Error: The pipe has been ended, errno = 109)
+
+```
+#0      _checkForErrorResponse (dart:io/common.dart:58:9)
+#1      _RandomAccessFile.writeFrom.<anonymous closure> (dart:io/file_impl.dart:976:7)
+#2      _rootRunUnary (dart:async/zone_root.dart:48:47)
+#3      _CustomZone.runUnary (dart:async/zone.dart:816:35)
+<asynchronous suspension>
+#4      _FileStreamConsumer.addStream.<anonymous closure>.<anonymous closure>.<anonymous closure> (dart:io/file_impl.dart:237:27)
+<asynchronous suspension>
+```
+
+## flutter doctor
+
+```
+[✓] Flutter (Channel stable, 3.47.4, on Microsoft Windows [Version 10.0.21996.1], locale en-US) [1,073ms]
+    • Flutter version 3.47.4 on channel stable at D:\flutter_sdk\flutter
+    • Upstream repository https://github.com/flutter/flutter.git
+    • Framework revision 9584c6713b (7 weeks ago), 2026-09-10 15:25:10 -0700
+    • Engine revision 06a2e2a110
+    • Dart version 3.13.3
+    • DevTools version 2.60.0
+    • Feature flags: enable-web, enable-linux-desktop, enable-macos-desktop, enable-windows-desktop, enable-android, enable-ios, cli-animations, enable-native-assets, enable-record-use, enable-swift-package-manager, omit-legacy-version-file, enable-lldb-debugging, enable-uiscene-migration
+
+[✓] Windows Version (11 Pro 64-bit, Dev, 2009) [4.2s]
+
+[✓] Android toolchain - develop for Android devices (Android SDK version 36.0.0) [1,165ms]
+    • Android SDK at C:\Users\manka\AppData\Local\Android\Sdk
+    • Emulator version 37.1.11.0 (build_id 15917651) (CL:N/A)
+    • Platform android-canary-20260909, build-tools 36.0.0
+    • ANDROID_HOME = C:\Users\manka\AppData\Local\Android\Sdk
+    • ANDROID_SDK_ROOT = C:\Users\manka\AppData\Local\Android\Sdk
+    • Java binary at: C:\Program Files\Java\jdk-21\bin\java
+      This JDK is specified in your Flutter configuration.
+      To change the current JDK, run: `flutter config --jdk-dir="path/to/jdk"`.
+    • Java version Java(TM) SE Runtime Environment (build 21.0.7+8-LTS-245)
+    • All Android licenses accepted.
+
+[✓] Chrome - develop for the web [13ms]
+    • Chrome at C:\Program Files\Google\Chrome\Application\chrome.exe
+
+[✗] Visual Studio - develop Windows apps [11ms]
+    ✗ Visual Studio not installed; this is necessary to develop Windows apps.
+      Download at https://visualstudio.microsoft.com/downloads/.
+      Please install the "Desktop development with C++" workload, including all of its default components
+
+[✓] Connected device (4 available) [1,213ms]
+    • sdk gphone16k x86 64 (mobile) • emulator-5554 • android-x64    • Android 17 (API 37) (emulator)
+    • Windows (desktop)             • windows       • windows-x64    • Microsoft Windows [Version 10.0.21996.1]
+    • Chrome (web)                  • chrome        • web-javascript • Google Chrome 156.0.8078.74
+    • Edge (web)                    • edge          • web-javascript • Microsoft Edge 156.0.4314.50
+
+[✓] Network resources [1,163ms]
+    • All expected network resources are available.
+
+! Doctor found issues in 1 category.
+```

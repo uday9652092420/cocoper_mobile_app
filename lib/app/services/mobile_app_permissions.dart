@@ -1,6 +1,9 @@
+import 'dart:convert';
+
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 
+import '../helpers/console_print.dart';
 import '../routes/app_routes.dart';
 
 enum MobileAppDestination {
@@ -34,12 +37,16 @@ class MobileAppPermissions {
     required this.mobileAppLabourAttendance,
     this.hasMobileAppLoginField = true,
     this.hasLabourAttendanceField = true,
+    this.modulePermissions = const <String>{},
+    this.hasModulePermissions = false,
   });
 
   final bool? mobileAppLogin;
   final bool? mobileAppLabourAttendance;
   final bool hasMobileAppLoginField;
   final bool hasLabourAttendanceField;
+  final Set<String> modulePermissions;
+  final bool hasModulePermissions;
 
   static MobileAppPermissions? current;
   static bool hasAuthenticatedSession = false;
@@ -91,6 +98,11 @@ class MobileAppPermissions {
       mobileAppLabourAttendance: bootstrap.mobileAppLabourAttendance,
       hasMobileAppLoginField: true,
       hasLabourAttendanceField: true,
+      modulePermissions: bootstrap.hasModulePermissions
+          ? bootstrap.modulePermissions
+          : login.modulePermissions,
+      hasModulePermissions:
+          bootstrap.hasModulePermissions || login.hasModulePermissions,
     );
     if (!permissions.canAccessMainApp && !permissions.canUseLabourAttendance) {
       return MobilePermissionReconciliation(
@@ -173,14 +185,33 @@ class MobileAppPermissions {
 
     final hasLogin = user.containsKey('mobile_app_login');
     final hasAttendance = user.containsKey('mobile_app_labour_attendance');
+    final userHasModulePermissions = user.containsKey('permissions');
+    final tokenPermissions = _tokenPermissions(response['token']);
+    final rawPermissions = userHasModulePermissions
+        ? user['permissions']
+        : tokenPermissions.permissions;
+    final effectivePermissions = userHasModulePermissions
+        ? _parsePermissions(rawPermissions)
+        : tokenPermissions.permissions;
+    consolePrint(
+      'MOBILE PERMISSIONS: source=${userHasModulePermissions ? 'user' : 'token'}, '
+      'fieldType=${rawPermissions.runtimeType}, '
+      'keys=${effectivePermissions.toList()}',
+    );
     return MobileAppPermissions(
       mobileAppLogin: _parseBoolean(user['mobile_app_login']),
       mobileAppLabourAttendance:
           _parseBoolean(user['mobile_app_labour_attendance']),
       hasMobileAppLoginField: hasLogin,
       hasLabourAttendanceField: hasAttendance,
+      modulePermissions: effectivePermissions,
+      hasModulePermissions:
+          userHasModulePermissions || tokenPermissions.present,
     );
   }
+
+  bool hasPermission(String permission) =>
+      modulePermissions.contains(permission);
 
   static Map<String, Object?> _diagnoseField(
     Map<String, dynamic>? user,
@@ -274,6 +305,45 @@ class MobileAppPermissions {
       return value;
     }
     return null;
+  }
+
+  static Set<String> _parsePermissions(dynamic value) {
+    if (value is! List) return const <String>{};
+    return Set<String>.unmodifiable(
+      value
+          .whereType<String>()
+          .map((permission) => permission.trim())
+          .where((permission) => permission.isNotEmpty),
+    );
+  }
+
+  static ({Set<String> permissions, bool present}) _tokenPermissions(
+    dynamic token,
+  ) {
+    if (token is! String) {
+      return (permissions: const <String>{}, present: false);
+    }
+
+    final parts = token.split('.');
+    if (parts.length != 3) {
+      return (permissions: const <String>{}, present: false);
+    }
+
+    try {
+      final payload = jsonDecode(
+        utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))),
+      );
+      if (payload is Map && payload.containsKey('permissions')) {
+        return (
+          permissions: _parsePermissions(payload['permissions']),
+          present: true,
+        );
+      }
+    } on FormatException {
+      return (permissions: const <String>{}, present: false);
+    }
+
+    return (permissions: const <String>{}, present: false);
   }
 }
 

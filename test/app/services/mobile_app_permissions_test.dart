@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:cocoper_mobile/app/routes/app_routes.dart';
 import 'package:cocoper_mobile/app/services/mobile_app_permissions.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -24,6 +26,111 @@ void main() {
     expect(permissions?.mobileAppLogin, isTrue);
     expect(permissions?.mobileAppLabourAttendance, isTrue);
     expect(permissions?.canUseLabourAttendance, isTrue);
+  });
+
+  test('reads Purchase Order permissions from user.permissions only', () {
+    final permissions = MobileAppPermissions.fromLoginResponse({
+      'user': {
+        'mobile_app_login': true,
+        'mobile_app_labour_attendance': false,
+        'permissions': [
+          'purchase-order.read',
+          'purchase-order.edit',
+          'purchase-order.approve',
+        ],
+      },
+    });
+
+    expect(permissions?.hasPermission('purchase-order.read'), isTrue);
+    expect(permissions?.hasPermission('purchase-order.edit'), isTrue);
+    expect(permissions?.hasPermission('purchase-order.approve'), isTrue);
+    expect(permissions?.hasPermission('purchase-order.delete'), isFalse);
+    expect(
+      MobileAppPermissions.fromLoginResponse({
+        'user': {
+          'mobile_app_login': true,
+          'mobile_app_labour_attendance': false,
+        },
+      })?.hasPermission('purchase-order.approve'),
+      isFalse,
+    );
+  });
+
+  test('reads backend permission claims from the authenticated login token',
+      () {
+    final payload = base64Url.encode(
+      utf8.encode(
+        jsonEncode({
+          'permissions': [
+            'purchase-order.read',
+            'purchase-order.edit',
+            'purchase-order.approve',
+          ],
+        }),
+      ),
+    );
+    final token = 'header.$payload.signature';
+
+    final permissions = MobileAppPermissions.fromLoginResponse({
+      'token': token,
+      'user': {
+        'mobile_app_login': true,
+        'mobile_app_labour_attendance': false,
+      },
+    });
+
+    expect(permissions?.hasPermission('purchase-order.read'), isTrue);
+    expect(permissions?.hasPermission('purchase-order.edit'), isTrue);
+    expect(permissions?.hasPermission('purchase-order.approve'), isTrue);
+    expect(permissions?.hasPermission('purchase-order.delete'), isFalse);
+  });
+
+  test('reconciliation keeps Purchase Order permissions from the session', () {
+    final login = MobileAppPermissions.fromLoginResponse({
+      'user': {
+        'mobile_app_login': true,
+        'mobile_app_labour_attendance': false,
+        'permissions': ['purchase-order.approve'],
+      },
+    });
+
+    final bootstrap = MobileAppPermissions.fromBootstrapResponse({
+      'user': {
+        'mobile_app_login': true,
+        'mobile_app_labour_attendance': false,
+      },
+    });
+
+    final result = MobileAppPermissions.reconcile(login, bootstrap);
+
+    expect(
+      result.permissions?.hasPermission('purchase-order.approve'),
+      isTrue,
+    );
+  });
+
+  test('explicit bootstrap permissions replace older login permissions', () {
+    final login = MobileAppPermissions.fromLoginResponse({
+      'user': {
+        'mobile_app_login': true,
+        'mobile_app_labour_attendance': false,
+        'permissions': ['purchase-order.approve'],
+      },
+    });
+    final bootstrap = MobileAppPermissions.fromBootstrapResponse({
+      'user': {
+        'mobile_app_login': true,
+        'mobile_app_labour_attendance': false,
+        'permissions': null,
+      },
+    });
+
+    final result = MobileAppPermissions.reconcile(login, bootstrap);
+
+    expect(
+      result.permissions?.hasPermission('purchase-order.approve'),
+      isFalse,
+    );
   });
 
   test('reads explicit disabled permissions without guessing a role', () {

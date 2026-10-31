@@ -7,6 +7,7 @@ import '../../controllers/salesorders/sales_order_controller.dart';
 import '../../helpers/shared_preferences.dart';
 import '../../models/direct_sale.dart';
 import '../../models/lookup_option.dart';
+import '../../models/sales_order.dart';
 import '../../theme/app_theme.dart';
 
 const _kInk = AppColors.textDefaultLight;
@@ -36,6 +37,8 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
 
   String? _customerId;
   String? _branchId;
+  String? _selectedSalesOrderId;
+  String _selectedSalesOrderNo = '';
   late String _mode;
   bool _piecesPercentageEnabled = false;
 
@@ -102,7 +105,7 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
       final editor = _BagEditor();
       editor.bagTypeId = bag.bagTypeId;
       editor.bharthiTypeId = bag.bharthiTypeId;
-      editor.bagBharthi = bag.bagBharthi;
+      editor.bagBharthi.text = bag.bagBharthi.toString();
       editor.quantity.text = bag.quantity.toString();
       editor.rate.text = bag.rate.toString();
       _bags.add(editor);
@@ -111,6 +114,70 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
     if (_bags.isEmpty) {
       _bags.add(_BagEditor());
     }
+  }
+
+  void _clearOrderPopulatedData() {
+    final oldLines = List<_SaleLineEditor>.of(_lines);
+    final oldBags = List<_BagEditor>.of(_bags);
+    _lines
+      ..clear()
+      ..add(_SaleLineEditor());
+    _bags
+      ..clear()
+      ..add(_BagEditor());
+    _additionalChargesController.clear();
+    _loadingChargesController.clear();
+    _piecesPercentageEnabled = false;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      for (final line in oldLines) {
+        line.dispose();
+      }
+      for (final bag in oldBags) {
+        bag.dispose();
+      }
+    });
+  }
+
+  void _populateFromSalesOrder(SalesOrder order) {
+    final oldLines = List<_SaleLineEditor>.of(_lines);
+    final oldBags = List<_BagEditor>.of(_bags);
+    _lines.clear();
+    _bags
+      ..clear()
+      ..add(_BagEditor());
+    _mode = order.mode == SalesOrderController.modeLessing
+        ? SalesOrderController.modeLessing
+        : SalesOrderController.modeTonage;
+    _piecesPercentageEnabled = _mode == SalesOrderController.modeTonage &&
+        order.lines.any((line) => line.piecesPercentage > 0);
+    for (final orderLine in order.lines) {
+      final editor = _SaleLineEditor()
+        ..itemId = orderLine.itemId
+        ..quantity.text = orderLine.quantity.toString()
+        ..discount.text = orderLine.discount.toString()
+        ..manualDiscountText = orderLine.discount.toString()
+        ..piecesPercentage.text = orderLine.piecesPercentage.toString()
+        ..pieces.text = orderLine.pieces.toString()
+        ..salesPrice.text = orderLine.saleCost.toString();
+      if (_piecesPercentageEnabled) {
+        _syncEffectiveDiscount(editor);
+      }
+      _lines.add(editor);
+    }
+    if (order.branchId.isNotEmpty &&
+        _controller.branches.any((branch) => branch.id == order.branchId)) {
+      _branchId = order.branchId;
+    }
+    _additionalChargesController.clear();
+    _loadingChargesController.clear();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      for (final line in oldLines) {
+        line.dispose();
+      }
+      for (final bag in oldBags) {
+        bag.dispose();
+      }
+    });
   }
 
   void _setPiecesPercentageEnabled(bool enabled) {
@@ -364,27 +431,25 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
           _label('Customer', required: true),
           const SizedBox(height: 6),
           _dropdown(
+            key: const ValueKey('customer-selector'),
             value: _customerId,
             hint: 'Select customer',
             options: _controller.customers,
-            onChanged: (value) => setState(() => _customerId = value),
+            onChanged: _onCustomerChanged,
           ),
           const SizedBox(height: 14),
           _label('Sales Order No'),
           const SizedBox(height: 6),
-          _disabledSalesOrderField(
-            _customerId == null
-                ? 'Select customer first'
-                : 'Order linking unavailable',
-          ),
+          _buildSalesOrderDropdown(),
           const SizedBox(height: 14),
           _label('Branch', required: true),
           const SizedBox(height: 6),
           _dropdown(
+            key: const ValueKey('branch-selector'),
             value: _branchId,
             hint: 'Select branch',
             options: _controller.branches,
-            onChanged: (value) => setState(() => _branchId = value),
+            onChanged: _onBranchChanged,
           ),
           const SizedBox(height: 14),
           _label('Quantity Mode'),
@@ -544,6 +609,7 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
             children: [
               Expanded(
                 child: _numberField(
+                  key: ValueKey('sales-order-line-quantity-$index'),
                   label: _mode == SalesOrderController.modeLessing
                       ? 'Quantity (pieces)'
                       : 'Quantity (tons)',
@@ -555,6 +621,7 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
               const SizedBox(width: 10),
               Expanded(
                 child: _numberField(
+                  key: ValueKey('sales-order-line-discount-$index'),
                   label: _mode == SalesOrderController.modeLessing
                       ? 'Discount (pieces)'
                       : 'Discount (kg)',
@@ -570,6 +637,7 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
               _mode == SalesOrderController.modeTonage) ...[
             const SizedBox(height: 12),
             _numberField(
+              key: ValueKey('sales-order-line-percentage-$index'),
               label: 'Pieces %',
               controller: line.piecesPercentage,
               validator: _validatePiecesPercentage,
@@ -581,6 +649,7 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
             children: [
               Expanded(
                 child: _numberField(
+                  key: ValueKey('sales-order-line-pieces-$index'),
                   label: 'Pieces',
                   controller: line.pieces,
                 ),
@@ -588,6 +657,7 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
               const SizedBox(width: 10),
               Expanded(
                 child: _numberField(
+                  key: ValueKey('sales-order-line-price-$index'),
                   label: 'Sales Price',
                   controller: line.salesPrice,
                   required: true,
@@ -601,11 +671,17 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
             children: [
               Expanded(
                 child: _computed(
-                    'Actual Quantity', _format(values.actualQuantity)),
+                  'Actual Quantity',
+                  _formatActualQuantity(values.actualQuantity),
+                ),
               ),
               const SizedBox(width: 10),
               Expanded(
-                  child: _computed('Sales Amount', _money(values.salesAmount))),
+                child: _computed(
+                  'Sales Amount',
+                  _formatSalesAmount(values.salesAmount),
+                ),
+              ),
             ],
           ),
         ],
@@ -756,15 +832,235 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
     );
   }
 
-  Widget _disabledSalesOrderField(String hint) {
-    return DropdownButtonFormField<String>(
-      initialValue: null,
-      isExpanded: true,
-      disabledHint: Text(hint, overflow: TextOverflow.ellipsis),
-      decoration: _decoration(),
-      items: const [],
-      onChanged: null,
+  Widget _buildSalesOrderDropdown() {
+    return Obx(() {
+      final orders = _controller.salesOrdersForCustomer;
+      final isLoading = _controller.isLoadingSalesOrders.value;
+      final hasError = _controller.hasSalesOrdersError.value;
+      final hasCustomer = _customerId?.isNotEmpty == true;
+      final selectedOrderIsAvailable = orders.any(
+        (order) => order.id == _selectedSalesOrderId,
+      );
+      final value = selectedOrderIsAvailable ? _selectedSalesOrderId : null;
+      final hint = !hasCustomer
+          ? 'Select customer first'
+          : isLoading
+              ? 'Loading Sales Orders...'
+              : hasError
+                  ? 'Could not load Sales Orders'
+                  : orders.isEmpty
+                      ? 'No Sales Orders found'
+                      : 'Select Sales Order';
+      final suffix = isLoading
+          ? const Padding(
+              padding: EdgeInsets.all(12),
+              child: SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: _kGreen,
+                ),
+              ),
+            )
+          : hasError
+              ? IconButton(
+                  tooltip: 'Retry loading Sales Orders',
+                  onPressed: _customerId == null
+                      ? null
+                      : () => _controller.loadSalesOrdersForCustomer(
+                            _customerId!,
+                            branchId: _branchId,
+                            forceRefresh: true,
+                          ),
+                  icon: const Icon(Icons.refresh, color: _kGreen),
+                )
+              : null;
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          DropdownButtonFormField<String>(
+            key:
+                ValueKey('sales-order-${_customerId ?? ''}-${_branchId ?? ''}'),
+            initialValue: value,
+            isExpanded: true,
+            hint: Text(hint, overflow: TextOverflow.ellipsis),
+            disabledHint: Text(hint, overflow: TextOverflow.ellipsis),
+            decoration: _decoration(suffix: suffix).copyWith(
+              helperText: hasError ? _controller.salesOrdersError.value : null,
+            ),
+            items: orders
+                .map(
+                  (order) => DropdownMenuItem<String>(
+                    value: order.id,
+                    child: Text(
+                      _salesOrderLabel(order),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                )
+                .toList(),
+            onChanged: !hasCustomer || isLoading || hasError || orders.isEmpty
+                ? null
+                : _onSalesOrderChanged,
+          ),
+          if (_selectedSalesOrderId != null &&
+              _controller.isLoadingSalesOrderDetails.value)
+            const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: _kGreen,
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                  Text(
+                    'Loading Sales Order details...',
+                    style: TextStyle(fontSize: 12, color: _kMuted),
+                  ),
+                ],
+              ),
+            ),
+          if (_selectedSalesOrderId != null &&
+              _controller.salesOrderDetailsError.value.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _controller.salesOrderDetailsError.value,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.red,
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => _loadSelectedSalesOrder(
+                      _selectedSalesOrderId!,
+                      forceRefresh: true,
+                    ),
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            ),
+          if (_selectedSalesOrderId != null)
+            const Padding(
+              padding: EdgeInsets.only(top: 6),
+              child: Text(
+                'Sales Order reference and supported order lines will be included in this sale.',
+                style: TextStyle(fontSize: 12, color: _kMuted),
+              ),
+            ),
+        ],
+      );
+    });
+  }
+
+  String _salesOrderLabel(SalesOrder order) {
+    final details = <String>[
+      if (order.date.isNotEmpty) order.date,
+      if (order.status.isNotEmpty) order.status,
+    ];
+    return details.isEmpty
+        ? order.soNumber
+        : '${order.soNumber} · ${details.join(' · ')}';
+  }
+
+  void _onCustomerChanged(String? customerId) {
+    final hadSelectedOrder = _selectedSalesOrderId != null;
+    _controller.clearSelectedSalesOrderDetails();
+    setState(() {
+      _customerId = customerId;
+      _selectedSalesOrderId = null;
+      _selectedSalesOrderNo = '';
+      if (hadSelectedOrder) _clearOrderPopulatedData();
+    });
+    if (customerId == null || customerId.trim().isEmpty) {
+      _controller.clearSalesOrdersForCustomer();
+      return;
+    }
+    _controller.loadSalesOrdersForCustomer(
+      customerId,
+      branchId: _branchId,
     );
+  }
+
+  void _onBranchChanged(String? branchId) {
+    final hadSelectedOrder = _selectedSalesOrderId != null;
+    _controller.clearSelectedSalesOrderDetails();
+    setState(() {
+      _branchId = branchId;
+      _selectedSalesOrderId = null;
+      _selectedSalesOrderNo = '';
+      if (hadSelectedOrder) _clearOrderPopulatedData();
+    });
+    if (_customerId != null && _customerId!.trim().isNotEmpty) {
+      _controller.loadSalesOrdersForCustomer(
+        _customerId!,
+        branchId: branchId,
+      );
+    }
+  }
+
+  void _onSalesOrderChanged(String? id) {
+    _controller.clearSelectedSalesOrderDetails();
+    final selectedOrder = _controller.salesOrdersForCustomer
+        .where((order) => order.id == id)
+        .firstOrNull;
+    setState(() {
+      _selectedSalesOrderId = id;
+      _selectedSalesOrderNo = selectedOrder?.soNumber ?? '';
+      _clearOrderPopulatedData();
+    });
+    if (id == null || id.trim().isEmpty || _customerId == null) return;
+    _loadSelectedSalesOrder(id);
+  }
+
+  Future<void> _loadSelectedSalesOrder(
+    String id, {
+    bool forceRefresh = false,
+  }) async {
+    final customerId = _customerId;
+    if (customerId == null || _selectedSalesOrderId != id) return;
+    final order = await _controller.loadSalesOrderDetails(
+      salesOrderId: id,
+      customerId: customerId,
+      branchId: _branchId,
+      forceRefresh: forceRefresh,
+    );
+    if (!mounted || _selectedSalesOrderId != id || _customerId != customerId) {
+      return;
+    }
+    if (order == null) {
+      setState(() {});
+      return;
+    }
+    if (order.mode != SalesOrderController.modeTonage &&
+        order.mode != SalesOrderController.modeLessing) {
+      _controller.salesOrderDetailsError.value =
+          'The selected Sales Order has an unsupported quantity mode.';
+      setState(() {});
+      return;
+    }
+    if (order.branchId.isNotEmpty &&
+        !_controller.branches.any((branch) => branch.id == order.branchId)) {
+      _controller.salesOrderDetailsError.value =
+          'The selected Sales Order belongs to an unavailable branch.';
+      setState(() {});
+      return;
+    }
+    setState(() {
+      _populateFromSalesOrder(order);
+    });
   }
 
   Widget _buildBagEditor(int index) {
@@ -812,7 +1108,7 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
               setState(() {
                 bag.bagTypeId = id ?? '';
                 bag.bharthiTypeId = selected?.bharthiTypeId ?? '';
-                bag.bagBharthi = selected?.bagBharthi ?? 0;
+                bag.bagBharthi.text = selected?.bagBharthi.toString() ?? '';
               });
             },
           ),
@@ -820,7 +1116,11 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
           Row(
             children: [
               Expanded(
-                child: _computed('Bag Bharthi', _format(bag.bagBharthi)),
+                child: _numberField(
+                  key: ValueKey('bag-bharthi-$index'),
+                  label: 'Bag Bharthi',
+                  controller: bag.bagBharthi,
+                ),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -900,12 +1200,27 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
               child: widget.sale != null
                   ? saveButton(onPressed: null, label: 'Save Changes')
                   : Obx(
-                      () => saveButton(
-                        onPressed: _controller.isSaving.value ? null : _save,
-                        label: _controller.isSaving.value
-                            ? 'Saving…'
-                            : 'Save Sales',
-                      ),
+                      () {
+                        final isOrderUnresolved =
+                            _selectedSalesOrderId != null &&
+                                (_controller.isLoadingSalesOrderDetails.value ||
+                                    _controller.selectedSalesOrderDetails.value
+                                            ?.id !=
+                                        _selectedSalesOrderId ||
+                                    _controller.salesOrderDetailsError.value
+                                        .isNotEmpty);
+                        return saveButton(
+                          onPressed:
+                              _controller.isSaving.value || isOrderUnresolved
+                                  ? null
+                                  : _save,
+                          label: _controller.isSaving.value
+                              ? 'Saving…'
+                              : _controller.isLoadingSalesOrderDetails.value
+                                  ? 'Loading Order…'
+                                  : 'Save Sales',
+                        );
+                      },
                     ),
             ),
           ],
@@ -989,12 +1304,14 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
   }
 
   Widget _dropdown({
+    Key? key,
     required String? value,
     required String hint,
     required List<LookupOption> options,
     required ValueChanged<String?> onChanged,
   }) {
     return DropdownButtonFormField<String>(
+      key: key,
       initialValue: value,
       isExpanded: true,
       validator: (selected) =>
@@ -1014,6 +1331,7 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
   Widget _numberField({
     required String label,
     required TextEditingController controller,
+    Key? key,
     bool required = false,
     bool readOnly = false,
     ValueChanged<String>? onChanged,
@@ -1025,6 +1343,7 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
         _label(label, required: required),
         const SizedBox(height: 6),
         TextFormField(
+          key: key,
           controller: controller,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           textAlign: readOnly ? TextAlign.right : TextAlign.start,
@@ -1120,6 +1439,17 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
       return;
     }
 
+    if (_selectedSalesOrderId != null &&
+        (_controller.isLoadingSalesOrderDetails.value ||
+            _controller.selectedSalesOrderDetails.value?.id !=
+                _selectedSalesOrderId ||
+            _controller.salesOrderDetailsError.value.isNotEmpty)) {
+      _showValidation(
+        'Load valid Sales Order details or clear the Sales Order selection before saving.',
+      );
+      return;
+    }
+
     if (!_formKey.currentState!.validate()) return;
     if (_lines.isEmpty) {
       _showValidation('Add at least one sales line.');
@@ -1137,6 +1467,10 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
       }
     }
     for (final bag in _bags) {
+      final isEmptyBagPlaceholder = bag.bagTypeId.isEmpty &&
+          bag.quantity.text.trim().isEmpty &&
+          bag.rate.text.trim().isEmpty;
+      if (isEmptyBagPlaceholder) continue;
       if (bag.bagTypeId.isEmpty ||
           _number(bag.quantity) <= 0 ||
           _number(bag.rate) <= 0) {
@@ -1153,9 +1487,13 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
       invoiceDate: DateFormat('yyyy-MM-dd').format(parsedDate),
       mode: _mode,
       lines: _lines.map(_buildLine).toList(),
-      gunnyBags: _bags.map(_buildBag).toList(),
+      gunnyBags: _bags
+          .where((bag) => bag.bagTypeId.isNotEmpty)
+          .map(_buildBag)
+          .toList(),
       additionalCharges: _number(_additionalChargesController),
       loadingCharges: _number(_loadingChargesController),
+      salesOrderNo: _selectedSalesOrderNo,
     );
     if (saved && mounted) Get.back<dynamic>(result: true);
   }
@@ -1185,7 +1523,7 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
     return DirectSaleGunnyBag(
       bagTypeId: editor.bagTypeId,
       bharthiTypeId: editor.bharthiTypeId,
-      bagBharthi: editor.bagBharthi,
+      bagBharthi: _number(editor.bagBharthi),
       quantity: quantity,
       rate: rate,
       amount: quantity * rate,
@@ -1245,6 +1583,12 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
     return value.toStringAsFixed(6).replaceFirst(RegExp(r'\.?0+$'), '');
   }
 
+  String _formatActualQuantity(double value) =>
+      NumberFormat('#,##0', 'en_IN').format(value.round());
+
+  String _formatSalesAmount(double value) =>
+      '₹${NumberFormat('#,##,##0', 'en_IN').format(value.round())}';
+
   String _money(double value) {
     return '₹${NumberFormat('#,##,##0.00', 'en_IN').format(value)}';
   }
@@ -1288,11 +1632,12 @@ class _SaleLineEditor {
 class _BagEditor {
   String bagTypeId = '';
   String bharthiTypeId = '';
-  double bagBharthi = 0;
+  final bagBharthi = TextEditingController(text: '0');
   final quantity = TextEditingController();
   final rate = TextEditingController();
 
   void dispose() {
+    bagBharthi.dispose();
     quantity.dispose();
     rate.dispose();
   }

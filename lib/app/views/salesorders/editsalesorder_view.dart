@@ -8,6 +8,7 @@ import '../../custome_widgets/app_status_badge.dart';
 import '../../models/lookup_option.dart';
 import '../../models/sales_order.dart';
 import '../../models/sales_order_line.dart';
+import '../../routes/app_routes.dart';
 import '../../theme/app_theme.dart';
 
 const _kInk = AppColors.textDefaultLight;
@@ -17,8 +18,7 @@ const _kGreen = AppColors.primaryLight;
 const _kMint = AppColors.surfaceTint;
 const _kFieldFill = AppColors.fieldFill;
 
-/// Sales Order editor. Reads are refreshed from GET /sales-orders; mutation
-/// controls remain disabled until the backend write contracts are verified.
+/// Sales Order editor. Reads and updates use the existing Sales Order API.
 class EditSalesOrderView extends StatefulWidget {
   const EditSalesOrderView({super.key, required this.orderId});
 
@@ -42,6 +42,17 @@ class _EditSalesOrderViewState extends State<EditSalesOrderView> {
   final List<_EditSalesOrderLine> _lines = [];
 
   bool get _isEditable =>
+      _order != null &&
+      SalesOrderController.canEditSalesOrder(_order!) &&
+      SalesOrderController.hasSalesOrderActionPermission('edit');
+
+  bool get _canApprove =>
+      _order != null &&
+      SalesOrderController.canEditSalesOrder(_order!) &&
+      SalesOrderController.hasPermission('approve') &&
+      _hasSupportedMode;
+
+  bool get _canShowApprove =>
       _order != null && SalesOrderController.canEditSalesOrder(_order!);
 
   bool get _hasSupportedMode => const {
@@ -199,9 +210,8 @@ class _EditSalesOrderViewState extends State<EditSalesOrderView> {
     final status = SalesOrderController.normalizedStatus(order.status);
     final statusMessage = switch (status) {
       'approved' => 'Approved Sales Orders are read-only.',
-      'draft' =>
-        'Changes can be reviewed here, but saving is unavailable until the '
-            'backend update contract is verified.',
+      'draft' when canEdit => 'Changes are saved to this Draft Sales Order.',
+      'draft' => 'This Sales Order is read-only for your account.',
       _ => 'This status is not a verified editable Draft. Changes are '
           'read-only.',
     };
@@ -304,8 +314,7 @@ class _EditSalesOrderViewState extends State<EditSalesOrderView> {
                   if (canEdit) ...[
                     const SizedBox(height: 8),
                     _notice(
-                      'Sales Order update, approval, and delete endpoints are '
-                      'not verified. No changes will be sent to the server.',
+                      'Saving changes does not approve this Sales Order.',
                     ),
                   ],
                 ],
@@ -313,7 +322,7 @@ class _EditSalesOrderViewState extends State<EditSalesOrderView> {
             ),
           ),
         ),
-        _buildActions(canEdit),
+        _buildActions(),
       ],
     );
   }
@@ -588,8 +597,8 @@ class _EditSalesOrderViewState extends State<EditSalesOrderView> {
           const SizedBox(height: 10),
           _twoFields(
             _numberField(
-              label: 'Sale Cost *',
-              controller: line.saleCost,
+              label: 'Sale Price *',
+              controller: line.salePrice,
               enabled: canEdit,
               requiredPositive: true,
               onChanged: (_) => setState(() => line.isDirty = true),
@@ -710,8 +719,11 @@ class _EditSalesOrderViewState extends State<EditSalesOrderView> {
     );
   }
 
-  Widget _buildActions(bool canEdit) {
-    if (!canEdit) return const SizedBox.shrink();
+  Widget _buildActions() {
+    final canEdit = _isEditable && _hasSupportedMode;
+    final canApprove = _canApprove;
+    final showApprove = _canShowApprove;
+    if (!canEdit && !showApprove) return const SizedBox.shrink();
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
       decoration: const BoxDecoration(
@@ -724,28 +736,177 @@ class _EditSalesOrderViewState extends State<EditSalesOrderView> {
           ),
         ],
       ),
-      child: const SafeArea(
+      child: SafeArea(
         top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: null,
-                child: Text('Save Changes'),
-              ),
-            ),
-            SizedBox(height: 4),
-            Text(
-              'Saving is disabled until the backend update contract is verified.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 11, color: _kMuted),
-            ),
-          ],
+        child: Obx(
+          () {
+            final isSaving = _controller.isSaving.value;
+            final isApproving = _controller.isApproving.value;
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (canEdit)
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: isSaving ? null : _onSave,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _kGreen,
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor: _kGreen.withValues(alpha: 0.6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 15,
+                        ),
+                        minimumSize: const Size(0, 48),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: isSaving && !isApproving
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                'Save Changes',
+                                maxLines: 1,
+                              ),
+                            ),
+                    ),
+                  ),
+                if (canEdit && showApprove) const SizedBox(height: 8),
+                if (showApprove)
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: isSaving || !canApprove ? null : _onApprove,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: canApprove ? _kGreen : _kMuted,
+                        disabledForegroundColor: _kMuted,
+                        side: BorderSide(
+                          color: canApprove && !isSaving ? _kGreen : _kLine,
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 15,
+                        ),
+                        minimumSize: const Size(0, 48),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: isApproving
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: _kGreen,
+                              ),
+                            )
+                          : const FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text('Approve'),
+                            ),
+                    ),
+                  ),
+              ],
+            );
+          },
         ),
       ),
     );
+  }
+
+  Future<void> _onSave() async {
+    if (_controller.isSaving.value || !_isEditable) return;
+    if (!_formKey.currentState!.validate()) return;
+
+    final order = _order;
+    final customerId = _customerId;
+    if (order == null || customerId == null || !_hasSupportedMode) return;
+
+    final saved = await _controller.updateSalesOrder(
+      id: order.id,
+      status: order.status,
+      organizationId: order.organizationId,
+      branchId: order.branchId,
+      soNumber: _soNumberController.text.trim(),
+      date: _apiDate(),
+      customerId: customerId,
+      remarks: _remarksController.text.trim(),
+      mode: _mode,
+      lines: _buildLinePayloads(),
+    );
+    if (!mounted || !saved) return;
+    await Get.offNamed<void>(Routes.savedSalesOrders);
+  }
+
+  Future<void> _onApprove() async {
+    if (_controller.isSaving.value || !_canApprove) return;
+    if (_formKey.currentState?.validate() != true) return;
+
+    final order = _order;
+    final customerId = _customerId;
+    if (order == null || customerId == null) return;
+
+    final confirmed = await Get.dialog<bool>(
+      AlertDialog(
+        title: const Text('Approve Sales Order?'),
+        content: const Text(
+          'Are you sure you want to approve this Sales Order?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back<bool>(result: false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Get.back<bool>(result: true),
+            child: const Text('Approve'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final approved = await _controller.approveSalesOrder(
+      id: order.id,
+      status: order.status,
+      organizationId: order.organizationId,
+      branchId: order.branchId,
+      soNumber: _soNumberController.text.trim(),
+      date: _apiDate(),
+      customerId: customerId,
+      remarks: _remarksController.text.trim(),
+      mode: _mode,
+      lines: _buildLinePayloads(),
+    );
+    if (!mounted || !approved) return;
+
+    SalesOrder? approvedOrder;
+    for (final savedOrder in _controller.salesOrders) {
+      if (savedOrder.id == order.id &&
+          SalesOrderController.normalizedStatus(savedOrder.status) ==
+              'approved') {
+        approvedOrder = savedOrder;
+        break;
+      }
+    }
+    if (approvedOrder != null) {
+      setState(() {
+        _order = approvedOrder;
+        _orderFuture = Future<SalesOrder?>.value(approvedOrder);
+      });
+    }
+    await Get.offNamed<void>(Routes.savedSalesOrders);
   }
 
   Widget _textField({
@@ -900,11 +1061,12 @@ class _EditSalesOrderViewState extends State<EditSalesOrderView> {
       discount: discount,
       piecesPercentage: percentage,
     );
-    final saleCost = _parse(line.saleCost);
+    final salePrice = _parse(line.salePrice);
     final saleAmount =
-        SalesOrderController.calculateSaleAmount(saleCost, actual);
+        SalesOrderController.calculateSaleAmount(salePrice, actual);
     final pieces = _parse(line.pieces);
     return SalesOrderLine(
+      id: line.id,
       itemId: line.itemId,
       itemName: line.itemName,
       quantity: quantity,
@@ -913,7 +1075,7 @@ class _EditSalesOrderViewState extends State<EditSalesOrderView> {
       pieces: pieces,
       baseCost: SalesOrderController.calculateBaseCost(saleAmount, pieces),
       actualQuantity: actual,
-      saleCost: saleCost,
+      salePrice: salePrice,
       saleAmount: saleAmount,
       amount: saleAmount,
     );
@@ -938,6 +1100,11 @@ class _EditSalesOrderViewState extends State<EditSalesOrderView> {
   String _displayDate(String value) {
     final parsed = DateTime.tryParse(value);
     return parsed == null ? value : DateFormat('dd/MM/yyyy').format(parsed);
+  }
+
+  String _apiDate() {
+    final parsed = DateFormat('dd/MM/yyyy').tryParse(_dateController.text);
+    return parsed == null ? '' : DateFormat('yyyy-MM-dd').format(parsed);
   }
 
   String _modeLabel(String mode) => switch (mode) {
@@ -978,41 +1145,44 @@ class _EditSalesOrderViewState extends State<EditSalesOrderView> {
 }
 
 class _EditSalesOrderLine {
+  String id;
   String itemId;
   String itemName;
   final TextEditingController quantity;
   final TextEditingController discount;
   final TextEditingController piecesPercentage;
   final TextEditingController pieces;
-  final TextEditingController saleCost;
+  final TextEditingController salePrice;
   final SalesOrderLine? originalLine;
   bool isDirty;
 
   _EditSalesOrderLine({
+    this.id = '',
     required this.itemId,
     required this.itemName,
     required double quantity,
     required double discount,
     required double piecesPercentage,
     required double pieces,
-    required double saleCost,
+    required double salePrice,
     this.originalLine,
     this.isDirty = true,
   })  : quantity = TextEditingController(text: _text(quantity)),
         discount = TextEditingController(text: _text(discount)),
         piecesPercentage = TextEditingController(text: _text(piecesPercentage)),
         pieces = TextEditingController(text: _text(pieces)),
-        saleCost = TextEditingController(text: _text(saleCost));
+        salePrice = TextEditingController(text: _text(salePrice));
 
   factory _EditSalesOrderLine.fromLine(SalesOrderLine line) =>
       _EditSalesOrderLine(
+        id: line.id,
         itemId: line.itemId,
         itemName: line.itemName,
         quantity: line.quantity,
         discount: line.discount,
         piecesPercentage: line.piecesPercentage,
         pieces: line.pieces,
-        saleCost: line.saleCost,
+        salePrice: line.salePrice,
         originalLine: line,
         isDirty: false,
       );
@@ -1024,7 +1194,7 @@ class _EditSalesOrderLine {
         discount: 0,
         piecesPercentage: 0,
         pieces: 0,
-        saleCost: 0,
+        salePrice: 0,
         isDirty: true,
       );
 
@@ -1038,6 +1208,6 @@ class _EditSalesOrderLine {
     discount.dispose();
     piecesPercentage.dispose();
     pieces.dispose();
-    saleCost.dispose();
+    salePrice.dispose();
   }
 }

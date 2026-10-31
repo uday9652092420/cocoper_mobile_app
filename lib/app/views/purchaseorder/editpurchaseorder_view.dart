@@ -12,7 +12,13 @@ class EditPurchaseOrderView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final order = Get.arguments as PurchaseOrder?;
-    return NewPurchaseOrderView(order: order);
+    final arguments = Get.arguments;
+    final order = arguments is PurchaseOrder
+        ? arguments
+        : arguments is Map && arguments['order'] is PurchaseOrder
+            ? arguments['order'] as PurchaseOrder
+            : null;
+    final readOnly = arguments is Map && arguments['readOnly'] == true;
+    return NewPurchaseOrderView(order: order, readOnly: readOnly);
   }
 }

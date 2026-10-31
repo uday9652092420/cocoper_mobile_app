@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 
 import '../../controllers/salesorders/sales_order_controller.dart';
 import '../../custome_widgets/app_status_badge.dart';
+import '../../custome_widgets/custome_confirmation_dialog.dart';
 import '../../models/sales_order.dart';
 import '../../routes/app_routes.dart';
 import '../../theme/app_theme.dart';
@@ -28,7 +29,11 @@ class _SavedSalesOrdersViewState extends State<SavedSalesOrdersView> {
   @override
   void initState() {
     super.initState();
-    _controller.loadSalesOrders();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _controller.loadSalesOrders();
+      _controller.loadLookups();
+    });
   }
 
   @override
@@ -122,12 +127,14 @@ class _SavedSalesOrdersViewState extends State<SavedSalesOrdersView> {
         Obx(
           () => Row(
             children: [
-              const Text(
-                'Saved Orders',
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w800,
-                  color: _kInk,
+              const Expanded(
+                child: Text(
+                  'Saved Orders',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: _kInk,
+                  ),
                 ),
               ),
               const Spacer(),
@@ -164,7 +171,7 @@ class _SavedSalesOrdersViewState extends State<SavedSalesOrdersView> {
       );
     }
 
-    if (_controller.hasListError.value) {
+    if (_controller.hasListError.value && _controller.salesOrders.isEmpty) {
       return _buildErrorState();
     }
 
@@ -174,6 +181,14 @@ class _SavedSalesOrdersViewState extends State<SavedSalesOrdersView> {
 
     return Column(
       children: [
+        if (_controller.hasListError.value)
+          const Padding(
+            padding: EdgeInsets.only(bottom: 10),
+            child: Text(
+              'Unable to refresh. Showing the most recently saved orders.',
+              style: TextStyle(fontSize: 12, color: _kMuted),
+            ),
+          ),
         for (final so in _controller.salesOrders) _buildOrderCard(so),
       ],
     );
@@ -220,7 +235,8 @@ class _SavedSalesOrdersViewState extends State<SavedSalesOrdersView> {
                   arguments: so.id,
                 ),
               ),
-              if (_isDraft(so))
+              if (_isDraft(so) &&
+                  SalesOrderController.hasSalesOrderActionPermission('edit'))
                 _buildActionIcon(
                   icon: Icons.edit_outlined,
                   label: 'Edit Sales Order',
@@ -229,12 +245,20 @@ class _SavedSalesOrdersViewState extends State<SavedSalesOrdersView> {
                     arguments: so.id,
                   ),
                 ),
+              if (_isDraft(so) &&
+                  SalesOrderController.hasSalesOrderActionPermission('delete'))
+                _buildActionIcon(
+                  icon: Icons.delete_outline,
+                  label: 'Delete Sales Order',
+                  color: const Color(0xFFB3261E),
+                  onTap: () => _confirmDelete(so),
+                ),
             ],
           ),
-          if (so.customerName.isNotEmpty) ...[
+          if (_customerName(so).isNotEmpty) ...[
             const SizedBox(height: 6),
             Text(
-              so.customerName,
+              _customerName(so),
               style: const TextStyle(fontSize: 13, color: _kMuted),
             ),
           ],
@@ -276,6 +300,29 @@ class _SavedSalesOrdersViewState extends State<SavedSalesOrdersView> {
 
   bool _isDraft(SalesOrder so) =>
       SalesOrderController.normalizedStatus(so.status) == 'draft';
+
+  void _confirmDelete(SalesOrder order) {
+    Get.dialog<void>(
+      CustomConfirmationDialog(
+        header: 'Delete Sales Order',
+        body: 'Are you sure you want to delete ${order.soNumber}?',
+        yesText: 'Delete',
+        noText: 'Cancel',
+        onYes: () {
+          Get.back<void>();
+          _controller.deleteSalesOrder(order.id);
+        },
+      ),
+    );
+  }
+
+  String _customerName(SalesOrder order) {
+    if (order.customerName.isNotEmpty) return order.customerName;
+    for (final customer in _controller.customers) {
+      if (customer.id == order.customerId) return customer.label;
+    }
+    return order.customerId;
+  }
 
   Widget _buildActionIcon({
     required IconData icon,

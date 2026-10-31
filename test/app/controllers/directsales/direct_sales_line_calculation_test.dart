@@ -454,6 +454,27 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('₹0.00'), findsWidgets);
     });
+
+    testWidgets('Bag Bharthi accepts a user-entered value', (tester) async {
+      await pumpForm(tester);
+
+      final bagBharthiField = find.byKey(const ValueKey('bag-bharthi-0'));
+      await tester.ensureVisible(bagBharthiField);
+      await tester.enterText(bagBharthiField, '2.75');
+      await tester.pumpAndSettle();
+
+      final field = tester.widget<TextFormField>(bagBharthiField);
+      expect(field.controller!.text, '2.75');
+      expect(
+        tester.widget<TextField>(
+          find.descendant(
+            of: bagBharthiField,
+            matching: find.byType(TextField),
+          ),
+        ).readOnly,
+        isFalse,
+      );
+    });
   });
 }
 
@@ -464,7 +485,13 @@ class _FakeDirectSalesController extends DirectSalesController {
         .assignAll(const [LookupOption(id: 'customer-1', label: 'Customer')]);
     branches.assignAll(const [LookupOption(id: 'branch-1', label: 'Branch')]);
     items.assignAll(const [LookupOption(id: 'item-1', label: 'Item')]);
-    gunnyBagTypes.clear();
+    gunnyBagTypes.assignAll(const [
+      DirectSaleBagType(
+        id: 'bag-type-1',
+        label: 'Gunny Bag',
+        bagBharthi: 1.5,
+      ),
+    ]);
     hasLookupError.value = false;
     isLoadingLookups.value = false;
   }

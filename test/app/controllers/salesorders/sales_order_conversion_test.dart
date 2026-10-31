@@ -46,7 +46,8 @@ void main() {
       itemId: 'item-1',
       quantity: 10,
       actualQuantity: 10,
-      saleCost: 20,
+      baseCost: 12,
+      salePrice: 20,
       saleAmount: 200,
       amount: 200,
     ),
@@ -109,11 +110,17 @@ void main() {
       'POST ${EndPoints.salesOrders}',
       'GET ${EndPoints.salesOrders}',
     ]);
-    expect(requestBody?['sourcePoId'], 'purchase-order-1');
+    expect(requestBody?['sourcePOId'], 'purchase-order-1');
+    expect(requestBody?.containsKey('sourcePoId'), isFalse);
     expect(requestBody?['poNumber'], 'COP-01');
     expect(requestBody?['branchId'], 'branch-1');
+    expect(requestBody?['totalAmount'], 200);
     expect(requestBody?.containsKey('organizationId'), isFalse);
     expect(requestBody?['lines'], hasLength(1));
+    final requestLine = (requestBody?['lines'] as List).single as Map;
+    expect(requestLine['saleCost'], 20);
+    expect(requestLine.containsKey('salePrice'), isFalse);
+    expect(requestLine['baseCost'], 12);
     expect(controller.salesOrders.single.id, 'sales-order-1');
     expect(controller.salesOrders.single.sourcePoId, 'purchase-order-1');
     expect(controller.salesOrders.single.poNumber, 'COP-01');
@@ -124,6 +131,123 @@ void main() {
       calls.where((call) => call.contains(EndPoints.purchaseOrders)),
       isEmpty,
     );
+  });
+
+  test('confirms the backend direct Sales Order response without a list read',
+      () async {
+    final controller = SalesOrderController(
+      postRequest: (endpoint, body) async => response(201, {
+        'id': 'sales-order-direct',
+        'soNumber': 'COP-SO-01',
+        'sourcePOId': 'purchase-order-1',
+        'poNumber': 'COP-01',
+      }),
+      getRequest: (endpoint) async => response(503, {'message': 'unavailable'}),
+    );
+
+    expect(await convert(controller), isTrue);
+    expect(controller.lastCreatedSalesOrderId, 'sales-order-direct');
+    expect(controller.lastCreatedSalesOrderReference, 'COP-SO-01');
+    expect(
+      controller.salesOrders.single.sourcePoId,
+      'purchase-order-1',
+    );
+  });
+
+  test('accepts HTTP 200 only when the source link can be confirmed', () async {
+    final controller = SalesOrderController(
+      postRequest: (endpoint, body) async => response(200, {
+        'id': 'sales-order-200',
+        'soNumber': 'COP-SO-01',
+        'sourcePOId': 'purchase-order-1',
+      }),
+      getRequest: (endpoint) async => response(503, {'message': 'unavailable'}),
+    );
+
+    expect(await convert(controller), isTrue);
+    expect(controller.lastCreatedSalesOrderId, 'sales-order-200');
+  });
+
+  test('confirmed create succeeds when the subsequent list refresh fails',
+      () async {
+    var postCount = 0;
+    final controller = SalesOrderController(
+      postRequest: (endpoint, body) async {
+        postCount++;
+        expect(endpoint, EndPoints.salesOrders);
+        expect((body as Map)['lines'].single['saleCost'], 20);
+        return response(201, {
+          'success': true,
+          'message': 'Sales Order created',
+        });
+      },
+      getRequest: (endpoint) async =>
+          response(503, {'message': 'list unavailable'}),
+    );
+
+    final saved = await controller.createSalesOrder(
+      soNumber: 'SO-NEW',
+      date: '2026-10-26',
+      customerId: 'customer-1',
+      remarks: '',
+      mode: SalesOrderController.modeTonage,
+      sourcePoId: '',
+      poNumber: '',
+      lines: lines,
+    );
+
+    expect(saved, isTrue);
+    expect(postCount, 1);
+    expect(controller.hasListError.value, isTrue);
+    expect(lastToastMessage, contains('saved successfully'));
+  });
+
+  test('ambiguous create failure warns against resubmitting', () async {
+    var postCount = 0;
+    final controller = SalesOrderController(
+      postRequest: (endpoint, body) async {
+        postCount++;
+        return response(500, {'message': 'Unexpected server error'});
+      },
+    );
+
+    final saved = await controller.createSalesOrder(
+      soNumber: 'SO-AMBIGUOUS',
+      date: '2026-10-26',
+      customerId: 'customer-1',
+      remarks: '',
+      mode: SalesOrderController.modeTonage,
+      sourcePoId: '',
+      poNumber: '',
+      lines: lines,
+    );
+
+    expect(saved, isFalse);
+    expect(postCount, 1);
+    expect(lastToastMessage, contains('Unexpected server error'));
+    expect(lastToastMessage, contains('do not resubmit yet'));
+  });
+
+  test('does not confirm conversion when the saved PO link is missing',
+      () async {
+    final controller = SalesOrderController(
+      postRequest: (endpoint, body) async => response(201, {
+        'success': true,
+        'data': {
+          'id': 'sales-order-1',
+          'soNumber': 'COP-SO-01',
+        },
+      }),
+      getRequest: (endpoint) async => response(200, <dynamic>[]),
+    );
+
+    expect(await convert(controller), isFalse);
+    expect(controller.lastCreatedSalesOrderId, isNull);
+    expect(
+      controller.isPurchaseOrderConversionBlocked('purchase-order-1'),
+      isTrue,
+    );
+    expect(lastToastMessage, contains('link could not be confirmed'));
   });
 
   test('does not treat server rejection as conversion success; explicit retry',
@@ -168,8 +292,7 @@ void main() {
     expect(getCount, 1);
   });
 
-  test('requires HTTP 201 for conversion but preserves generic create success',
-      () {
+  test('accepts verified HTTP 200 and 201 creation responses', () {
     expect(
       SalesOrderController.isSuccessfulCreateResponse(
         response(201, {'success': true}),
@@ -182,7 +305,7 @@ void main() {
         response(200, {'success': true}),
         isPurchaseOrderConversion: true,
       ),
-      isFalse,
+      isTrue,
     );
     expect(
       SalesOrderController.isSuccessfulCreateResponse(
@@ -304,10 +427,10 @@ void main() {
       getRequest: (endpoint) async => response(200, <dynamic>[]),
     );
     expect(await convert(restoredController), isFalse);
-    expect(secondPostCount, 0);
+    expect(secondPostCount, 1);
   });
 
-  test('a successful list refresh clears an ambiguous conversion lock',
+  test('lost response is reconciled against the linked Sales Order list',
       () async {
     var postCount = 0;
     var getCount = 0;
@@ -328,29 +451,24 @@ void main() {
         getCount++;
         return response(
           200,
-          getCount == 1
-              ? <dynamic>[]
-              : [
-                  {
-                    'id': 'sales-order-1',
-                    'soNumber': 'COP-SO-01',
-                    'sourcePoId': 'purchase-order-1',
-                  },
-                ],
+          [
+            {
+              'id': 'sales-order-1',
+              'soNumber': 'COP-SO-01',
+              'sourcePOId': 'purchase-order-1',
+            },
+          ],
         );
       },
     );
 
-    expect(await convert(controller), isFalse);
+    expect(await convert(controller), isTrue);
+    expect(postCount, 1);
+    expect(getCount, 1);
+    expect(controller.lastCreatedSalesOrderId, 'sales-order-1');
+    expect(controller.lastCreatedSalesOrderReference, 'COP-SO-01');
     expect(controller.isPurchaseOrderConversionBlocked('purchase-order-1'),
         isTrue);
-
-    expect(await controller.loadSalesOrders(), isTrue);
-    expect(controller.isPurchaseOrderConversionBlocked('purchase-order-1'),
-        isFalse);
-    expect(await convert(controller), isTrue);
-    expect(postCount, 2);
-    expect(getCount, 2);
   });
 
   test('a conflict shows the server reason and blocks another conversion',
@@ -469,14 +587,19 @@ void main() {
         isTrue);
   });
 
-  test('ambiguous network outcome is not retried by another save tap',
+  test('confirmed absence after a lost response allows a controlled retry',
       () async {
     var postCount = 0;
     var getCount = 0;
     final controller = SalesOrderController(
       postRequest: (endpoint, body) async {
         postCount++;
-        return null;
+        if (postCount == 1) return null;
+        return response(201, {
+          'id': 'sales-order-created',
+          'soNumber': 'COP-SO-01',
+          'sourcePOId': 'purchase-order-1',
+        });
       },
       getRequest: (endpoint) async {
         getCount++;
@@ -486,10 +609,11 @@ void main() {
 
     expect(await convert(controller), isFalse);
     expect(controller.isPurchaseOrderConversionBlocked('purchase-order-1'),
-        isTrue);
-    expect(await convert(controller), isFalse);
-    expect(postCount, 1);
-    expect(getCount, 0);
+        isFalse);
+    expect(lastToastMessage, contains('You may retry'));
+    expect(await convert(controller), isTrue);
+    expect(postCount, 2);
+    expect(getCount, 2);
   });
 
   test('maps authentication, missing PO and conflict statuses', () {

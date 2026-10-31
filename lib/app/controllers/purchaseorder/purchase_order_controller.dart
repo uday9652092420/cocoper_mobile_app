@@ -19,12 +19,20 @@ class PurchaseOrderController extends GetxController {
     Future<Response<dynamic>?> Function(String endpoint)? getRequest,
     Future<Response<dynamic>?> Function(String endpoint, dynamic body)?
         postRequest,
+    Future<Response<dynamic>?> Function(
+            String endpoint, Map<String, dynamic> body)?
+        putRequest,
   })  : _getRequest = getRequest,
-        _postRequest = postRequest;
+        _postRequest = postRequest,
+        _putRequest = putRequest;
 
   final Future<Response<dynamic>?> Function(String endpoint)? _getRequest;
   final Future<Response<dynamic>?> Function(String endpoint, dynamic body)?
       _postRequest;
+  final Future<Response<dynamic>?> Function(
+    String endpoint,
+    Map<String, dynamic> body,
+  )? _putRequest;
 
   // ============================================================
   // LIST STATE
@@ -259,7 +267,7 @@ class PurchaseOrderController extends GetxController {
     double purchaseCost,
     double actualQuantity,
   ) {
-    return purchaseCost * actualQuantity;
+    return roundValue(purchaseCost * actualQuantity, 0);
   }
 
   static double calculateBaseCost(double purchaseAmount, double pieces) {
@@ -298,7 +306,7 @@ class PurchaseOrderController extends GetxController {
 
   Future<bool> updatePurchaseOrder({
     required String id,
-    required String status,
+    String? organizationId,
     required String poNumber,
     required String supplierId,
     required String branchId,
@@ -306,22 +314,41 @@ class PurchaseOrderController extends GetxController {
     required String mode,
     required String remarks,
     required List<PurchaseOrderLine> lines,
-  }) {
-    return _submitPurchaseOrder(
-      id: id,
+  }) async {
+    final savedOrganizationId = organizationId?.trim().isNotEmpty == true
+        ? organizationId!.trim()
+        : await SharedPrefsHelper.getString(
+            SharedPrefsHelper.organizationId,
+          );
+    final body = PurchaseOrder(
       poNumber: poNumber,
+      organizationId: savedOrganizationId,
       supplierId: supplierId,
       branchId: branchId,
       date: date,
-      mode: mode,
       remarks: remarks,
+      mode: mode,
       lines: lines,
-      status: status,
+    ).toUpdateRequestJson(organizationId: savedOrganizationId);
+
+    return _submitUpdate(
+      id: id,
+      body: body,
+      successMessage: 'Purchase order updated.',
+      failureMessage: 'Unable to save purchase order.',
+    );
+  }
+
+  Future<bool> approvePurchaseOrder(String id) {
+    return _submitUpdate(
+      id: id,
+      body: const <String, dynamic>{'status': 'Approved'},
+      successMessage: 'Purchase Order approved successfully.',
+      failureMessage: 'Unable to approve purchase order.',
     );
   }
 
   Future<bool> _submitPurchaseOrder({
-    String? id,
     required String status,
     required String poNumber,
     required String supplierId,
@@ -352,26 +379,16 @@ class PurchaseOrderController extends GetxController {
         lines: lines,
       ).toRequestJson(organizationId: organizationId);
 
-      consolePrint(
-        id == null
-            ? 'PURCHASE ORDER CREATE REQUEST'
-            : 'PURCHASE ORDER UPDATE REQUEST',
-      );
+      consolePrint('PURCHASE ORDER CREATE REQUEST');
       consolePrint('PURCHASE ORDER NUMBER: $poNumber');
 
-      final response = id == null
-          ? await _post(EndPoints.purchaseOrders, body)
-          : await ApiService.put('${EndPoints.purchaseOrders}/$id', body);
+      final response = await _post(EndPoints.purchaseOrders, body);
 
       consolePrint('PURCHASE ORDER SAVE STATUS: ${response?.statusCode}');
 
       if (isSuccessfulSaveResponse(response)) {
         consolePrint('PURCHASE ORDER SAVE SUCCESS');
-        successToast(
-          id == null
-              ? 'Purchase order saved successfully.'
-              : 'Purchase order updated.',
-        );
+        successToast('Purchase order saved successfully.');
         await loadPurchaseOrders();
         return true;
       }
@@ -381,6 +398,42 @@ class PurchaseOrderController extends GetxController {
         message.isNotEmpty ? message : 'Unable to save purchase order.',
       );
       return false;
+    } finally {
+      isSaving.value = false;
+    }
+  }
+
+  Future<bool> _submitUpdate({
+    required String id,
+    required Map<String, dynamic> body,
+    required String successMessage,
+    required String failureMessage,
+  }) async {
+    if (isSaving.value) return false;
+
+    isSaving.value = true;
+    try {
+      final response = await _put('${EndPoints.purchaseOrders}/$id', body);
+      if (!isSuccessfulSaveResponse(response)) {
+        final message = _extractMessage(response?.data);
+        errorToast(message.isNotEmpty ? message : failureMessage);
+        return false;
+      }
+
+      final responseOrderData = _extractObject(response?.data);
+      final responseOrder = responseOrderData == null
+          ? null
+          : PurchaseOrder.fromJson(responseOrderData);
+      if (responseOrder?.id == id) {
+        _replacePurchaseOrder(responseOrder!);
+      }
+
+      successToast(successMessage);
+      await loadPurchaseOrders();
+      if (responseOrder?.id == id) {
+        _replacePurchaseOrder(responseOrder!);
+      }
+      return true;
     } finally {
       isSaving.value = false;
     }
@@ -436,6 +489,15 @@ class PurchaseOrderController extends GetxController {
     return false;
   }
 
+  void _replacePurchaseOrder(PurchaseOrder order) {
+    final index = purchaseOrders.indexWhere((item) => item.id == order.id);
+    if (index == -1) {
+      purchaseOrders.add(order);
+    } else {
+      purchaseOrders[index] = order;
+    }
+  }
+
   // ============================================================
   // HELPERS
   // ============================================================
@@ -454,6 +516,16 @@ class PurchaseOrderController extends GetxController {
     final request = _postRequest;
     return request == null
         ? ApiService.post(endpoint, body)
+        : request(endpoint, body);
+  }
+
+  Future<Response<dynamic>?> _put(
+    String endpoint,
+    Map<String, dynamic> body,
+  ) {
+    final request = _putRequest;
+    return request == null
+        ? ApiService.put(endpoint, body)
         : request(endpoint, body);
   }
 

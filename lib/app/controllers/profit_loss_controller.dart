@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../helpers/shared_preferences.dart';
@@ -103,8 +102,7 @@ class ProfitLossController extends GetxController {
     filterErrorMessage.value = '';
   }
 
-  String get reportingPeriod =>
-      '${DateFormatters.shortDate(fromDate.value)} – '
+  String get reportingPeriod => '${DateFormatters.shortDate(fromDate.value)} – '
       '${DateFormatters.shortDate(toDate.value)}';
 
   static DateTime _day(DateTime value) =>

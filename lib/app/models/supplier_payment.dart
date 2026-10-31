@@ -107,16 +107,12 @@ class SupplierPayment {
     return value?.toString().trim().toLowerCase() == 'true';
   }
 
-  static String _date(dynamic value) {
+  static DateTime? parseBusinessDate(Object? value) {
     final text = _text(value);
-    if (text.isEmpty) return '';
+    if (text.isEmpty) return null;
     final parsed = DateTime.tryParse(text);
     if (parsed != null) {
-      final businessDate =
-          parsed.isUtc ? parsed.add(_backendDateOffset) : parsed;
-      return '${businessDate.year.toString().padLeft(4, '0')}-'
-          '${businessDate.month.toString().padLeft(2, '0')}-'
-          '${businessDate.day.toString().padLeft(2, '0')}';
+      return parsed.isUtc ? parsed.add(_backendDateOffset) : parsed;
     }
     final parts = text.split('/');
     if (parts.length == 3) {
@@ -128,13 +124,20 @@ class SupplierPayment {
         if (candidate.year == year &&
             candidate.month == month &&
             candidate.day == day) {
-          return '${year.toString().padLeft(4, '0')}-'
-              '${month.toString().padLeft(2, '0')}-'
-              '${day.toString().padLeft(2, '0')}';
+          return candidate;
         }
       }
     }
-    return text;
+    return null;
+  }
+
+  static String _date(dynamic value) {
+    final text = _text(value);
+    final businessDate = parseBusinessDate(value);
+    if (businessDate == null) return text;
+    return '${businessDate.year.toString().padLeft(4, '0')}-'
+        '${businessDate.month.toString().padLeft(2, '0')}-'
+        '${businessDate.day.toString().padLeft(2, '0')}';
   }
 
   static const Duration _backendDateOffset = Duration(hours: 2);

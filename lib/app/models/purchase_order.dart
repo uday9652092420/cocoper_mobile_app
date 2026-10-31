@@ -86,11 +86,8 @@ class PurchaseOrder {
     );
   }
 
-  double get totalAmount => lines.fold(
-        0,
-        (sum, line) =>
-            sum + (line.amount != 0 ? line.amount : line.purchaseAmount),
-      );
+  double get totalAmount =>
+      lines.fold(0, (sum, line) => sum + line.purchaseAmount);
 
   Map<String, dynamic> toRequestJson({required String organizationId}) =>
       <String, dynamic>{
@@ -101,6 +98,20 @@ class PurchaseOrder {
         'date': date,
         if (remarks.isNotEmpty) 'remarks': remarks,
         'status': status,
+        'mode': mode,
+        'lines': lines.map((line) => line.toJson()).toList(),
+      };
+
+  Map<String, dynamic> toUpdateRequestJson({
+    required String organizationId,
+  }) =>
+      <String, dynamic>{
+        'poNumber': poNumber,
+        'organizationId': organizationId,
+        'supplierId': supplierId,
+        if (branchId.isNotEmpty) 'branchId': branchId,
+        'date': date,
+        'remarks': remarks,
         'mode': mode,
         'lines': lines.map((line) => line.toJson()).toList(),
       };

@@ -19,8 +19,8 @@ const _kFieldFill = AppColors.fieldFill;
 /// Sales Order (Conversion) screen, opened from an approved Purchase Order.
 ///
 /// Matches the web Sales Order conversion flow: the SO number is generated
-/// client-side, converted lines keep the PO item/quantity locked, sale cost is
-/// pre-filled from purchase cost, actual quantity is kept to 6 decimals and
+/// client-side, converted lines keep the PO item/quantity locked, sale price
+/// must be entered separately, actual quantity is kept to 6 decimals and
 /// profit = total sale amount - total purchase amount (frontend only).
 class NewSaleOrderView extends StatefulWidget {
   const NewSaleOrderView({super.key});
@@ -30,7 +30,12 @@ class NewSaleOrderView extends StatefulWidget {
 }
 
 class _NewSaleOrderViewState extends State<NewSaleOrderView> {
-  final _controller = Get.find<SalesOrderController>();
+  late final SalesOrderController _controller = () {
+    if (!Get.isRegistered<SalesOrderController>()) {
+      Get.put(SalesOrderController());
+    }
+    return Get.find<SalesOrderController>();
+  }();
 
   final _soNumberController = TextEditingController();
   final _dateController = TextEditingController();
@@ -520,7 +525,7 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
             const SizedBox(height: 12),
             _twoColumnRow(
               left: _labeledDiscountField(item),
-              right: _labeledNumField('Sale Cost', item.saleCost),
+              right: _labeledSalePriceField(item),
             ),
             const SizedBox(height: 12),
             _twoColumnRow(
@@ -542,7 +547,7 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
             ),
             const SizedBox(height: 12),
             _twoColumnRow(
-              left: _labeledNumField('Sale Cost', item.saleCost),
+              left: _labeledSalePriceField(item),
               right: _labeledNumField('Pieces', item.pieces),
             ),
             const SizedBox(height: 12),
@@ -566,44 +571,40 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
   /// user pick an item from the loaded master list.
   Widget _buildItemField(_SaleLineItem item) {
     if (item.isConverted) {
-      return Obx(
-        () => Container(
-          width: double.infinity,
-          alignment: Alignment.centerLeft,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
-          decoration: BoxDecoration(
-            color: _kMint.withValues(alpha: 0.35),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: _kLine),
-          ),
-          child: Text(
-            _resolveItemLabel(item),
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: _kInk,
-            ),
+      return Container(
+        width: double.infinity,
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
+        decoration: BoxDecoration(
+          color: _kMint.withValues(alpha: 0.35),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: _kLine),
+        ),
+        child: Text(
+          _resolveItemLabel(item),
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: _kInk,
           ),
         ),
       );
     }
 
-    return Obx(
-      () => _buildDropdown(
-        value: item.itemId.isEmpty ? null : item.itemId,
-        hint: 'Select item',
-        items: _controller.items
-            .map(
-              (it) => DropdownMenuItem<String>(
-                value: it.id,
-                child: Text(it.label, overflow: TextOverflow.ellipsis),
-              ),
-            )
-            .toList(),
-        onChanged: (v) => setState(
-          () => item.select(v, _itemLabelFromId(v)),
-        ),
+    return _buildDropdown(
+      value: item.itemId.isEmpty ? null : item.itemId,
+      hint: 'Select item',
+      items: _controller.items
+          .map(
+            (it) => DropdownMenuItem<String>(
+              value: it.id,
+              child: Text(it.label, overflow: TextOverflow.ellipsis),
+            ),
+          )
+          .toList(),
+      onChanged: (v) => setState(
+        () => item.select(v, _itemLabelFromId(v)),
       ),
     );
   }
@@ -695,6 +696,47 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
     );
   }
 
+  Widget _labeledSalePriceField(_SaleLineItem item) {
+    return TextField(
+      controller: item.saleCost,
+      keyboardType: const TextInputType.numberWithOptions(
+        decimal: true,
+        signed: true,
+      ),
+      textAlign: TextAlign.start,
+      textDirection: TextDirection.ltr,
+      onChanged: (_) => setState(() {}),
+      style: const TextStyle(fontSize: 13, color: _kInk),
+      decoration: InputDecoration(
+        labelText: 'Sale Price *',
+        hintText: 'Enter Sale Price',
+        floatingLabelBehavior: FloatingLabelBehavior.always,
+        isDense: true,
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: _kLine),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: _kLine),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: _kGreen, width: 1.1),
+        ),
+        labelStyle: const TextStyle(
+          fontSize: 12.5,
+          fontWeight: FontWeight.w700,
+          color: _kInk,
+        ),
+        hintStyle: const TextStyle(fontSize: 12.5, color: Color(0xFF9AA69F)),
+      ),
+    );
+  }
+
   Widget _labeledPiecesPercentageField(_SaleLineItem item) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -745,8 +787,10 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
     );
   }
 
-  InputDecoration _compactInputDecoration() {
+  InputDecoration _compactInputDecoration({String? hint}) {
     return InputDecoration(
+      hintText: hint,
+      hintStyle: const TextStyle(fontSize: 12.5, color: Color(0xFF9AA69F)),
       isDense: true,
       filled: true,
       fillColor: Colors.white,
@@ -824,23 +868,13 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
   }
 
   Widget _fieldLabel(String label, {bool required = false}) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 13.5,
-            fontWeight: FontWeight.w700,
-            color: _kInk,
-          ),
-        ),
-        if (required)
-          const Text(
-            ' *',
-            style: TextStyle(color: Colors.red, fontSize: 15),
-          ),
-      ],
+    return Text(
+      '$label${required ? ' *' : ''}',
+      style: const TextStyle(
+        fontSize: 13.5,
+        fontWeight: FontWeight.w700,
+        color: _kInk,
+      ),
     );
   }
 
@@ -1068,19 +1102,19 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
     _totalPurchaseAmount = 0;
     for (final line in order.lines) {
       _totalPurchaseAmount += line.purchaseAmount;
-      _lineItems.add(
-        _SaleLineItem(
-          itemId: line.itemId,
-          itemName: line.itemName,
-          purchaseAmount: line.purchaseAmount,
-          quantity: line.quantity,
-          discount: line.discount,
-          piecesPercentage: line.piecesPercentage,
-          saleCost: line.purchaseCost,
-          pieces: line.pieces,
-          isConverted: true,
-        ),
+      final item = _SaleLineItem(
+        itemId: line.itemId,
+        itemName: line.itemName,
+        purchaseAmount: line.purchaseAmount,
+        quantity: line.quantity,
+        discount: line.discount,
+        piecesPercentage: line.piecesPercentage,
+        saleCost: 0,
+        pieces: line.pieces,
+        isConverted: true,
       );
+      item.saleCost.clear();
+      _lineItems.add(item);
     }
   }
 
@@ -1228,6 +1262,11 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
         errorToast('Please select an item for every line.');
         return false;
       }
+      final salePrice = _parse(item.saleCost);
+      if (salePrice <= 0 || item.saleCost.text.trim().isEmpty) {
+        errorToast('Please enter a sale price for every line.');
+        return false;
+      }
     }
     return true;
   }
@@ -1277,7 +1316,9 @@ class _SaleLineItem {
   })  : quantity = TextEditingController(text: _text(quantity)),
         discount = TextEditingController(text: _text(discount)),
         piecesPercentage = TextEditingController(text: _text(piecesPercentage)),
-        saleCost = TextEditingController(text: _text(saleCost)),
+        saleCost = TextEditingController(
+          text: isConverted && saleCost == 0 ? '' : _text(saleCost),
+        ),
         pieces = TextEditingController(text: _text(pieces));
 
   _SaleLineItem.empty()

@@ -78,4 +78,17 @@ void main() {
     expect(order.lines.single.itemId, 'item-1');
     expect(order.lines.single.quantity, 10);
   });
+
+  test('uses the saved purchase amount and only falls back when absent', () {
+    final order = PurchaseOrder.fromJson({
+      'lines': [
+        {'purchaseAmount': 0, 'amount': 42},
+        {'amount': 17},
+      ],
+    });
+
+    expect(order.lines[0].purchaseAmount, 0);
+    expect(order.lines[1].purchaseAmount, 17);
+    expect(order.totalAmount, 17);
+  });
 }

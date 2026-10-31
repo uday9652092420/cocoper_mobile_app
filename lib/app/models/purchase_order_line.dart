@@ -63,7 +63,7 @@ class PurchaseOrderLine {
       ),
       purchaseCost: _double(json['purchaseCost'] ?? json['purchase_cost']),
       purchaseAmount: _double(
-        json['purchaseAmount'] ?? json['purchase_amount'],
+        json['purchaseAmount'] ?? json['purchase_amount'] ?? json['amount'],
       ),
       amount: _double(json['amount']),
       rate: json['rate'] is num ? (json['rate'] as num).toDouble() : null,

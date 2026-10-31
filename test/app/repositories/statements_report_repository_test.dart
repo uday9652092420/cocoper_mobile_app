@@ -95,4 +95,53 @@ void main() {
     expect(record.loadedQuantity, 40);
     expect(record.pendingQuantity, 60);
   });
+
+  test('supplier statement uses the supplier payment business date', () async {
+    const purchaseTimestamp = '2026-10-26';
+    const paymentTimestamp = '2026-10-26T22:00:00.000Z';
+    final repository = StatementsReportRepository(
+      service: _FixtureReportService({
+        'purchase-invoices': [
+          {
+            'id': 'purchase-1',
+            'invoiceNo': 'GPI-01',
+            'supplierId': 'supplier-1',
+            'invoiceDate': purchaseTimestamp,
+            'grandTotal': 1617660,
+          },
+        ],
+        'supplier-payments': [
+          {
+            'id': 'payment-1',
+            'paymentNumber': 'SP-01',
+            'supplierId': 'supplier-1',
+            'date': paymentTimestamp,
+            'createdAt': '2026-10-26T08:00:00.000Z',
+            'amount': 1000,
+          },
+          {
+            'id': 'payment-2',
+            'paymentNumber': 'SP-02',
+            'supplierId': 'supplier-1',
+            'date': '2026-10-27',
+            'amount': 50000,
+          },
+        ],
+        'suppliers': [
+          {'id': 'supplier-1', 'supplier_name': 'Supplier One'},
+        ],
+      }),
+    );
+
+    final data = await repository.load(StatementsReportType.supplierStatement);
+
+    expect(data.records.map((record) => record.reference),
+        ['GPI-01', 'SP-01', 'SP-02']);
+    expect(data.records[0].date?.day, 26);
+    expect(data.records[0].date?.month, 10);
+    expect(data.records[1].date?.day, 27);
+    expect(data.records[1].date?.month, 10);
+    expect(data.records[2].date?.day, 27);
+    expect(data.records[2].date?.month, 10);
+  });
 }

@@ -61,7 +61,7 @@ void main() {
     final service = ProfitLossService(
       get: (endpoint, {queryParameters}) async {
         callCount++;
-        return _response(endpoint, const []);
+        return _response(endpoint, const <dynamic>[]);
       },
     );
 

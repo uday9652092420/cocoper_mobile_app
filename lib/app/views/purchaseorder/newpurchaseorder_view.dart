@@ -5,12 +5,15 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 
 import '../../controllers/purchaseorder/purchase_order_controller.dart';
+import '../../controllers/salesorders/sales_order_controller.dart';
 import '../../helpers/flutter_toast.dart';
 import '../../helpers/shared_preferences.dart';
 import '../../models/lookup_option.dart';
 import '../../models/purchase_order.dart';
 import '../../models/purchase_order_line.dart';
+import '../../models/sales_order.dart';
 import '../../routes/app_routes.dart';
+import '../../services/mobile_app_permissions.dart';
 import '../../theme/app_theme.dart';
 
 const _kInk = AppColors.textDefaultLight;
@@ -21,10 +24,15 @@ const _kMint = AppColors.surfaceTint;
 const _kFieldFill = AppColors.fieldFill;
 
 class NewPurchaseOrderView extends StatefulWidget {
-  const NewPurchaseOrderView({super.key, this.order});
+  const NewPurchaseOrderView({
+    super.key,
+    this.order,
+    this.readOnly = false,
+  });
 
   /// When provided, the form runs in edit mode for this Purchase Order.
   final PurchaseOrder? order;
+  final bool readOnly;
 
   @override
   State<NewPurchaseOrderView> createState() => _NewPurchaseOrderViewState();
@@ -33,6 +41,8 @@ class NewPurchaseOrderView extends StatefulWidget {
 class _NewPurchaseOrderViewState extends State<NewPurchaseOrderView> {
   final PurchaseOrderController _controller =
       Get.find<PurchaseOrderController>();
+  final SalesOrderController _salesOrderController =
+      Get.find<SalesOrderController>();
 
   final _poNumberController = TextEditingController();
   final _dateController = TextEditingController();
@@ -52,7 +62,9 @@ class _NewPurchaseOrderViewState extends State<NewPurchaseOrderView> {
   bool _isLoadingOrder = false;
   bool _isPreparingSalesOrder = false;
   bool _hasAuthoritativeOrder = false;
-  String? _savedFormSnapshot;
+  bool _hasAuthoritativeConversionStatus = false;
+  SalesOrder? _linkedSalesOrder;
+  String? _persistedFormSnapshot;
 
   @override
   void initState() {
@@ -96,38 +108,79 @@ class _NewPurchaseOrderViewState extends State<NewPurchaseOrderView> {
     final order = await _controller.fetchPurchaseOrderById(id);
     if (!mounted) return false;
 
+    SalesOrder? linkedSalesOrder;
+    var conversionStatusVerified = false;
+    if (order != null) {
+      try {
+        conversionStatusVerified =
+            await _salesOrderController.loadSalesOrders(showErrors: false);
+        if (conversionStatusVerified) {
+          linkedSalesOrder =
+              _salesOrderController.salesOrderByPurchaseOrderReference(
+            purchaseOrderId: order.id,
+            poNumber: order.poNumber,
+          );
+        }
+      } catch (error) {
+        debugPrint('PURCHASE ORDER CONVERSION CHECK FAILED: $error');
+      }
+    }
+
     setState(() {
       _isLoadingOrder = false;
       if (order == null) {
         _hasAuthoritativeOrder = false;
+        _hasAuthoritativeConversionStatus = false;
+        _linkedSalesOrder = null;
         return;
       }
       _currentOrder = order;
       _hasAuthoritativeOrder = true;
-      _savedFormSnapshot = null;
+      _hasAuthoritativeConversionStatus = conversionStatusVerified;
+      _linkedSalesOrder = linkedSalesOrder;
       _prefillFromOrder(order);
+      _persistedFormSnapshot = _formSnapshot();
     });
     return order != null;
   }
 
   bool get _canEdit {
-    if (widget.order == null) return true;
-    return !_isReadOnly;
+    if (widget.order == null) {
+      return true;
+    }
+    return !_isReadOnly &&
+        MobileAppPermissions.current?.hasPermission('purchase-order.edit') ==
+            true;
   }
 
   bool get _isReadOnly =>
-      widget.order != null &&
-      (!_hasAuthoritativeOrder ||
-          _isLoadingOrder ||
-          _currentOrder?.status.trim().toLowerCase() != 'draft');
+      widget.readOnly ||
+      !_hasAuthoritativeOrder ||
+      _isLoadingOrder ||
+      !_hasAuthoritativeConversionStatus ||
+      _isConverted ||
+      _currentOrder?.status.trim().toLowerCase() != 'draft' ||
+      MobileAppPermissions.current?.hasPermission('purchase-order.edit') !=
+          true;
 
   bool get _isApproved =>
       _currentOrder?.status.trim().toLowerCase() == 'approved';
 
-  bool get _canApproveSavedChanges =>
-      _canEdit &&
-      _savedFormSnapshot != null &&
-      _savedFormSnapshot == _formSnapshot();
+  bool get _isConverted => _linkedSalesOrder != null;
+
+  bool get _canApprove =>
+      widget.order != null &&
+      !_isLoadingOrder &&
+      _hasAuthoritativeOrder &&
+      _hasAuthoritativeConversionStatus &&
+      !_isConverted &&
+      _currentOrder?.status.trim().toLowerCase() == 'draft' &&
+      MobileAppPermissions.current?.hasPermission('purchase-order.approve') ==
+          true;
+
+  bool get _hasUnsavedChanges =>
+      _persistedFormSnapshot != null &&
+      _persistedFormSnapshot != _formSnapshot();
 
   @override
   void dispose() {
@@ -160,7 +213,7 @@ class _NewPurchaseOrderViewState extends State<NewPurchaseOrderView> {
                     child: Obx(() {
                       final isSaving = _controller.isSaving.value;
                       return AbsorbPointer(
-                        absorbing: !_canEdit || isSaving,
+                        absorbing: isSaving,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -217,7 +270,9 @@ class _NewPurchaseOrderViewState extends State<NewPurchaseOrderView> {
           Expanded(
             child: Text(
               widget.order != null
-                  ? 'Edit Purchase Order'
+                  ? _canEdit
+                      ? 'Edit Purchase Order'
+                      : 'View Purchase Order'
                   : 'New Purchase Order',
               style: const TextStyle(
                 fontSize: 20,
@@ -245,6 +300,7 @@ class _NewPurchaseOrderViewState extends State<NewPurchaseOrderView> {
           _buildTextField(
             controller: _poNumberController,
             hint: 'PO Number',
+            readOnly: widget.order != null,
           ),
           const SizedBox(height: 14),
           _fieldLabel('Date', required: true),
@@ -454,27 +510,31 @@ class _NewPurchaseOrderViewState extends State<NewPurchaseOrderView> {
         top: false,
         child: isEdit
             ? _buildEditActions()
-            : Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    'Save to keep PO as draft, or approve when final.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 11.5, color: _kMuted),
+            : !_canEdit
+                ? const SizedBox.shrink()
+                : Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'Save to keep PO as draft, or approve when final.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 11.5, color: _kMuted),
+                      ),
+                      const SizedBox(height: 10),
+                      _buildActionButton(
+                        label: 'Save',
+                        color: _kGreen,
+                        onPressed: _onSave,
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 10),
-                  _buildActionButton(
-                    label: 'Save',
-                    color: _kGreen,
-                    onPressed: _onSave,
-                  ),
-                ],
-              ),
       ),
     );
   }
 
   Widget _buildEditActions() {
+    if (widget.readOnly) return const SizedBox.shrink();
+
     if (_isLoadingOrder) {
       return const Center(
         child: SizedBox(
@@ -498,50 +558,129 @@ class _NewPurchaseOrderViewState extends State<NewPurchaseOrderView> {
       );
     }
 
-    if (!_canEdit) {
-      if (_isApproved) {
-        return Column(
-          children: [
-            const Text(
-              'This purchase order is approved and read-only. Continue to '
-              'Sales Order entry to prepare a Sales Order; this does not '
-              'confirm a backend conversion.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: _kMuted),
+    if (_isConverted) {
+      final linkedOrder = _linkedSalesOrder!;
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Converted to Sales Order ${linkedOrder.soNumber}. This Purchase '
+            'Order is read-only.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 12, color: _kMuted),
+          ),
+          const SizedBox(height: 8),
+          _buildActionButton(
+            label: 'View Sales Order',
+            color: const Color(0xFF0E8F86),
+            onPressed: () => Get.toNamed<void>(
+              Routes.viewSalesOrder,
+              arguments: linkedOrder.id,
             ),
-            const SizedBox(height: 10),
-            _buildActionButton(
-              label: 'Convert to Sales Order',
-              color: const Color(0xFF0E8F86),
-              onPressed: _onConvertToSalesOrder,
-            ),
-          ],
-        );
-      }
-      return Text(
-        'This purchase order is read-only (status: '
-        '${_currentOrder?.status.isNotEmpty == true ? _currentOrder!.status : 'unknown'}).',
-        textAlign: TextAlign.center,
-        style: const TextStyle(fontSize: 12, color: _kMuted),
+          ),
+        ],
       );
     }
 
-    return Column(
-      children: [
-        if (_canApproveSavedChanges)
-          _buildActionButton(
-            label: 'Approve',
-            color: const Color(0xFF0E8F86),
-            onPressed: _onApprove,
-          )
-        else
-          _buildActionButton(
-            label: 'Save Changes',
-            color: _kGreen,
-            onPressed: _onSave,
+    if (!_hasAuthoritativeConversionStatus) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+            'Unable to verify the Purchase Order conversion status. This '
+            'order is read-only until it can be checked.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, color: _kMuted),
           ),
-      ],
-    );
+          TextButton(
+            onPressed: () {
+              setState(() => _isLoadingOrder = true);
+              _loadAuthoritativeOrder(widget.order!.id);
+            },
+            child: const Text('Retry'),
+          ),
+        ],
+      );
+    }
+
+    final canSave = _canEdit;
+    final canApprove = _canApprove;
+    if (canSave && canApprove) {
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final buttons = [
+            Expanded(
+              child: _buildActionButton(
+                label: 'Save Changes',
+                color: _kGreen,
+                onPressed: _onSave,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _buildActionButton(
+                label: 'Approve',
+                color: const Color(0xFF0E8F86),
+                onPressed: _onApprove,
+              ),
+            ),
+          ];
+          if (constraints.maxWidth < 320) {
+            return Column(
+              children: [
+                _buildActionButton(
+                  label: 'Save Changes',
+                  color: _kGreen,
+                  onPressed: _onSave,
+                ),
+                const SizedBox(height: 8),
+                _buildActionButton(
+                  label: 'Approve',
+                  color: const Color(0xFF0E8F86),
+                  onPressed: _onApprove,
+                ),
+              ],
+            );
+          }
+          return Row(children: buttons);
+        },
+      );
+    }
+
+    if (canSave) {
+      return _buildActionButton(
+        label: 'Save Changes',
+        color: _kGreen,
+        onPressed: _onSave,
+      );
+    }
+    if (canApprove) {
+      return _buildActionButton(
+        label: 'Approve',
+        color: const Color(0xFF0E8F86),
+        onPressed: _onApprove,
+      );
+    }
+    if (_isApproved) {
+      return Column(
+        children: [
+          const Text(
+            'This purchase order is approved and read-only. Continue to '
+            'Sales Order entry to prepare a Sales Order; this does not '
+            'confirm a backend conversion.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, color: _kMuted),
+          ),
+          const SizedBox(height: 10),
+          _buildActionButton(
+            label: 'Convert to Sales Order',
+            color: const Color(0xFF0E8F86),
+            onPressed: _onConvertToSalesOrder,
+          ),
+        ],
+      );
+    }
+    return const SizedBox.shrink();
   }
 
   Widget _buildActionButton({
@@ -1135,6 +1274,7 @@ class _NewPurchaseOrderViewState extends State<NewPurchaseOrderView> {
       _remarksController.text.trim(),
       for (final item in _lineItems)
         [
+          item.id,
           item.item,
           item.quantity.text,
           item.discount.text,
@@ -1211,6 +1351,7 @@ class _NewPurchaseOrderViewState extends State<NewPurchaseOrderView> {
     final base = PurchaseOrderController.calculateBaseCost(amount, pieces);
 
     return PurchaseOrderLine(
+      id: item.id,
       itemId: item.item ?? '',
       quantity: quantity,
       discount: discount,
@@ -1262,6 +1403,8 @@ class _NewPurchaseOrderViewState extends State<NewPurchaseOrderView> {
     final order = _currentOrder;
     if (!_hasAuthoritativeOrder ||
         _isLoadingOrder ||
+        !_hasAuthoritativeConversionStatus ||
+        _isConverted ||
         !_isApproved ||
         order == null ||
         _isPreparingSalesOrder) {
@@ -1294,11 +1437,10 @@ class _NewPurchaseOrderViewState extends State<NewPurchaseOrderView> {
                   'could not be refreshed; retry loading it to verify status.',
         );
       }
-      if (salesOrderId != null && salesOrderId.isNotEmpty && mounted) {
-        await Get.toNamed<void>(
-          Routes.viewSalesOrder,
-          arguments: salesOrderId,
-        );
+      if ((salesOrderId?.isNotEmpty == true ||
+              salesOrderReference?.isNotEmpty == true) &&
+          mounted) {
+        await Get.offNamed<void>(Routes.savedSalesOrders);
       }
     } finally {
       if (mounted) {
@@ -1319,7 +1461,7 @@ class _NewPurchaseOrderViewState extends State<NewPurchaseOrderView> {
     if (order != null) {
       success = await _controller.updatePurchaseOrder(
         id: order.id,
-        status: 'Draft',
+        organizationId: _currentOrder?.organizationId,
         poNumber: _poNumberController.text.trim(),
         supplierId: _supplier?.trim() ?? '',
         branchId: _branch?.trim() ?? '',
@@ -1332,13 +1474,14 @@ class _NewPurchaseOrderViewState extends State<NewPurchaseOrderView> {
 
       setState(() {
         _isLoadingOrder = true;
-        _hasAuthoritativeOrder = false;
-        _savedFormSnapshot = null;
       });
       final refreshed = await _controller.fetchPurchaseOrderById(order.id);
       if (!mounted) return;
       if (refreshed == null) {
-        setState(() => _isLoadingOrder = false);
+        setState(() {
+          _isLoadingOrder = false;
+          _persistedFormSnapshot = _formSnapshot();
+        });
         return;
       }
       setState(() {
@@ -1346,9 +1489,10 @@ class _NewPurchaseOrderViewState extends State<NewPurchaseOrderView> {
         _currentOrder = refreshed;
         _hasAuthoritativeOrder = true;
         _prefillFromOrder(refreshed);
-        _savedFormSnapshot = refreshed.status.trim().toLowerCase() == 'draft'
-            ? _formSnapshot()
-            : null;
+        _persistedFormSnapshot =
+            refreshed.status.trim().toLowerCase() == 'draft'
+                ? _formSnapshot()
+                : null;
       });
       if (refreshed.status.trim().toLowerCase() != 'draft') {
         errorToast(
@@ -1375,49 +1519,77 @@ class _NewPurchaseOrderViewState extends State<NewPurchaseOrderView> {
 
   Future<void> _onApprove() async {
     final order = widget.order;
-    if (order == null || !_canApproveSavedChanges) return;
-    if (!_validate()) return;
+    if (order == null || !_canApprove || _controller.isSaving.value) return;
 
-    final lines = _lineItems.map(_buildLinePayload).toList();
-    final date = _apiDate();
-
-    final success = await _controller.updatePurchaseOrder(
-      id: order.id,
-      status: 'Approved',
-      poNumber: _poNumberController.text.trim(),
-      supplierId: _supplier?.trim() ?? '',
-      branchId: _branch?.trim() ?? '',
-      date: date,
-      mode: _apiMode(),
-      remarks: _remarksController.text.trim(),
-      lines: lines,
+    final hasUnsavedChanges = _hasUnsavedChanges;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Approve Purchase Order'),
+        content: Text(
+          hasUnsavedChanges
+              ? 'This Purchase Order has unsaved changes. Are you sure you '
+                  'want to approve the currently saved Purchase Order? Your '
+                  'unsaved changes will not be included.'
+              : 'Are you sure you want to approve this Purchase Order? Once '
+                  'approved, it will become read-only.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Approve'),
+          ),
+        ],
+      ),
     );
+    if (confirmed != true || !mounted || !_canApprove) return;
+
+    final success = await _controller.approvePurchaseOrder(order.id);
     if (!success || !mounted) return;
 
     setState(() {
       _isLoadingOrder = true;
-      _hasAuthoritativeOrder = false;
-      _savedFormSnapshot = null;
     });
     final refreshed = await _controller.fetchPurchaseOrderById(order.id);
     if (!mounted) return;
-    if (refreshed == null) {
-      setState(() => _isLoadingOrder = false);
-      return;
+    PurchaseOrder? currentFromList;
+    for (final purchaseOrder in _controller.purchaseOrders) {
+      if (purchaseOrder.id == order.id) {
+        currentFromList = purchaseOrder;
+        break;
+      }
     }
-    setState(() {
-      _isLoadingOrder = false;
-      _currentOrder = refreshed;
-      _hasAuthoritativeOrder = true;
-      _savedFormSnapshot = null;
-      _prefillFromOrder(refreshed);
-    });
-    if (refreshed.status.trim().toLowerCase() != 'approved') {
+    final confirmedOrder = refreshed ??
+        (currentFromList?.status.trim().toLowerCase() == 'approved'
+            ? currentFromList
+            : null);
+    if (confirmedOrder == null ||
+        confirmedOrder.status.trim().toLowerCase() != 'approved') {
+      setState(() {
+        _isLoadingOrder = false;
+        if (refreshed != null) {
+          _currentOrder = refreshed;
+          _hasAuthoritativeOrder = true;
+          _prefillFromOrder(refreshed);
+        }
+      });
       errorToast(
         'Purchase Order approval was not confirmed by the server. '
         'The current status has been refreshed.',
       );
+      return;
     }
+    setState(() {
+      _isLoadingOrder = false;
+      _currentOrder = confirmedOrder;
+      _hasAuthoritativeOrder = true;
+      _persistedFormSnapshot = null;
+      _prefillFromOrder(confirmedOrder);
+    });
   }
 
   void _prefillFromOrder(PurchaseOrder order) {
@@ -1449,6 +1621,7 @@ class _NewPurchaseOrderViewState extends State<NewPurchaseOrderView> {
     for (final line in order.lines) {
       _lineItems.add(
         _LineItem()
+          ..id = line.id
           ..item = line.itemId.isEmpty ? null : line.itemId
           ..quantity.text = _formatNumber(line.quantity)
           ..discount.text = _formatNumber(line.discount)
@@ -1519,6 +1692,7 @@ class _NewPurchaseOrderViewState extends State<NewPurchaseOrderView> {
 }
 
 class _LineItem {
+  String? id;
   String? item;
   final TextEditingController quantity;
   final TextEditingController discount;

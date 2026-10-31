@@ -1,12 +1,25 @@
-import 'package:get/get.dart';
+import 'package:dio/dio.dart' show DioException, Response;
+import 'package:get/get.dart' hide Response;
 
 import '../../helpers/flutter_toast.dart';
 import '../../helpers/shared_preferences.dart';
 import '../../models/direct_sale.dart';
 import '../../models/lookup_option.dart';
+import '../../models/sales_order.dart';
 import '../../controllers/salesorders/sales_order_controller.dart';
 import '../../services/api_service.dart';
 import '../../services/endpoints.dart';
+
+typedef DirectSalesOrderGetRequest = Future<Response<dynamic>?> Function(
+  String endpoint, {
+  Map<String, dynamic>? queryParameters,
+  Map<String, String>? headers,
+});
+
+typedef DirectSalesCreateRequest = Future<Response<dynamic>?> Function(
+  String endpoint,
+  dynamic body,
+);
 
 class DirectSaleLineValues {
   final double discount;
@@ -23,6 +36,27 @@ class DirectSaleLineValues {
 }
 
 class DirectSalesController extends GetxController {
+  DirectSalesController({
+    DirectSalesOrderGetRequest? salesOrderGetRequest,
+    DirectSalesCreateRequest? directSalesCreateRequest,
+  })  : _salesOrderGetRequest = salesOrderGetRequest,
+        _directSalesCreateRequest = directSalesCreateRequest;
+
+  final DirectSalesOrderGetRequest? _salesOrderGetRequest;
+  final DirectSalesCreateRequest? _directSalesCreateRequest;
+  final salesOrdersForCustomer = <SalesOrder>[].obs;
+  final selectedSalesOrderDetails = Rxn<SalesOrder>();
+  final isLoadingSalesOrders = false.obs;
+  final isLoadingSalesOrderDetails = false.obs;
+  final hasSalesOrdersError = false.obs;
+  final salesOrdersError = ''.obs;
+  final salesOrderDetailsError = ''.obs;
+  final salesOrdersCustomerId = ''.obs;
+  int _salesOrdersRequestVersion = 0;
+  int _salesOrderDetailsRequestVersion = 0;
+  String _activeSalesOrdersBranchId = '';
+  final Map<String, List<SalesOrder>> _salesOrdersCache = {};
+
   final directSales = <DirectSale>[].obs;
   final customers = <LookupOption>[].obs;
   final branches = <LookupOption>[].obs;
@@ -170,6 +204,294 @@ class DirectSalesController extends GetxController {
     isLoadingLookups.value = false;
   }
 
+  Future<void> loadSalesOrdersForCustomer(
+    String customerId, {
+    String? branchId,
+    bool forceRefresh = false,
+  }) async {
+    final normalizedCustomerId = customerId.trim();
+    final normalizedBranchId = branchId?.trim() ?? '';
+
+    if (normalizedCustomerId.isEmpty) {
+      clearSalesOrdersForCustomer();
+      return;
+    }
+
+    if (!forceRefresh &&
+        salesOrdersCustomerId.value == normalizedCustomerId &&
+        _activeSalesOrdersBranchId == normalizedBranchId &&
+        isLoadingSalesOrders.value) {
+      return;
+    }
+    final requestVersion = ++_salesOrdersRequestVersion;
+    salesOrdersCustomerId.value = normalizedCustomerId;
+    _activeSalesOrdersBranchId = normalizedBranchId;
+    salesOrdersForCustomer.clear();
+    hasSalesOrdersError.value = false;
+    salesOrdersError.value = '';
+    isLoadingSalesOrders.value = true;
+
+    final organizationId = (await SharedPrefsHelper.getString(
+      SharedPrefsHelper.organizationId,
+    ))
+        .trim();
+    if (requestVersion != _salesOrdersRequestVersion) return;
+
+    if (organizationId.isEmpty) {
+      _setSalesOrdersError(
+        requestVersion,
+        'Organization context is unavailable. Please sign in again.',
+      );
+      return;
+    }
+
+    final cacheKey =
+        '$organizationId|$normalizedBranchId|$normalizedCustomerId';
+    final cachedOrders = _salesOrdersCache[cacheKey];
+    if (!forceRefresh && cachedOrders != null) {
+      salesOrdersForCustomer.assignAll(cachedOrders);
+      isLoadingSalesOrders.value = false;
+      return;
+    }
+
+    try {
+      final response = await (_salesOrderGetRequest ?? ApiService.get)(
+        EndPoints.salesOrders,
+        headers: normalizedBranchId.isEmpty
+            ? null
+            : {'x-branch-id': normalizedBranchId},
+      );
+      if (requestVersion != _salesOrdersRequestVersion) return;
+
+      if (response?.statusCode != 200) {
+        final statusCode = response?.statusCode;
+        final error = statusCode == 401
+            ? 'Your session has expired. Please sign in again.'
+            : _extractError(
+                response?.data,
+                statusCode == 403
+                    ? 'You do not have permission to view Sales Orders.'
+                    : 'Unable to load Sales Orders. Please try again.',
+              );
+        _setSalesOrdersError(requestVersion, error);
+        return;
+      }
+
+      final rows = _extractList(response?.data);
+      if (rows == null) {
+        _setSalesOrdersError(
+          requestVersion,
+          'Unable to read Sales Orders from the server.',
+        );
+        return;
+      }
+
+      final orders = rows
+          .whereType<Map<dynamic, dynamic>>()
+          .map((row) => SalesOrder.fromJson(Map<String, dynamic>.from(row)))
+          .where((order) =>
+              order.customerId == normalizedCustomerId &&
+              (order.organizationId.isEmpty ||
+                  order.organizationId == organizationId))
+          .toList();
+      _salesOrdersCache[cacheKey] = orders;
+      salesOrdersForCustomer.assignAll(orders);
+    } on DioException catch (error) {
+      if (requestVersion != _salesOrdersRequestVersion) return;
+      final statusCode = error.response?.statusCode;
+      _setSalesOrdersError(
+        requestVersion,
+        statusCode == 401
+            ? 'Your session has expired. Please sign in again.'
+            : _extractError(
+                error.response?.data,
+                'Unable to load Sales Orders. Check your connection and retry.',
+              ),
+      );
+    } finally {
+      if (requestVersion == _salesOrdersRequestVersion) {
+        isLoadingSalesOrders.value = false;
+      }
+    }
+  }
+
+  void clearSalesOrdersForCustomer() {
+    _salesOrdersRequestVersion++;
+    salesOrdersCustomerId.value = '';
+    _activeSalesOrdersBranchId = '';
+    salesOrdersForCustomer.clear();
+    isLoadingSalesOrders.value = false;
+    hasSalesOrdersError.value = false;
+    salesOrdersError.value = '';
+    clearSelectedSalesOrderDetails();
+  }
+
+  Future<SalesOrder?> loadSalesOrderDetails({
+    required String salesOrderId,
+    required String customerId,
+    String? branchId,
+    bool forceRefresh = false,
+  }) async {
+    final id = salesOrderId.trim();
+    final expectedCustomerId = customerId.trim();
+    if (id.isEmpty || expectedCustomerId.isEmpty) {
+      _setSalesOrderDetailsError(
+        ++_salesOrderDetailsRequestVersion,
+        'Select a valid Sales Order for the selected customer.',
+      );
+      return null;
+    }
+
+    final selectedOrder =
+        salesOrdersForCustomer.where((order) => order.id == id).firstOrNull;
+    if (selectedOrder == null ||
+        selectedOrder.customerId != expectedCustomerId) {
+      _setSalesOrderDetailsError(
+        ++_salesOrderDetailsRequestVersion,
+        'This Sales Order is not available for the selected customer.',
+      );
+      return null;
+    }
+
+    final existingDetails = selectedSalesOrderDetails.value;
+    if (!forceRefresh &&
+        existingDetails?.id == id &&
+        existingDetails?.customerId == expectedCustomerId) {
+      return existingDetails;
+    }
+
+    final requestVersion = ++_salesOrderDetailsRequestVersion;
+    selectedSalesOrderDetails.value = null;
+    salesOrderDetailsError.value = '';
+    isLoadingSalesOrderDetails.value = true;
+
+    try {
+      final organizationId = (await SharedPrefsHelper.getString(
+        SharedPrefsHelper.organizationId,
+      ))
+          .trim();
+      if (requestVersion != _salesOrderDetailsRequestVersion) return null;
+      if (organizationId.isEmpty) {
+        _setSalesOrderDetailsError(
+          requestVersion,
+          'Organization context is unavailable. Please sign in again.',
+        );
+        return null;
+      }
+
+      final normalizedBranchId = branchId?.trim() ?? '';
+      final response = await (_salesOrderGetRequest ?? ApiService.get)(
+        '${EndPoints.salesOrders}/$id',
+        headers: normalizedBranchId.isEmpty
+            ? null
+            : {'x-branch-id': normalizedBranchId},
+      );
+      if (requestVersion != _salesOrderDetailsRequestVersion) return null;
+
+      if (response?.statusCode != 200 ||
+          (response?.data is Map && response?.data['success'] == false)) {
+        final statusCode = response?.statusCode;
+        _setSalesOrderDetailsError(
+          requestVersion,
+          statusCode == 401
+              ? 'Your session has expired. Please sign in again.'
+              : _extractError(
+                  response?.data,
+                  statusCode == 403
+                      ? 'You do not have permission to view this Sales Order.'
+                      : statusCode == 404
+                          ? 'The selected Sales Order could not be found.'
+                          : 'Unable to load Sales Order details.',
+                ),
+        );
+        return null;
+      }
+
+      final order = SalesOrder.fromApiResponse(response?.data);
+      if (order == null || order.id != id) {
+        _setSalesOrderDetailsError(
+          requestVersion,
+          'The server returned invalid Sales Order details.',
+        );
+        return null;
+      }
+      if (order.customerId != expectedCustomerId ||
+          (order.organizationId.isNotEmpty &&
+              order.organizationId != organizationId) ||
+          (normalizedBranchId.isNotEmpty &&
+              order.branchId.isNotEmpty &&
+              order.branchId != normalizedBranchId)) {
+        _setSalesOrderDetailsError(
+          requestVersion,
+          'The selected Sales Order does not belong to this customer, organization, or branch.',
+        );
+        return null;
+      }
+      if (order.lines.isEmpty ||
+          order.lines.any(
+            (line) =>
+                line.itemId.isEmpty ||
+                !line.quantity.isFinite ||
+                line.quantity <= 0 ||
+                !line.saleCost.isFinite ||
+                line.saleCost < 0 ||
+                !items.any((item) => item.id == line.itemId),
+          )) {
+        _setSalesOrderDetailsError(
+          requestVersion,
+          'The selected Sales Order has incomplete details or an unavailable item.',
+        );
+        return null;
+      }
+
+      selectedSalesOrderDetails.value = order;
+      return order;
+    } on DioException catch (error) {
+      if (requestVersion != _salesOrderDetailsRequestVersion) return null;
+      _setSalesOrderDetailsError(
+        requestVersion,
+        _extractError(
+          error.response?.data,
+          'Unable to load Sales Order details. Check your connection and retry.',
+        ),
+      );
+      return null;
+    } catch (error) {
+      if (requestVersion != _salesOrderDetailsRequestVersion) return null;
+      _setSalesOrderDetailsError(
+        requestVersion,
+        'Unable to read Sales Order details: $error',
+      );
+      return null;
+    } finally {
+      if (requestVersion == _salesOrderDetailsRequestVersion) {
+        isLoadingSalesOrderDetails.value = false;
+      }
+    }
+  }
+
+  void clearSelectedSalesOrderDetails() {
+    _salesOrderDetailsRequestVersion++;
+    selectedSalesOrderDetails.value = null;
+    isLoadingSalesOrderDetails.value = false;
+    salesOrderDetailsError.value = '';
+  }
+
+  void _setSalesOrderDetailsError(int requestVersion, String message) {
+    if (requestVersion != _salesOrderDetailsRequestVersion) return;
+    selectedSalesOrderDetails.value = null;
+    salesOrderDetailsError.value = message;
+    isLoadingSalesOrderDetails.value = false;
+  }
+
+  void _setSalesOrdersError(int requestVersion, String message) {
+    if (requestVersion != _salesOrdersRequestVersion) return;
+    salesOrdersForCustomer.clear();
+    hasSalesOrdersError.value = true;
+    salesOrdersError.value = message;
+    isLoadingSalesOrders.value = false;
+  }
+
   Future<bool> createDirectSale({
     required String customerId,
     required String branchId,
@@ -179,6 +501,7 @@ class DirectSalesController extends GetxController {
     required List<DirectSaleGunnyBag> gunnyBags,
     required double additionalCharges,
     required double loadingCharges,
+    String salesOrderNo = '',
   }) async {
     if (isSaving.value) return false;
     isSaving.value = true;
@@ -207,7 +530,7 @@ class DirectSalesController extends GetxController {
 
       final body = <String, dynamic>{
         'directSaleNo': '',
-        'salesOrderNo': '',
+        'salesOrderNo': salesOrderNo.trim(),
         'organizationId': organizationId,
         'customerId': customerId,
         'branchId': branchId,
@@ -224,7 +547,11 @@ class DirectSalesController extends GetxController {
         'gunnyBags': gunnyBags.map((bag) => bag.toJson()).toList(),
       };
 
-      final response = await ApiService.post(EndPoints.directSales, body);
+      final response = await (_directSalesCreateRequest ??
+          (endpoint, payload) => ApiService.post(endpoint, payload))(
+        EndPoints.directSales,
+        body,
+      );
       if (_isSuccessful(response)) {
         lastCreatedDirectSaleNo.value = _extractDirectSaleNo(response?.data);
         final saleNo = lastCreatedDirectSaleNo.value;

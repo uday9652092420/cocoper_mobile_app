@@ -168,6 +168,11 @@ Each line contains `itemId`, `quantity`, `discount`, optional
 `piecesPercentage` and `pieces`, `actualQuantity`, `saleCost`, `saleAmount`,
 and `amount`. The backend takes authoritative PO number and branch from the
 locked source PO; request `branchId` is not the relationship key.
+For Flutter conversion, `saleCost` is the separately entered Sale Price; it is
+not copied from the Purchase Order's `purchaseCost`. No authoritative Web
+selling-price source or calculation was available in the supplied mobile
+workspace. The mobile form leaves Sale Price blank and blocks submission until
+a verified selling price is entered.
 
 Successful conversion returns HTTP 201 and the Sales Order row directly as
 JSON, including `id`, `soNumber`, `organizationId`, `branchId`, `customerId`,
@@ -175,27 +180,61 @@ JSON, including `id`, `soNumber`, `organizationId`, `branchId`, `customerId`,
 `totalAmount`, and persisted `lines`. A duplicate returns HTTP 409 with
 `{status:"error", code:"PURCHASE_ORDER_ALREADY_CONVERTED", message, details}`
 and `details.salesOrder` when the existing order belongs to the requesting
-organization. Flutter offers to open that returned Sales Order instead of
-retrying.
+organization. On confirmed creation, Flutter navigates to Saved Sales Orders,
+which refreshes from `GET /sales-orders`; a duplicate response offers to open
+the existing Sales Order instead of retrying.
 After a successful but unconfirmed conversion, Flutter preserves a retry lock
 across app restarts until a refreshed Sales Order list confirms the PO-to-SO
 link. An existing-order response also blocks another create and exposes the
 linked Sales Order ID for navigation.
 
-`GET /sales-orders` returns the organization-scoped raw Sales Order array with
-line items and `sourcePOId`; `GET /sales-orders/:id` returns organization-scoped
-details. The Web Sales Orders page consumes this list, while Purchase Order
+`GET /sales-orders` returns the raw Sales Order array filtered by the
+`x-organization-id` header when present; `GET /sales-orders/:id` currently
+queries only by ID in the checked-in backend and does not apply organization
+scope. The backend `PUT /sales-orders/:id` accepts the Sales Order update
+DTO, including `status: "Approved"`, and returns the updated row; mobile
+approval reuses this route with the edited header/line payload and
+`status: "Approved"`. Mobile update and approval requests preserve the order's
+persisted `organizationId` and `branchId` in the PUT body when present, rather
+than substituting the currently selected scope. The checked-in COCOPER
+backend DTO accepts `organizationId` but does not declare or return
+`branchId`; its update repository does not validate organization/branch IDs or
+update organization scope. The reported “organization or branch identifier
+is invalid” response is not present in this checked-in backend source, so its
+deployed validation contract still needs confirmation. The checked-in backend
+source currently has no
+Sales Order route permission middleware or Draft-only update/delete checks.
+Its permission catalog contains `transactions.sales`, but not the granular
+`sales-order.edit`, `sales-order.approve`, or `sales-order.delete` codes. Mobile
+Sales Order action gating accepts the established `transactions.sales`
+permission as a fallback to the granular action codes. When no Sales Order
+action codes are configured for an authenticated main-app user, Draft Edit
+and Delete remain available instead of hiding the actions due to the absent
+granular catalog entries. Approval still requires its specific approval or
+Sales transaction permission. Server-side authorization and transition
+enforcement must be added and deployed before approval or deletion can be
+considered secure.
+The Web Sales Orders page consumes this list, while Purchase Order
 list/detail return the related Sales Order through the same
 `sales_orders.source_po_id` relationship. The Flutter Edit screen continues to
 refresh the list and resolves the selected order by ID; it edits supported
 basic fields and lines only for the verified `tonage` and `lessing` calculation
 modes. Pieces-percentage and unknown modes preserve their existing values and
 keep line editing disabled. Approved and unrecognized statuses are read-only.
-Approval and deletion remain unavailable in the Flutter UI.
-Do not infer an update/approval/delete route or reuse the create endpoint for
-any of these operations. The View screen also refreshes the list and resolves
-the selected order by ID; the backend also provides the organization-scoped
-`GET /sales-orders/:id` detail endpoint.
+The mobile editor requires `sales-order.edit` for updates, with the established
+`transactions.sales` permission as a fallback. Approval requires
+`sales-order.approve` or `transactions.sales`. If no Sales Order action
+permissions are configured, Draft Edit and Delete stay available to
+authenticated main-app users; a configured action permission set still gates
+each action independently.
+Approval is confirmed through a refreshed backend detail before the local
+list status changes. Deletion confirms the latest backend status is Draft
+before using the existing `DELETE /sales-orders/:id` endpoint and refreshing
+the list.
+Approved and unknown statuses remain View-only. The backend currently lacks
+status and module-permission enforcement for DELETE, so mobile checks do not
+replace the required server-side authorization. The View screen also refreshes
+the list and resolves the selected order by ID.
 
 Bag Purchase contract verified from the supplied TypeScript source: the list
 accepts optional `organizationId` and `branchId` query parameters and can be
@@ -235,7 +274,7 @@ The client conservatively disables edits/deletes on approved/completed entries. 
 
 - PO: poNumber, organizationId, supplierId, branchId, warehouseId, date, remarks, status, purchaseOrderInvoiceStatus, mode, lines. Each line retains quantity, discount, piecesPercentage, pieces, baseCost, actualQuantity, purchaseCost, purchaseAmount, amount and rate.
 - PI: invoiceNo, supplierId, branchId, purchaseOrderId, invoiceDate, mode, loadingCost, marketCess, bagsAndSticks, freight, grandTotal, outstandingAmount, status, supplierPaymentReceiptStatus and lines. PI line quantity is quantityTons.
-- Sales: directSaleNo, salesOrderNo, customerId, branchId, invoiceDate, mode, invoiceTotal, charges, lines and gunnyBags. Sales line price/amount are salesPrice/salesAmount. Bag lines include bagTypeId, bharthiTypeId, bagBharthi, quantity, rate and amount. Blank directSaleNo lets the server allocate its number. Linked-order conversion is disabled until its stock behavior is confirmed.
+- Sales: directSaleNo, salesOrderNo, customerId, branchId, invoiceDate, mode, invoiceTotal, charges, lines and gunnyBags. Sales line price/amount are salesPrice/salesAmount. Bag lines include bagTypeId, bharthiTypeId, bagBharthi, quantity, rate and amount. Blank directSaleNo lets the server allocate its number. The Direct Sales form reads organization-scoped orders from `GET /sales-orders`, filters by customer ID, fetches the selected order from `GET /sales-orders/:id`, copies its supported lines, and submits the selected `soNumber` as `salesOrderNo` in the Direct Sale create payload. The backend source/UAT behavior for linked-order stock deduction and persisted reference still requires end-to-end verification. Sales Order detail fields for gunny bags and additional/loading charges are not present in the verified contract.
 - Dispatch: dispatchNumber, customerId, lorryNumber, driverName, driverMobile, dispatchStatus, dispatchDate, invoiceGenerated and lines. Each line has branchId, date, itemId, bharthi, quantity, loadedQuantity and pendingQuantity. Only Dispatched counts as completed.
 - Receipt: **snake_case** receipt_no, customer_id, receipt_date, invoice_mode, invoice_no, amount, payment_mode, remarks, attachment_names, attachment_files, organization_id. GET /customer-receipts/next-no allocates the displayed number. Invoice mode selects an approved sale's actual invoice_no, not its ID. Cumulative mode sends null invoice_no. Supplied payment_mode contract is Cash or UPI. Customer receipt attachments are JSON-encoded strings containing parallel filename and data-URL arrays; the local backend schema stores them in text columns and has a 15 MiB JSON body limit. Mobile limits combined raw files to 10 MiB. The collection query omits attachment fields, and PUT overwrites those columns with null if omitted. The staging detail endpoint GET /customer-receipts/:id returns the full receipt, including both attachment fields; this route is not confirmed in every deployed environment. Edit falls back to the refreshed collection record if detail returns 404 but the requested ID is still listed, and requires an explicit attachment replacement before saving when attachment data is unavailable. New attachments append to existing metadata by default when the detail response supplies it; replacing is an explicit client choice. Confirm the same detail response contract in other deployed environments.
 - Supplier payment: **camelCase** paymentNumber, supplierId, supplierName, date, invoiceMode, paymentMode, amount, purchaseInvoiceId, remarks, attachmentNames, attachmentFiles, organizationId. GET /supplier-payments/next-no supplies its number. Cumulative mode sends null purchaseInvoiceId. Partial payments are allowed.

@@ -371,6 +371,129 @@ void main() {
       {'PI-1': 100, 'SP-1': 60},
     );
   });
+
+  test('customer statement defaults to chronological order and reconciles',
+      () async {
+    final controller = StatementsReportController(
+      type: StatementsReportType.customerStatement,
+      repository: _FixedStatementsReportRepository(
+        StatementsReportData(
+          records: [
+            _customerStatementRecord(
+              id: 'receipt-1',
+              date: DateTime(2026, 10, 27),
+              reference: 'CR-01',
+              debit: 0,
+              credit: 1000,
+              transactionType: 'Receipt',
+            ),
+            _customerStatementRecord(
+              id: 'sale-1',
+              date: DateTime(2026, 10, 26),
+              reference: 'GSO-01',
+              debit: 735155.34,
+              credit: 0,
+              transactionType: 'Sale',
+            ),
+          ],
+          parties: const [(id: 'customer-1', name: 'Customer One')],
+        ),
+      ),
+    );
+    await controller.load();
+    controller.selectParty('customer-1');
+    expect(controller.applyFilters(), isTrue);
+
+    final records = controller.visibleRecords;
+    expect(controller.sortAscending.value, isTrue);
+    expect(
+      records.map((record) => record.reference),
+      ['GSO-01', 'CR-01'],
+    );
+    expect(records.map((record) => record.balance), [735155.34, 734155.34]);
+    expect(controller.openingBalance, 0);
+    expect(controller.totalDebit, 735155.34);
+    expect(controller.totalCredit, 1000);
+    expect(controller.closingBalance, 734155.34);
+
+    controller.setStartDate(DateTime(2026, 10, 27));
+    controller.setEndDate(DateTime(2026, 10, 27));
+    expect(controller.applyFilters(), isTrue);
+    expect(
+      controller.visibleRecords.map((record) => record.reference),
+      ['CR-01'],
+    );
+    expect(controller.openingBalance, 735155.34);
+    expect(controller.closingBalance, 734155.34);
+    controller.setSearch('CR-01');
+    expect(controller.visibleRecords, hasLength(1));
+    expect(controller.totalCredit, 1000);
+
+    controller.setSort(StatementsReportSortField.date, ascending: false);
+    controller.resetSorting();
+    expect(controller.sortAscending.value, isTrue);
+  });
+
+  test('supplier statement defaults to chronological order and reconciles',
+      () async {
+    final controller = StatementsReportController(
+      type: StatementsReportType.supplierStatement,
+      repository: _FixedStatementsReportRepository(
+        StatementsReportData(
+          records: [
+            _statementRecord(
+              id: 'payment-2',
+              date: DateTime(2026, 10, 27),
+              reference: 'SP-02',
+              debit: 0,
+              credit: 50000,
+              transactionType: 'Payment',
+            ),
+            _statementRecord(
+              id: 'payment-1',
+              date: DateTime(2026, 10, 27),
+              reference: 'SP-01',
+              debit: 0,
+              credit: 1000,
+              transactionType: 'Payment',
+            ),
+            _statementRecord(
+              id: 'purchase-1',
+              date: DateTime(2026, 10, 27),
+              reference: 'GPI-01',
+              debit: 1617660,
+              credit: 0,
+              transactionType: 'Purchase',
+            ),
+          ],
+          parties: const [(id: 'supplier-1', name: 'Supplier One')],
+        ),
+      ),
+    );
+    await controller.load();
+    controller.selectParty('supplier-1');
+    expect(controller.applyFilters(), isTrue);
+
+    final records = controller.visibleRecords;
+    expect(controller.sortAscending.value, isTrue);
+    expect(records.map((record) => record.reference),
+        ['GPI-01', 'SP-01', 'SP-02']);
+    expect(
+        records.map((record) => record.balance), [1617660, 1616660, 1566660]);
+    expect(controller.openingBalance, 0);
+    expect(controller.totalDebit, 1617660);
+    expect(controller.totalCredit, 51000);
+    expect(controller.closingBalance, 1566660);
+    expect(
+      controller.openingBalance +
+          controller.totalDebit -
+          controller.totalCredit,
+      controller.closingBalance,
+    );
+    controller.setSort(StatementsReportSortField.date, ascending: false);
+    controller.resetSorting();
+    expect(controller.sortAscending.value, isTrue);
+  });
 }
 
 StatementsReportRecord _record({
@@ -435,6 +558,30 @@ StatementsReportRecord _statementRecord({
       reference: reference,
       partyId: 'supplier-1',
       partyName: 'Supplier One',
+      branchId: '',
+      branchName: '',
+      description: transactionType,
+      transactionType: transactionType,
+      amount: debit + credit,
+      debit: debit,
+      credit: credit,
+      status: '',
+    );
+
+StatementsReportRecord _customerStatementRecord({
+  required String id,
+  required DateTime date,
+  required String reference,
+  required double debit,
+  required double credit,
+  required String transactionType,
+}) =>
+    StatementsReportRecord(
+      id: id,
+      date: date,
+      reference: reference,
+      partyId: 'customer-1',
+      partyName: 'Customer One',
       branchId: '',
       branchName: '',
       description: transactionType,

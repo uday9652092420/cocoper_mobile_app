@@ -174,7 +174,9 @@ Error type: ${error.type.name}
           final statusCode = error.response?.statusCode;
 
           // Server error
-          if (statusCode != null && statusCode >= 500) {
+          if (statusCode != null &&
+              statusCode >= 500 &&
+              error.requestOptions.extra['suppressServerErrorToast'] != true) {
             if (Get.context != null) {
               errorToast(
                 'Something went wrong. Please try again.',
@@ -208,6 +210,7 @@ Error type: ${error.type.name}
     dynamic body, {
     Map<String, String>? headers,
     bool requireAuthToken = true,
+    bool showServerErrors = true,
     String? diagnosticLabel,
   }) async {
     if (!await isInternet()) {
@@ -246,6 +249,9 @@ Error type: ${error.type.name}
         data: body,
         options: Options(
           headers: mergedHeaders,
+          extra: {
+            if (!showServerErrors) 'suppressServerErrorToast': true,
+          },
         ),
       );
 
@@ -314,12 +320,22 @@ Error type: ${error.type.name}
       'code',
       'errorCode',
       'requestId',
+      'message',
+      'error',
     };
-    return <String, dynamic>{
-      for (final entry in body.entries)
-        if (safeKeys.contains(entry.key.toString()))
-          entry.key.toString(): entry.value,
-    };
+    final diagnosticBody = <String, dynamic>{};
+    for (final entry in body.entries) {
+      final key = entry.key.toString();
+      final value = entry.value;
+      if (!safeKeys.contains(key)) continue;
+      if (value is String) {
+        diagnosticBody[key] =
+            value.length > 500 ? '${value.substring(0, 500)}…' : value;
+      } else if (value is num || value is bool) {
+        diagnosticBody[key] = value;
+      }
+    }
+    return diagnosticBody;
   }
 
   // ============================================================
@@ -331,6 +347,7 @@ Error type: ${error.type.name}
     Map<String, dynamic>? queryParameters,
     Map<String, String>? headers,
     bool requireAuthToken = true,
+    bool showServerErrors = true,
     String? diagnosticLabel,
   }) async {
     if (!await isInternet()) {
@@ -368,6 +385,9 @@ Error type: ${error.type.name}
         queryParameters: queryParameters,
         options: Options(
           headers: mergedHeaders,
+          extra: {
+            if (!showServerErrors) 'suppressServerErrorToast': true,
+          },
         ),
       );
 
@@ -377,7 +397,8 @@ Error type: ${error.type.name}
           'path: ${_endpointPath(endpoint)}\n'
           'method: GET\n'
           'status: ${response.statusCode}\n'
-          'requestId: ${response.headers.value('x-request-id') ?? 'none'}',
+          'requestId: ${response.headers.value('x-request-id') ?? 'none'}\n'
+          'body: ${jsonEncode(_safeDiagnosticBody(response.data))}',
           name: diagnosticLabel,
         );
       }
@@ -390,6 +411,7 @@ Error type: ${error.type.name}
           'method: GET\n'
           'status: ${e.response?.statusCode ?? 'none'}\n'
           'requestId: ${e.response?.headers.value('x-request-id') ?? 'none'}\n'
+          'body: ${jsonEncode(_safeDiagnosticBody(e.response?.data))}\n'
           'errorType: ${e.type.name}',
           name: diagnosticLabel,
         );
@@ -434,6 +456,8 @@ Error type: ${error.type.name}
     Map<String, dynamic> body, {
     Map<String, String>? headers,
     bool requireAuthToken = true,
+    bool showServerErrors = true,
+    String? diagnosticLabel,
   }) async {
     if (!await isInternet()) {
       consolePrint(
@@ -453,16 +477,58 @@ Error type: ${error.type.name}
         requireAuthToken: requireAuthToken,
       );
 
+      if (!isProduction && diagnosticLabel != null) {
+        log(
+          'HTTP request\n'
+          'path: ${_endpointPath(endpoint)}\n'
+          'method: PUT\n'
+          'bearerTokenPresent: '
+          '${mergedHeaders['Authorization']?.startsWith('Bearer ') == true}\n'
+          'organizationHeaderPresent: '
+          '${mergedHeaders.containsKey('x-organization-id')}\n'
+          'branchHeaderPresent: ${mergedHeaders.containsKey('x-branch-id')}\n'
+          '${diagnosticLabel.startsWith('sales-order.update') ? 'organizationHeader: ${mergedHeaders['x-organization-id'] ?? 'missing'}\nbranchHeader: ${mergedHeaders['x-branch-id'] ?? 'missing'}\n' : ''}'
+          'payloadKeys: ${_safePayloadKeys(body)}',
+          name: diagnosticLabel,
+        );
+      }
+
       final response = await dio.put<dynamic>(
         endpoint,
         data: body,
         options: Options(
           headers: mergedHeaders,
+          extra: {
+            if (!showServerErrors) 'suppressServerErrorToast': true,
+          },
         ),
       );
 
+      if (!isProduction && diagnosticLabel != null) {
+        log(
+          'HTTP response\n'
+          'path: ${_endpointPath(endpoint)}\n'
+          'method: PUT\n'
+          'status: ${response.statusCode}\n'
+          'requestId: ${response.headers.value('x-request-id') ?? 'none'}\n'
+          'body: ${jsonEncode(_safeDiagnosticBody(response.data))}',
+          name: diagnosticLabel,
+        );
+      }
       return response;
     } on DioException catch (e) {
+      if (!isProduction && diagnosticLabel != null) {
+        log(
+          'HTTP error\n'
+          'path: ${_endpointPath(endpoint)}\n'
+          'method: PUT\n'
+          'status: ${e.response?.statusCode}\n'
+          'requestId: ${e.response?.headers.value('x-request-id') ?? 'none'}\n'
+          'body: ${jsonEncode(_safeDiagnosticBody(e.response?.data))}\n'
+          'errorType: ${e.type.name}',
+          name: diagnosticLabel,
+        );
+      }
       debugPrint(
         '========== PUT API ERROR ==========',
       );

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cocoper_mobile/app/controllers/purchaseorder/purchase_order_controller.dart';
 import 'package:cocoper_mobile/app/helpers/shared_preferences.dart';
 import 'package:cocoper_mobile/app/models/purchase_order_line.dart';
@@ -68,6 +70,17 @@ void main() {
     expect(
       PurchaseOrderController.isSuccessfulSaveResponse(null),
       isFalse,
+    );
+  });
+
+  test('matches Web Purchase Order whole-unit amount rounding', () {
+    expect(
+      PurchaseOrderController.calculatePurchaseAmount(25.25, 4),
+      101,
+    );
+    expect(
+      PurchaseOrderController.calculatePurchaseAmount(25.125, 4),
+      101,
     );
   });
 
@@ -234,5 +247,137 @@ void main() {
     expect(await create(), isTrue);
     expect(postCount, 2);
     expect(getCount, 1);
+  });
+
+  test('save and approval use independent PUT payloads', () async {
+    final requests = <({String endpoint, Map<String, dynamic> body})>[];
+    var listReadCount = 0;
+    final controller = PurchaseOrderController(
+      putRequest: (endpoint, body) async {
+        requests
+            .add((endpoint: endpoint, body: Map<String, dynamic>.from(body)));
+        return response(statusCode: 200, data: {'success': true});
+      },
+      getRequest: (endpoint) async {
+        listReadCount++;
+        return response(
+          statusCode: 200,
+          data: [
+            {
+              'id': 'po-1',
+              'poNumber': 'TPO-01',
+              'organizationId': 'org-1',
+              'supplierId': 'supplier-1',
+              'branchId': 'branch-1',
+              'status': listReadCount == 1 ? 'Draft' : 'Approved',
+              'lines': [
+                {'id': 'line-1', 'itemId': 'item-1', 'quantity': 10},
+              ],
+            },
+          ],
+        );
+      },
+    );
+
+    final saved = await controller.updatePurchaseOrder(
+      id: 'po-1',
+      poNumber: 'TPO-01',
+      supplierId: 'supplier-1',
+      branchId: 'branch-1',
+      date: '2026-10-26',
+      mode: 'tonage',
+      remarks: '',
+      lines: const [
+        PurchaseOrderLine(
+          id: 'line-1',
+          itemId: 'item-1',
+          quantity: 10,
+          purchaseCost: 25,
+          purchaseAmount: 250,
+          amount: 250,
+        ),
+      ],
+    );
+
+    expect(saved, isTrue);
+    expect(requests, hasLength(1));
+    expect(requests.first.endpoint, '${EndPoints.purchaseOrders}/po-1');
+    expect(requests.first.body.containsKey('status'), isFalse);
+    expect(requests.first.body['poNumber'], 'TPO-01');
+    expect(requests.first.body['organizationId'], 'org-1');
+    expect(requests.first.body['supplierId'], 'supplier-1');
+    expect(requests.first.body['branchId'], 'branch-1');
+    expect(requests.first.body['remarks'], '');
+    expect((requests.first.body['lines'] as List).single['id'], 'line-1');
+    expect(controller.purchaseOrders.single.status, 'Draft');
+
+    final approved = await controller.approvePurchaseOrder('po-1');
+
+    expect(approved, isTrue);
+    expect(requests, hasLength(2));
+    expect(requests.last.endpoint, '${EndPoints.purchaseOrders}/po-1');
+    expect(requests.last.body, const {'status': 'Approved'});
+    expect(controller.purchaseOrders.single.status, 'Approved');
+  });
+
+  test('prevents duplicate approval requests while one is in progress',
+      () async {
+    final pendingResponse = Completer<Response<dynamic>?>();
+    var putCount = 0;
+    final controller = PurchaseOrderController(
+      putRequest: (endpoint, body) {
+        putCount++;
+        return pendingResponse.future;
+      },
+      getRequest: (endpoint) async =>
+          response(statusCode: 200, data: <dynamic>[]),
+    );
+
+    final firstApproval = controller.approvePurchaseOrder('po-1');
+    expect(controller.isSaving.value, isTrue);
+    expect(await controller.approvePurchaseOrder('po-1'), isFalse);
+    expect(putCount, 1);
+
+    pendingResponse.complete(
+      response(statusCode: 200, data: {'success': true}),
+    );
+    expect(await firstApproval, isTrue);
+    expect(controller.isSaving.value, isFalse);
+  });
+
+  test('prevents duplicate save requests while one is in progress', () async {
+    final pendingResponse = Completer<Response<dynamic>?>();
+    var putCount = 0;
+    final controller = PurchaseOrderController(
+      putRequest: (endpoint, body) {
+        putCount++;
+        return pendingResponse.future;
+      },
+      getRequest: (endpoint) async =>
+          response(statusCode: 200, data: <dynamic>[]),
+    );
+
+    Future<bool> save() => controller.updatePurchaseOrder(
+          id: 'po-1',
+          poNumber: 'TPO-01',
+          supplierId: 'supplier-1',
+          branchId: 'branch-1',
+          date: '2026-10-26',
+          mode: 'tonage',
+          remarks: '',
+          lines: const [PurchaseOrderLine(itemId: 'item-1', quantity: 1)],
+        );
+
+    final firstSave = save();
+    await Future<void>.delayed(Duration.zero);
+    expect(controller.isSaving.value, isTrue);
+    expect(await save(), isFalse);
+    expect(putCount, 1);
+
+    pendingResponse.complete(
+      response(statusCode: 200, data: {'success': true}),
+    );
+    expect(await firstSave, isTrue);
+    expect(controller.isSaving.value, isFalse);
   });
 }

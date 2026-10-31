@@ -8,7 +8,12 @@ class StatementsReportController extends GetxController {
   StatementsReportController({
     required this.type,
     required StatementsReportRepository repository,
-  }) : _repository = repository;
+  }) : _repository = repository {
+    if (type == StatementsReportType.supplierStatement ||
+        type == StatementsReportType.customerStatement) {
+      sortAscending.value = true;
+    }
+  }
 
   final StatementsReportType type;
   final StatementsReportRepository _repository;
@@ -424,7 +429,8 @@ class StatementsReportController extends GetxController {
 
   void resetSorting() {
     sortField.value = StatementsReportSortField.date;
-    sortAscending.value = false;
+    sortAscending.value = type == StatementsReportType.supplierStatement ||
+        type == StatementsReportType.customerStatement;
   }
 
   void setDateRange(DateTimeRangeValues value) {
@@ -532,7 +538,14 @@ class StatementsReportController extends GetxController {
       StatementsReportSortField.quantity =>
         left.totalQuantity.compareTo(right.totalQuantity),
     };
-    return sortAscending.value ? order : -order;
+    final directedOrder = sortAscending.value ? order : -order;
+    if (directedOrder != 0) return directedOrder;
+    final referenceOrder =
+        left.reference.toLowerCase().compareTo(right.reference.toLowerCase());
+    if (referenceOrder != 0) {
+      return sortAscending.value ? referenceOrder : -referenceOrder;
+    }
+    return left.id.compareTo(right.id);
   }
 
   static String _dateLabel(DateTime date) =>
@@ -545,9 +558,10 @@ class StatementsReportController extends GetxController {
   ) {
     final dateOrder =
         (left.date ?? DateTime(1900)).compareTo(right.date ?? DateTime(1900));
-    return dateOrder != 0
-        ? dateOrder
-        : left.reference.compareTo(right.reference);
+    if (dateOrder != 0) return dateOrder;
+    final referenceOrder =
+        left.reference.toLowerCase().compareTo(right.reference.toLowerCase());
+    return referenceOrder != 0 ? referenceOrder : left.id.compareTo(right.id);
   }
 
   static DateTime _day(DateTime date) =>

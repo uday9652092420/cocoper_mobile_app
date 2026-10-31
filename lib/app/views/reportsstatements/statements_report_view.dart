@@ -98,6 +98,54 @@ class StatementsReportView extends StatelessWidget {
                   return _selectPartyState(type);
                 }
                 final records = controller.visibleRecords;
+                if (type == StatementsReportType.supplierStatement) {
+                  return RefreshIndicator(
+                    color: _green,
+                    onRefresh: controller.load,
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                      children: [
+                        if (controller.errorMessage.value.isNotEmpty)
+                          _inlineError(controller),
+                        _supplierStatementSummary(controller),
+                        const SizedBox(height: 8),
+                        _statementTable(
+                          controller,
+                          records,
+                          debitLabel: 'Purchase',
+                          creditLabel: 'Payment',
+                          emptyMessage:
+                              'No transactions match the selected supplier and dates.',
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                if (type == StatementsReportType.customerStatement) {
+                  return RefreshIndicator(
+                    color: _green,
+                    onRefresh: controller.load,
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                      children: [
+                        if (controller.errorMessage.value.isNotEmpty)
+                          _inlineError(controller),
+                        _customerStatementSummary(controller),
+                        const SizedBox(height: 8),
+                        _statementTable(
+                          controller,
+                          records,
+                          debitLabel: 'Sales',
+                          creditLabel: 'Receipt',
+                          emptyMessage:
+                              'No transactions match the selected customer and dates.',
+                        ),
+                      ],
+                    ),
+                  );
+                }
                 if (records.isEmpty) {
                   return _emptyState(
                     controller,
@@ -635,6 +683,243 @@ class StatementsReportView extends StatelessWidget {
                 bold: true),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _supplierStatementSummary(
+    StatementsReportController controller,
+  ) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEAF3E9),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _line),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _statementMetric(
+                  'Opening Balance',
+                  controller.openingBalance,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: _statementMetric(
+                  'Total Purchase',
+                  controller.totalDebit,
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: 22),
+          Row(
+            children: [
+              Expanded(
+                child: _statementMetric(
+                  'Total Payment',
+                  controller.totalCredit,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: _statementMetric(
+                  'Closing Balance',
+                  controller.closingBalance,
+                  bold: true,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _statementMetric(String label, double amount, {bool bold = false}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
+            color: _muted,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          _currency.format(amount),
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+            color: _ink,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _statementTable(
+    StatementsReportController controller,
+    List<StatementsReportRecord> records, {
+    required String debitLabel,
+    required String creditLabel,
+    required String emptyMessage,
+  }) {
+    const columnWidths = <int, TableColumnWidth>{
+      0: FixedColumnWidth(105),
+      1: FixedColumnWidth(90),
+      2: FixedColumnWidth(135),
+      3: FixedColumnWidth(135),
+      4: FixedColumnWidth(165),
+    };
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _line),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: SizedBox(
+          width: 630,
+          child: Table(
+            columnWidths: columnWidths,
+            defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+            border: const TableBorder(
+              horizontalInside: BorderSide(color: _line, width: 0.7),
+              bottom: BorderSide(color: _line, width: 0.7),
+            ),
+            children: [
+              _statementTableRow(
+                ['Date', 'Voucher', debitLabel, creditLabel, 'Running Balance'],
+                header: true,
+              ),
+              if (records.isEmpty)
+                _statementTableRow([
+                  '',
+                  emptyMessage,
+                  '',
+                  '',
+                  '',
+                ])
+              else
+                for (final record in records)
+                  _statementTableRow([
+                    record.date == null
+                        ? '—'
+                        : DateFormat('dd MMM yyyy').format(record.date!),
+                    record.reference,
+                    record.debit == 0 ? '—' : _currency.format(record.debit),
+                    record.credit == 0 ? '—' : _currency.format(record.credit),
+                    _currency.format(record.balance),
+                  ]),
+              _statementTableRow(
+                [
+                  '',
+                  'TOTAL',
+                  _currency.format(controller.totalDebit),
+                  _currency.format(controller.totalCredit),
+                  _currency.format(controller.closingBalance),
+                ],
+                total: true,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  TableRow _statementTableRow(
+    List<String> values, {
+    bool header = false,
+    bool total = false,
+  }) =>
+      TableRow(
+        decoration: BoxDecoration(
+          color: header
+              ? const Color(0xFFF2F6F2)
+              : total
+                  ? const Color(0xFFEAF3E9)
+                  : Colors.white,
+        ),
+        children: [
+          for (var index = 0; index < values.length; index++)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+              child: Text(
+                values[index],
+                textAlign: index >= 2 ? TextAlign.right : TextAlign.left,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: header ? 11 : 11.5,
+                  fontWeight:
+                      header || total ? FontWeight.w800 : FontWeight.w600,
+                  color: _ink,
+                ),
+              ),
+            ),
+        ],
+      );
+
+  Widget _customerStatementSummary(StatementsReportController controller) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEAF3E9),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _line),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _statementMetric(
+                  'Opening Balance',
+                  controller.openingBalance,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: _statementMetric(
+                  'Total Sales',
+                  controller.totalDebit,
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: 22),
+          Row(
+            children: [
+              Expanded(
+                child: _statementMetric(
+                  'Total Receipts',
+                  controller.totalCredit,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: _statementMetric(
+                  'Closing Balance',
+                  controller.closingBalance,
+                  bold: true,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../controllers/salesorders/sales_order_controller.dart';
 import '../../models/sales_order.dart';
+import '../../models/sales_order_line.dart';
 import '../../theme/app_theme.dart';
 
 const _kInk = AppColors.textDefaultLight;
@@ -37,7 +38,12 @@ class _ViewSalesOrderViewState extends State<ViewSalesOrderView> {
   void _loadOrder() {
     _orderFuture = _orderId.isEmpty
         ? Future<SalesOrder?>.value(null)
-        : _controller.fetchSalesOrderById(_orderId);
+        : _loadOrderWithLookups();
+  }
+
+  Future<SalesOrder?> _loadOrderWithLookups() async {
+    await _controller.loadLookups();
+    return _controller.fetchSalesOrderById(_orderId);
   }
 
   @override
@@ -160,14 +166,24 @@ class _ViewSalesOrderViewState extends State<ViewSalesOrderView> {
             _detail('Sales Order Number', order.soNumber),
             _detail('Status', order.status),
             _detail('Date', _displayDate(order.date)),
-            _detail('Customer', order.customerName),
+            _detail('Customer', _customerName(order)),
             if (order.poNumber.isNotEmpty || order.sourcePoId.isNotEmpty)
               _detail(
                 'Source Purchase Order',
                 order.poNumber.isNotEmpty ? order.poNumber : order.sourcePoId,
               ),
             _detail('Remarks', order.remarks),
-            _detail('Total', '₹${_formatAmount(order.totalAmount)}/-'),
+            _detail(
+                'Total Lines Amount', _formatCurrency(order.lineTotalAmount)),
+            _detail('Saved Total Amount', _formatCurrency(order.totalAmount)),
+            if (order.savedTotalAmount != null &&
+                (order.savedTotalAmount! - order.lineTotalAmount).abs() >=
+                    0.005)
+              _detail(
+                'Saved/line difference',
+                _formatCurrency(
+                    order.savedTotalAmount! - order.lineTotalAmount),
+              ),
           ],
         ),
         const SizedBox(height: 12),
@@ -191,7 +207,7 @@ class _ViewSalesOrderViewState extends State<ViewSalesOrderView> {
               for (final line in order.lines) ...[
                 const Divider(height: 16, color: _kLine),
                 Text(
-                  line.itemName.isEmpty ? line.itemId : line.itemName,
+                  _itemName(line),
                   style: const TextStyle(
                     fontWeight: FontWeight.w700,
                     color: _kInk,
@@ -199,10 +215,27 @@ class _ViewSalesOrderViewState extends State<ViewSalesOrderView> {
                 ),
                 const SizedBox(height: 5),
                 Text(
-                  'Quantity: ${_formatAmount(line.quantity)}  ·  '
-                  'Sale cost: ₹${_formatAmount(line.saleCost)}  ·  '
-                  'Amount: ₹${_formatAmount(line.saleAmount != 0 ? line.saleAmount : line.amount)}',
+                  'Quantity: ${_formatQuantity(line.quantity)}  ·  '
+                  'Discount: ${_formatQuantity(line.discount)}',
                   style: const TextStyle(fontSize: 12, color: _kMuted),
+                ),
+                Text(
+                  'Actual quantity: ${_formatQuantity(line.actualQuantity)}  ·  '
+                  'Pieces: ${_formatQuantity(line.pieces)}',
+                  style: const TextStyle(fontSize: 12, color: _kMuted),
+                ),
+                Text(
+                  'Sale Price: ${_formatCurrency(line.salePrice)}  ·  '
+                  'Base cost: ${_formatCurrency(line.baseCost)}',
+                  style: const TextStyle(fontSize: 12, color: _kMuted),
+                ),
+                Text(
+                  'Sale amount: ${_formatCurrency(line.effectiveSaleAmount)}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: _kInk,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ],
           ],
@@ -261,8 +294,25 @@ class _ViewSalesOrderViewState extends State<ViewSalesOrderView> {
     return parsed == null ? value : DateFormat('dd/MM/yyyy').format(parsed);
   }
 
-  String _formatAmount(double value) {
-    if (value == value.roundToDouble()) return value.toInt().toString();
-    return value.toStringAsFixed(2).replaceFirst(RegExp(r'\.?0+$'), '');
+  String _customerName(SalesOrder order) {
+    if (order.customerName.isNotEmpty) return order.customerName;
+    for (final customer in _controller.customers) {
+      if (customer.id == order.customerId) return customer.label;
+    }
+    return order.customerId;
   }
+
+  String _itemName(SalesOrderLine line) {
+    if (line.itemName.isNotEmpty) return line.itemName;
+    for (final item in _controller.items) {
+      if (item.id == line.itemId) return item.label;
+    }
+    return line.itemId;
+  }
+
+  String _formatCurrency(double value) =>
+      '₹${NumberFormat('#,##,##0.##', 'en_IN').format(value)}/-';
+
+  String _formatQuantity(double value) =>
+      NumberFormat('#,##,##0.######', 'en_IN').format(value);
 }

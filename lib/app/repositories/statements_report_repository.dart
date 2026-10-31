@@ -1,4 +1,5 @@
 import '../models/statements_report.dart';
+import '../models/supplier_payment.dart';
 import '../services/endpoints.dart';
 import '../services/statements_report_service.dart';
 
@@ -134,7 +135,9 @@ class StatementsReportRepository {
           return _record(
             row,
             reference: _text(_first(row, ['invoiceNo', 'invoice_no'])),
-            date: _date(_first(row, ['invoiceDate', 'invoice_date'])),
+            date: _date(
+              _first(row, ['invoiceDate', 'invoice_date']),
+            ),
             partyId: supplierId,
             partyName: partyNames[supplierId] ?? 'Supplier',
             branchId: _text(_first(row, ['branchId', 'branch_id'])),
@@ -156,7 +159,11 @@ class StatementsReportRepository {
           return _record(
             row,
             reference: _text(_first(row, ['paymentNumber', 'payment_number'])),
-            date: _date(_first(row, ['date', 'paymentDate', 'payment_date'])),
+            date: type == StatementsReportType.supplierStatement
+                ? SupplierPayment.parseBusinessDate(
+                    _first(row, ['date', 'paymentDate', 'payment_date']),
+                  )
+                : _date(_first(row, ['date', 'paymentDate', 'payment_date'])),
             partyId: supplierId,
             partyName: _text(_first(row, [
                   'supplierName',
@@ -345,7 +352,9 @@ class StatementsReportRepository {
       double.tryParse(value?.toString() ?? '') ?? 0;
 
   static DateTime? _date(dynamic value) {
-    if (value is DateTime) return value;
+    if (value is DateTime) {
+      return value;
+    }
     final text = value?.toString().trim() ?? '';
     if (text.isEmpty) return null;
     final iso = DateTime.tryParse(text);

@@ -8,6 +8,7 @@ class SalesOrder {
   final String id;
   final String soNumber;
   final String date;
+  final String organizationId;
   final String customerId;
   final String customerName;
   final String branchId;
@@ -16,12 +17,14 @@ class SalesOrder {
   final String mode;
   final String sourcePoId;
   final String poNumber;
+  final double? savedTotalAmount;
   final List<SalesOrderLine> lines;
 
   const SalesOrder({
     this.id = '',
     this.soNumber = '',
     this.date = '',
+    this.organizationId = '',
     this.customerId = '',
     this.customerName = '',
     this.branchId = '',
@@ -30,6 +33,7 @@ class SalesOrder {
     this.mode = '',
     this.sourcePoId = '',
     this.poNumber = '',
+    this.savedTotalAmount,
     this.lines = const [],
   });
 
@@ -53,6 +57,9 @@ class SalesOrder {
       id: _string(json['id'] ?? json['_id']),
       soNumber: _string(json['soNumber'] ?? json['so_number']),
       date: _string(json['date'] ?? json['invoiceDate']),
+      organizationId: _string(
+        json['organizationId'] ?? json['organization_id'],
+      ),
       customerId: _string(
         json['customerId'] ?? json['customer_id'] ?? customer['id'],
       ),
@@ -62,7 +69,9 @@ class SalesOrder {
             customer['name'] ??
             customer['customer_name'],
       ),
-      branchId: _string(json['branchId'] ?? json['branch_id']),
+      branchId: _string(
+        json['branchId'] ?? json['branch_id'] ?? _asMap(json['branch'])?['id'],
+      ),
       remarks: _string(json['remarks']),
       status: _string(json['status']),
       mode: _string(json['mode']),
@@ -70,11 +79,14 @@ class SalesOrder {
         json['sourcePOId'] ?? json['sourcePoId'] ?? json['source_po_id'],
       ),
       poNumber: _string(json['poNumber'] ?? json['po_number']),
+      savedTotalAmount: _doubleOrNull(
+        json['totalAmount'] ?? json['total_amount'],
+      ),
       lines: parsedLines,
     );
   }
 
-  static SalesOrder? fromCreateResponse(dynamic response) {
+  static SalesOrder? fromApiResponse(dynamic response) {
     if (response is! Map) return null;
 
     var payload = Map<String, dynamic>.from(response);
@@ -94,10 +106,13 @@ class SalesOrder {
     return order;
   }
 
-  double get totalAmount => lines.fold(
-      0,
-      (sum, line) =>
-          sum + (line.saleAmount != 0 ? line.saleAmount : line.amount));
+  static SalesOrder? fromCreateResponse(dynamic response) =>
+      fromApiResponse(response);
+
+  double get lineTotalAmount =>
+      lines.fold(0, (sum, line) => sum + line.effectiveSaleAmount);
+
+  double get totalAmount => savedTotalAmount ?? lineTotalAmount;
 
   Map<String, dynamic> toCreateRequestJson() => <String, dynamic>{
         'soNumber': soNumber,
@@ -107,10 +122,40 @@ class SalesOrder {
         if (remarks.isNotEmpty) 'remarks': remarks,
         'status': status,
         'mode': mode,
-        if (sourcePoId.isNotEmpty) 'sourcePoId': sourcePoId,
+        if (sourcePoId.isNotEmpty) 'sourcePOId': sourcePoId,
         if (poNumber.isNotEmpty) 'poNumber': poNumber,
+        'totalAmount': lineTotalAmount,
+        'lines': lines.map((line) => line.toJson()).toList(),
+      };
+
+  Map<String, dynamic> toUpdateRequestJson() => <String, dynamic>{
+        'soNumber': soNumber,
+        if (organizationId.isNotEmpty) 'organizationId': organizationId,
+        'date': date,
+        'customerId': customerId,
+        'remarks': remarks,
+        'mode': mode,
+        if (sourcePoId.isNotEmpty) 'sourcePOId': sourcePoId,
+        if (poNumber.isNotEmpty) 'poNumber': poNumber,
+        'totalAmount': lineTotalAmount,
         'lines': lines.map((line) => line.toJson()).toList(),
       };
 
   static String _string(dynamic value) => value?.toString().trim() ?? '';
+
+  static Map<String, dynamic>? _asMap(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) return Map<String, dynamic>.from(value);
+    return null;
+  }
+
+  static double? _doubleOrNull(dynamic value) {
+    if (value is num) {
+      final parsed = value.toDouble();
+      return parsed.isFinite ? parsed : null;
+    }
+    if (value == null) return null;
+    final parsed = double.tryParse(value.toString());
+    return parsed != null && parsed.isFinite ? parsed : null;
+  }
 }

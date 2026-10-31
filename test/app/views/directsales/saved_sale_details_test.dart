@@ -29,9 +29,9 @@ void main() {
         discount: 25,
         piecesPercentage: 25,
         pieces: 10,
-        actualQuantity: 75,
+        actualQuantity: 75.4,
         salesPrice: 2,
-        salesAmount: 150,
+        salesAmount: 150.4,
       ),
     ],
     gunnyBags: [
@@ -80,6 +80,10 @@ void main() {
     expect(find.text('SO-12'), findsOneWidget);
     expect(find.text('Coconut Bondam'), findsOneWidget);
     expect(find.text('Pieces %'), findsOneWidget);
+    expect(find.text('Actual Quantity'), findsOneWidget);
+    expect(find.text('75'), findsOneWidget);
+    expect(find.text('75.4'), findsNothing);
+    expect(find.text('₹150'), findsOneWidget);
     expect(find.text('Gunny Bag 1'), findsOneWidget);
     expect(find.text('₹150.00'), findsWidgets);
   });
