@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:cocoper_mobile/app/controllers/customerreceipt/customer_receipt_controller.dart';
 import 'package:cocoper_mobile/app/models/customer_receipt.dart';
 import 'package:cocoper_mobile/app/models/lookup_option.dart';
+import 'package:cocoper_mobile/app/routes/app_routes.dart';
 import 'package:cocoper_mobile/app/views/customerreceipt/editcustomerreceipt_view.dart';
 import 'package:cocoper_mobile/app/views/customerreceipt/newcustomerreceipt_view.dart';
 import 'package:cocoper_mobile/app/views/customerreceipt/customer_receipt_form.dart';
@@ -480,6 +481,156 @@ void main() {
     expect(controller.savedReceipt?.remarks, 'Updated note');
   });
 
+  testWidgets('edit approval leaves the receipt read-only', (
+    tester,
+  ) async {
+    final controller = _FakeCustomerReceiptController()..saveResult = true;
+    await tester.pumpWidget(
+      GetMaterialApp(
+        initialBinding: _TestReceiptBinding(controller),
+        home: const EditCustomerReceiptView(receiptId: 'receipt-7'),
+        getPages: [
+          GetPage<dynamic>(
+            name: Routes.savedCustomerReceipts,
+            page: () => const Scaffold(body: Text('Saved Receipts screen')),
+          ),
+        ],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Save Changes'), findsOneWidget);
+    expect(find.text('Approve'), findsOneWidget);
+    await tester.enterText(
+      find.byType(TextFormField).last,
+      'Updated before approval',
+    );
+    await tester.tap(find.text('Approve'));
+    await tester.pumpAndSettle();
+    expect(find.text('Approve Customer Receipt'), findsOneWidget);
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(FilledButton),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(controller.saveCalls, 1);
+    expect(controller.savedReceipt?.remarks, 'Updated before approval');
+    expect(controller.approvalCalls, 1);
+    expect(controller.approvedReceipt?.remarks, 'Updated before approval');
+    expect(find.text('Save Changes'), findsNothing);
+    expect(find.text('Approve'), findsNothing);
+    expect(find.text('Approved · Read-only'), findsOneWidget);
+    expect(
+      tester.widgetList<TextFormField>(find.byType(TextFormField)).every(
+            (field) => !field.enabled,
+          ),
+      isTrue,
+    );
+    expect(
+      tester
+          .widgetList<DropdownButtonFormField<String>>(
+            find.byType(DropdownButtonFormField<String>),
+          )
+          .every((field) => field.onChanged == null),
+      isTrue,
+    );
+  });
+
+  testWidgets('edit does not approve when saving changes fails',
+      (tester) async {
+    final controller = _FakeCustomerReceiptController();
+    await tester.pumpWidget(
+      GetMaterialApp(
+        initialBinding: _TestReceiptBinding(controller),
+        home: const EditCustomerReceiptView(receiptId: 'receipt-7'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Approve'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(FilledButton),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(controller.saveCalls, 1);
+    expect(controller.approvalCalls, 0);
+    expect(find.text('Edit Customer Receipt'), findsOneWidget);
+  });
+
+  testWidgets('edit previews attachments returned with camelCase keys', (
+    tester,
+  ) async {
+    final controller = _FakeCustomerReceiptController()
+      ..receipt = CustomerReceipt.fromJson({
+        'id': 'receipt-7',
+        'receipt_no': 'CR-103',
+        'receipt_date': '2025-01-15',
+        'customer_id': 'customer-1',
+        'invoice_mode': 'Cumulative',
+        'payment_mode': 'UPI',
+        'amount': 250,
+        'status': 'Draft',
+        'attachmentNames': ['proof.png'],
+        'attachmentFiles': ['data:image/png;base64,AQID'],
+      });
+
+    await tester.pumpWidget(
+      GetMaterialApp(
+        initialBinding: _TestReceiptBinding(controller),
+        home: const EditCustomerReceiptView(receiptId: 'receipt-7'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Existing attachment(s): proof.png'), findsOneWidget);
+    await tester.tap(find.text('View'));
+    await tester.pumpAndSettle();
+    expect(find.byType(InteractiveViewer), findsOneWidget);
+  });
+
+  testWidgets('edit restores and previews attachments returned as arrays', (
+    tester,
+  ) async {
+    final controller = _FakeCustomerReceiptController()
+      ..receipt = CustomerReceipt.fromJson({
+        'id': 'receipt-7',
+        'receipt_no': 'CR-103',
+        'receipt_date': '2025-01-15',
+        'customer_id': 'customer-1',
+        'invoice_mode': 'Cumulative',
+        'payment_mode': 'UPI',
+        'amount': 250,
+        'status': 'Draft',
+        'attachment_names': ['proof.png'],
+        'attachment_files': ['data:image/png;base64,AQID'],
+      });
+
+    await tester.pumpWidget(
+      GetMaterialApp(
+        initialBinding: _TestReceiptBinding(controller),
+        home: const EditCustomerReceiptView(receiptId: 'receipt-7'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Existing attachment(s): proof.png'), findsOneWidget);
+    expect(find.text('View'), findsOneWidget);
+    await tester.ensureVisible(find.text('View'));
+    await tester.tap(find.text('View').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('proof.png'), findsNWidgets(2));
+    expect(find.byType(InteractiveViewer), findsOneWidget);
+  });
+
   testWidgets('edit save stays enabled without requiring new attachments',
       (tester) async {
     final controller = _FakeCustomerReceiptController();
@@ -542,6 +693,14 @@ void main() {
     expect(find.text('proof.pdf'), findsOneWidget);
     expect(find.text('photo.jpg'), findsOneWidget);
     expect(find.text('scan.png'), findsOneWidget);
+    expect(find.byTooltip('View photo.jpg'), findsOneWidget);
+    await tester.ensureVisible(find.byTooltip('View photo.jpg'));
+    await tester.tap(find.byTooltip('View photo.jpg'));
+    await tester.pumpAndSettle();
+    expect(find.text('photo.jpg'), findsNWidgets(2));
+    expect(find.byType(InteractiveViewer), findsOneWidget);
+    await tester.tap(find.byTooltip('Close attachment preview'));
+    await tester.pumpAndSettle();
     await tester.ensureVisible(find.byTooltip('Remove photo.jpg'));
     await tester.tap(find.byTooltip('Remove photo.jpg'));
     await tester.pumpAndSettle();
@@ -632,8 +791,11 @@ class _TestReceiptBinding extends Bindings {
 
 class _FakeCustomerReceiptController extends CustomerReceiptController {
   int saveCalls = 0;
+  int approvalCalls = 0;
   String? fetchedId;
   CustomerReceipt? savedReceipt;
+  CustomerReceipt? approvedReceipt;
+  bool saveResult = false;
   List<CustomerReceiptAttachment> savedAttachments = [];
   bool? lastIsEdit;
   bool? replaceExistingAttachmentsSaved;
@@ -699,6 +861,13 @@ class _FakeCustomerReceiptController extends CustomerReceiptController {
     savedAttachments = attachments;
     lastIsEdit = isEdit;
     replaceExistingAttachmentsSaved = replaceExistingAttachments;
-    return false;
+    return saveResult;
+  }
+
+  @override
+  Future<bool> approveReceipt(CustomerReceipt receipt) async {
+    approvalCalls++;
+    approvedReceipt = receipt;
+    return true;
   }
 }

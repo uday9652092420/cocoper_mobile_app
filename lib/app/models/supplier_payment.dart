@@ -50,6 +50,24 @@ class SupplierPayment {
         parsedNames.length == parsedFiles.length;
   }
 
+  SupplierPayment withApproved(bool value) => SupplierPayment(
+        id: id,
+        paymentNumber: paymentNumber,
+        supplierId: supplierId,
+        supplierName: supplierName,
+        date: date,
+        invoiceMode: invoiceMode,
+        paymentMode: paymentMode,
+        amount: amount,
+        purchaseInvoiceId: purchaseInvoiceId,
+        remarks: remarks,
+        attachmentNamesJson: attachmentNamesJson,
+        attachmentFilesJson: attachmentFilesJson,
+        hasAttachmentFields: hasAttachmentFields,
+        approved: value,
+        organizationId: organizationId,
+      );
+
   factory SupplierPayment.fromJson(Map<String, dynamic> json) {
     return SupplierPayment(
       id: _text(json['id']),

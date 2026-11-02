@@ -26,6 +26,15 @@ void main() {
   tearDown(Get.reset);
 
   group('Direct Sales customer Sales Orders', () {
+    test('parses a linked Sales Order reference from direct sale data', () {
+      final sale = DirectSale.fromJson({
+        'salesOrder': {'id': 'order-1', 'soNumber': 'SO-14'},
+      });
+
+      expect(sale.salesOrderId, 'order-1');
+      expect(sale.salesOrderNo, 'SO-14');
+    });
+
     test('does not request orders before a customer is selected', () {
       var requests = 0;
       final controller = _TestDirectSalesController(
@@ -641,7 +650,7 @@ void main() {
         find.byKey(const ValueKey('sales-order-line-quantity-1')),
         findsNothing,
       );
-      expect(find.text('₹450'), findsOneWidget);
+      expect(find.text('₹450'), findsWidgets);
 
       await tester.tap(
         find.widgetWithText(ElevatedButton, 'Save Sales'),
@@ -683,6 +692,120 @@ void main() {
             )
             .onPressed,
         isNotNull,
+      );
+    });
+
+    testWidgets('restores and saves the linked Sales Order when editing',
+        (tester) async {
+      Map<String, dynamic>? submittedBody;
+      var detailRequests = 0;
+      final controller = _TestDirectSalesController(
+        updateRequest: (endpoint, body) async {
+          expect(endpoint, '${EndPoints.directSales}/sale-1');
+          submittedBody = Map<String, dynamic>.from(body as Map);
+          return _response(endpoint, {'success': true});
+        },
+        request: (endpoint, {queryParameters, headers}) async {
+          if (endpoint != EndPoints.salesOrders) {
+            detailRequests++;
+          }
+          return _response(endpoint, [
+            _order(
+              id: 'a-1',
+              number: 'SO-A1',
+              customerId: 'customer-a',
+              organizationId: 'org-1',
+            ),
+          ]);
+        },
+      );
+      Get.put<DirectSalesController>(controller);
+      const sale = DirectSale(
+        id: 'sale-1',
+        directSaleNo: 'DS-01',
+        salesOrderId: 'a-1',
+        customerId: 'customer-a',
+        branchId: 'branch-1',
+        invoiceDate: '2025-01-15',
+        mode: 'tonage',
+        approved: false,
+        lines: [
+          DirectSaleLine(
+            itemId: 'item-1',
+            itemName: 'Item One',
+            quantity: 3,
+            actualQuantity: 3,
+            salesPrice: 25,
+            salesAmount: 75,
+          ),
+        ],
+      );
+      await tester.pumpWidget(
+        const GetMaterialApp(home: NewDirectSaleView(sale: sale)),
+      );
+      await tester.pumpAndSettle();
+
+      final salesOrderFieldFinder = find.descendant(
+        of: find.byKey(const ValueKey('sales-order-customer-a-branch-1')),
+        matching: find.byType(DropdownButtonFormField<String>),
+      );
+      final orderDropdown = tester.widget<DropdownButtonFormField<String>>(
+        salesOrderFieldFinder,
+      );
+      expect(orderDropdown.initialValue, 'a-1');
+      expect(tester.state<FormFieldState<String>>(salesOrderFieldFinder).value,
+          'a-1');
+      expect(find.textContaining('SO-A1'), findsOneWidget);
+      expect(controller.selectedSalesOrderDetails.value, isNull);
+
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Save Changes'));
+      await tester.pumpAndSettle();
+
+      expect(submittedBody?['salesOrderNo'], 'SO-A1');
+      expect(submittedBody?['lines'], hasLength(1));
+      expect(submittedBody?['lines'].first['quantity'], 3);
+      expect(detailRequests, 0);
+    });
+
+    testWidgets('shows the saved Sales Order number when it is not in lookups',
+        (tester) async {
+      final controller = _TestDirectSalesController(
+        request: (endpoint, {queryParameters, headers}) async =>
+            _response(endpoint, <dynamic>[]),
+      );
+      Get.put<DirectSalesController>(controller);
+      const sale = DirectSale(
+        id: 'sale-2',
+        directSaleNo: 'DS-02',
+        salesOrderNo: 'SO-19',
+        customerId: 'customer-a',
+        branchId: 'branch-1',
+        invoiceDate: '2025-01-15',
+        mode: 'tonage',
+        approved: false,
+        lines: [
+          DirectSaleLine(
+            itemId: 'item-1',
+            quantity: 3,
+            actualQuantity: 3,
+            salesPrice: 25,
+            salesAmount: 75,
+          ),
+        ],
+      );
+      await tester.pumpWidget(
+        const GetMaterialApp(home: NewDirectSaleView(sale: sale)),
+      );
+      await tester.pumpAndSettle();
+
+      final salesOrderFieldFinder = find.descendant(
+        of: find.byKey(const ValueKey('sales-order-customer-a-branch-1')),
+        matching: find.byType(DropdownButtonFormField<String>),
+      );
+      expect(find.text('SO-19'), findsOneWidget);
+      expect(
+        tester.state<FormFieldState<String>>(salesOrderFieldFinder).value,
+        '__saved_sales_order__',
       );
     });
 

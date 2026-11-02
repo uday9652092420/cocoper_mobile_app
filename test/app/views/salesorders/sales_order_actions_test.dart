@@ -917,6 +917,25 @@ void main() {
     );
   });
 
+  testWidgets(
+      'edit retry reloads order without returning a Future from setState',
+      (tester) async {
+    _controller.orders = [_order(id: 'retry', status: 'Draft')];
+    _controller.failListLoad = true;
+    await _pumpSavedOrders(tester);
+    Get.toNamed<void>(Routes.editSalesOrder, arguments: 'retry');
+    await tester.pumpAndSettle();
+
+    expect(find.text('Unable to load the latest Sales Order.'), findsOneWidget);
+    _controller.failListLoad = false;
+    await tester.tap(find.text('Retry'));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Edit Sales Order'), findsOneWidget);
+    expect(find.text('SO-retry'), findsOneWidget);
+  });
+
   testWidgets('view resolves the selected order by ID from refreshed list', (
     tester,
   ) async {

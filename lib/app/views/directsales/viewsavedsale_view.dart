@@ -459,7 +459,7 @@ class ViewSavedSaleView extends StatelessWidget {
 
   String _currency(double value) {
     if (!value.isFinite) return '—';
-    return '₹${NumberFormat('#,##,##0.00', 'en_IN').format(value)}';
+    return '₹${NumberFormat('#,##,##0', 'en_IN').format(value.round())}';
   }
 
   String _value(String value) => value.trim().isEmpty ? '—' : value.trim();

@@ -2,6 +2,7 @@
 class DirectSale {
   final String id;
   final String directSaleNo;
+  final String salesOrderId;
   final String salesOrderNo;
   final String customerId;
   final String branchId;
@@ -18,6 +19,7 @@ class DirectSale {
   const DirectSale({
     this.id = '',
     this.directSaleNo = '',
+    this.salesOrderId = '',
     this.salesOrderNo = '',
     this.customerId = '',
     this.branchId = '',
@@ -35,13 +37,30 @@ class DirectSale {
   factory DirectSale.fromJson(Map<String, dynamic> json) {
     final customer = _map(json['customer']);
     final branch = _map(json['branch']);
+    final salesOrder = _map(json['salesOrder'] ?? json['sales_order']);
+    final rawSalesOrder = json['salesOrderId'] ??
+        json['sales_order_id'] ??
+        json['salesOrder'] ??
+        json['sales_order'];
     final rawLines = json['lines'];
     final rawBags = json['gunnyBags'] ?? json['gunny_bags'];
 
     return DirectSale(
       id: _string(json['id'] ?? json['_id']),
       directSaleNo: _string(json['directSaleNo']),
-      salesOrderNo: _string(json['salesOrderNo']),
+      salesOrderId: _string(
+        rawSalesOrder is Map
+            ? rawSalesOrder['id'] ?? rawSalesOrder['_id']
+            : rawSalesOrder,
+      ),
+      salesOrderNo: _string(
+        json['salesOrderNo'] ??
+            json['sales_order_no'] ??
+            json['salesOrderNumber'] ??
+            json['sales_order_number'] ??
+            salesOrder['soNumber'] ??
+            salesOrder['so_number'],
+      ),
       customerId: _string(json['customerId'] ?? customer['id']),
       branchId: _string(json['branchId'] ?? branch['id']),
       invoiceDate: _string(json['invoiceDate'] ?? json['invoice_date']),

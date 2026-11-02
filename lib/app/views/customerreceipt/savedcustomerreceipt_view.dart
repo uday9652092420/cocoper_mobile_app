@@ -7,6 +7,7 @@ import '../../custome_widgets/custome_confirmation_dialog.dart';
 import '../../models/customer_receipt.dart';
 import '../../routes/app_routes.dart';
 import '../../theme/app_theme.dart';
+import 'customer_receipt_attachment_preview.dart';
 
 const _kInk = AppColors.textDefaultLight;
 const _kMuted = AppColors.textLightGrayLight;
@@ -447,28 +448,72 @@ class _SavedCustomerReceiptsViewState extends State<SavedCustomerReceiptsView> {
     );
   }
 
-  void _showReceipt(CustomerReceipt receipt) {
+  Future<void> _showReceipt(CustomerReceipt receipt) async {
+    final detailedReceipt =
+        receipt.id.isEmpty ? null : await _controller.fetchReceipt(receipt.id);
+    if (!mounted) return;
+    final viewReceipt = detailedReceipt ?? receipt;
+    final attachments = CustomerReceiptAttachment.attachmentsFromJson(
+      namesJson: viewReceipt.attachmentNamesJson,
+      filesJson: viewReceipt.attachmentFilesJson,
+    );
     Get.dialog<void>(
       AlertDialog(
         title: Text(
-          receipt.receiptNumber.isEmpty
+          viewReceipt.receiptNumber.isEmpty
               ? 'Customer Receipt'
-              : receipt.receiptNumber,
+              : viewReceipt.receiptNumber,
         ),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _detail('Date', receipt.date),
-              _detail('Customer', _controller.customerName(receipt.customerId)),
-              _detail('Invoice Mode', receipt.invoiceMode),
-              _detail('Invoice No', receipt.invoiceNumber),
-              _detail('Payment Mode', receipt.paymentMode),
-              _detail('Amount', receipt.amount.toStringAsFixed(2)),
+              _detail('Date', viewReceipt.date),
+              _detail(
+                'Customer',
+                _controller.customerName(viewReceipt.customerId),
+              ),
+              _detail('Invoice Mode', viewReceipt.invoiceMode),
+              _detail('Invoice No', viewReceipt.invoiceNumber),
+              _detail('Payment Mode', viewReceipt.paymentMode),
+              _detail('Amount', viewReceipt.amount.toStringAsFixed(2)),
               _detail('Status',
-                  receipt.status.isEmpty ? 'Unknown' : receipt.status),
-              _detail('Remarks', receipt.remarks),
+                  viewReceipt.status.isEmpty ? 'Unknown' : viewReceipt.status),
+              _detail('Remarks', viewReceipt.remarks),
+              if (attachments.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                const Text(
+                  'Attachments',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: _kInk,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                for (final attachment in attachments)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: () => showCustomerReceiptAttachmentPreview(
+                        context,
+                        attachment,
+                      ),
+                      icon: const Icon(Icons.visibility_outlined, size: 17),
+                      label: Text(
+                        attachment.name,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+              ] else if (viewReceipt.hasAttachmentFields) ...[
+                const SizedBox(height: 4),
+                const Text(
+                  'No attachments.',
+                  style: TextStyle(fontSize: 12, color: _kMuted),
+                ),
+              ],
             ],
           ),
         ),

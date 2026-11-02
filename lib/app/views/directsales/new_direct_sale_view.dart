@@ -16,6 +16,7 @@ const _kLine = AppColors.borderLightGrayLight;
 const _kGreen = AppColors.primaryLight;
 const _kMint = AppColors.surfaceTint;
 const _kFieldFill = AppColors.fieldFill;
+const _savedSalesOrderOptionId = '__saved_sales_order__';
 
 class NewDirectSaleView extends StatefulWidget {
   const NewDirectSaleView({super.key, this.sale});
@@ -53,6 +54,12 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
     if (widget.sale != null) {
       _customerId = widget.sale!.customerId;
       _branchId = widget.sale!.branchId;
+      _selectedSalesOrderNo = widget.sale!.salesOrderNo;
+      _selectedSalesOrderId = widget.sale!.salesOrderId.isNotEmpty
+          ? widget.sale!.salesOrderId
+          : widget.sale!.salesOrderNo.trim().isNotEmpty
+              ? _savedSalesOrderOptionId
+              : null;
       _dateController.text = _formatInvoiceDate(widget.sale!.invoiceDate);
       _controller.lastCreatedDirectSaleNo.value = widget.sale!.directSaleNo;
       _seedFromSale(widget.sale!);
@@ -266,12 +273,43 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
     final branch = await SharedPrefsHelper.getString(
       SharedPrefsHelper.selectedBranchId,
     );
+    final savedBranchId = widget.sale?.branchId.trim() ?? '';
     setState(() {
-      if (_controller.branches.any((option) => option.id == branch)) {
+      if (savedBranchId.isNotEmpty &&
+          _controller.branches.any((option) => option.id == savedBranchId)) {
+        _branchId = savedBranchId;
+      } else if (_controller.branches.any((option) => option.id == branch)) {
         _branchId = branch;
       } else if (_controller.branches.length == 1) {
         _branchId = _controller.branches.first.id;
       }
+    });
+
+    final sale = widget.sale;
+    if (sale == null || sale.customerId.trim().isEmpty) return;
+    await _controller.loadSalesOrdersForCustomer(
+      sale.customerId,
+      branchId: _branchId,
+    );
+    if (!mounted) return;
+    SalesOrder? matchingOrder;
+    for (final order in _controller.salesOrdersForCustomer) {
+      final matchesId =
+          sale.salesOrderId.isNotEmpty && order.id == sale.salesOrderId;
+      final matchesNumber = sale.salesOrderNo.trim().isNotEmpty &&
+          order.soNumber.trim().toLowerCase() ==
+              sale.salesOrderNo.trim().toLowerCase();
+      if (matchesId || matchesNumber) {
+        matchingOrder = order;
+        break;
+      }
+    }
+    setState(() {
+      _selectedSalesOrderNo = matchingOrder?.soNumber ?? sale.salesOrderNo;
+      _selectedSalesOrderId = matchingOrder?.id ??
+          (sale.salesOrderNo.trim().isNotEmpty || sale.salesOrderId.isNotEmpty
+              ? _savedSalesOrderOptionId
+              : null);
     });
   }
 
@@ -838,9 +876,25 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
       final isLoading = _controller.isLoadingSalesOrders.value;
       final hasError = _controller.hasSalesOrdersError.value;
       final hasCustomer = _customerId?.isNotEmpty == true;
+      final dropdownOrders = orders.toList();
+      if (_selectedSalesOrderId == _savedSalesOrderOptionId &&
+          (_selectedSalesOrderNo.isNotEmpty ||
+              widget.sale?.salesOrderId.isNotEmpty == true)) {
+        dropdownOrders.add(
+          SalesOrder(
+            id: _savedSalesOrderOptionId,
+            soNumber: _selectedSalesOrderNo.isNotEmpty
+                ? _selectedSalesOrderNo
+                : widget.sale!.salesOrderId,
+            customerId: _customerId ?? '',
+            branchId: _branchId ?? '',
+          ),
+        );
+      }
       final selectedOrderIsAvailable = orders.any(
-        (order) => order.id == _selectedSalesOrderId,
-      );
+            (order) => order.id == _selectedSalesOrderId,
+          ) ||
+          dropdownOrders.any((order) => order.id == _selectedSalesOrderId);
       final value = selectedOrderIsAvailable ? _selectedSalesOrderId : null;
       final hint = !hasCustomer
           ? 'Select customer first'
@@ -880,30 +934,38 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          DropdownButtonFormField<String>(
-            key:
-                ValueKey('sales-order-${_customerId ?? ''}-${_branchId ?? ''}'),
-            initialValue: value,
-            isExpanded: true,
-            hint: Text(hint, overflow: TextOverflow.ellipsis),
-            disabledHint: Text(hint, overflow: TextOverflow.ellipsis),
-            decoration: _decoration(suffix: suffix).copyWith(
-              helperText: hasError ? _controller.salesOrdersError.value : null,
+          KeyedSubtree(
+            key: ValueKey(
+              'sales-order-${_customerId ?? ''}-${_branchId ?? ''}',
             ),
-            items: orders
-                .map(
-                  (order) => DropdownMenuItem<String>(
-                    value: order.id,
-                    child: Text(
-                      _salesOrderLabel(order),
-                      overflow: TextOverflow.ellipsis,
+            child: DropdownButtonFormField<String>(
+              key: ValueKey('sales-order-field-${value ?? ''}'),
+              initialValue: value,
+              isExpanded: true,
+              hint: Text(hint, overflow: TextOverflow.ellipsis),
+              disabledHint: Text(hint, overflow: TextOverflow.ellipsis),
+              decoration: _decoration(suffix: suffix).copyWith(
+                helperText:
+                    hasError ? _controller.salesOrdersError.value : null,
+              ),
+              items: dropdownOrders
+                  .map(
+                    (order) => DropdownMenuItem<String>(
+                      value: order.id,
+                      child: Text(
+                        _salesOrderLabel(order),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                  ),
-                )
-                .toList(),
-            onChanged: !hasCustomer || isLoading || hasError || orders.isEmpty
-                ? null
-                : _onSalesOrderChanged,
+                  )
+                  .toList(),
+              onChanged: !hasCustomer ||
+                      isLoading ||
+                      hasError ||
+                      dropdownOrders.isEmpty
+                  ? null
+                  : _onSalesOrderChanged,
+            ),
           ),
           if (_selectedSalesOrderId != null &&
               _controller.isLoadingSalesOrderDetails.value)
@@ -1013,6 +1075,12 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
 
   void _onSalesOrderChanged(String? id) {
     _controller.clearSelectedSalesOrderDetails();
+    if (id == _savedSalesOrderOptionId) {
+      setState(() {
+        _selectedSalesOrderId = _savedSalesOrderOptionId;
+      });
+      return;
+    }
     final selectedOrder = _controller.salesOrdersForCustomer
         .where((order) => order.id == id)
         .firstOrNull;
@@ -1503,7 +1571,14 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
   }
 
   Future<void> _save() async {
+    final existingSalesOrderNo = widget.sale?.salesOrderNo.trim() ?? '';
+    final isUnchangedExistingOrder = widget.sale != null &&
+        (_selectedSalesOrderNo.trim() == existingSalesOrderNo ||
+            (widget.sale!.salesOrderId.isNotEmpty &&
+                _selectedSalesOrderId == widget.sale!.salesOrderId));
     if (_selectedSalesOrderId != null &&
+        _selectedSalesOrderId != _savedSalesOrderOptionId &&
+        !isUnchangedExistingOrder &&
         (_controller.isLoadingSalesOrderDetails.value ||
             _controller.selectedSalesOrderDetails.value?.id !=
                 _selectedSalesOrderId ||
@@ -1549,9 +1624,7 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
     final gunnyBags =
         _bags.where((bag) => bag.bagTypeId.isNotEmpty).map(_buildBag).toList();
     final sale = widget.sale;
-    final salesOrderNo = _selectedSalesOrderNo.isNotEmpty
-        ? _selectedSalesOrderNo
-        : sale?.salesOrderNo ?? '';
+    final salesOrderNo = _selectedSalesOrderNo;
     final saved = sale == null
         ? await _controller.createDirectSale(
             customerId: _customerId!,
@@ -1671,7 +1744,7 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
       '₹${NumberFormat('#,##,##0', 'en_IN').format(value.round())}';
 
   String _money(double value) {
-    return '₹${NumberFormat('#,##,##0.00', 'en_IN').format(value)}';
+    return '₹${NumberFormat('#,##,##0', 'en_IN').format(value.round())}';
   }
 
   void _removeLine(int index) {

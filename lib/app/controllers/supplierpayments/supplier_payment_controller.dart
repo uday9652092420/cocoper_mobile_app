@@ -175,6 +175,112 @@ class SupplierPaymentController extends GetxController {
         attachments: attachments,
       );
 
+  Future<bool> approveSupplierPayment(SupplierPayment payment) async {
+    if (isSaving.value || payment.id.trim().isEmpty || payment.approved) {
+      return false;
+    }
+
+    isSaving.value = true;
+    try {
+      final latestPayments = await _repository.fetchSupplierPayments();
+      payments.assignAll(latestPayments);
+      SupplierPayment? latest;
+      for (final record in latestPayments) {
+        if (record.id == payment.id) {
+          latest = record;
+          break;
+        }
+      }
+      if (latest == null || latest.approved) {
+        errorToast('Only an unapproved supplier payment can be approved.');
+        return false;
+      }
+
+      final response = await _repository.approveSupplierPayment(payment.id);
+      if (!SupplierPaymentRepository.isSuccessfulResponse(response)) {
+        errorToast(SupplierPaymentRepository.responseMessage(
+          response?.data,
+          'Unable to approve supplier payment.',
+        ));
+        return false;
+      }
+      final body = response?.data;
+      final data = body is Map ? body['data'] : null;
+      if (body is! Map ||
+          body['success'] != true ||
+          data is! Map ||
+          data['approved'] != true ||
+          (data['id'] != null && data['id'].toString() != payment.id)) {
+        errorToast('The server did not confirm supplier payment approval.');
+        return false;
+      }
+
+      final approvedPayment = latest.withApproved(true);
+      payments
+        ..removeWhere((record) => record.id == payment.id)
+        ..add(approvedPayment);
+      detail.value = approvedPayment;
+      successToast('Supplier payment approved successfully.');
+      return true;
+    } catch (error) {
+      errorToast('Unable to approve supplier payment: $error');
+      return false;
+    } finally {
+      isSaving.value = false;
+    }
+  }
+
+  Future<bool> deleteSupplierPayment(SupplierPayment payment) async {
+    if (isSaving.value) return false;
+    if (payment.id.trim().isEmpty || payment.approved) {
+      errorToast('Only an unapproved supplier payment can be deleted.');
+      return false;
+    }
+
+    isSaving.value = true;
+    try {
+      final latestPayments = await _repository.fetchSupplierPayments();
+      SupplierPayment? latest;
+      for (final record in latestPayments) {
+        if (record.id == payment.id) {
+          latest = record;
+          break;
+        }
+      }
+      if (latest == null || latest.approved) {
+        errorToast(
+          'This supplier payment is no longer available for deletion.',
+        );
+        return false;
+      }
+
+      final response = await _repository.deleteSupplierPayment(payment.id);
+      if (!SupplierPaymentRepository.isSuccessfulResponse(response)) {
+        errorToast(SupplierPaymentRepository.responseMessage(
+          response?.data,
+          'Unable to delete supplier payment.',
+        ));
+        return false;
+      }
+
+      await loadSupplierPayments();
+      if (hasListError.value) {
+        errorToast(
+          'Supplier payment was deleted, but the saved payment list could '
+          'not be refreshed: ${listError.value}',
+        );
+      } else {
+        successToast('Supplier payment deleted successfully.');
+      }
+      return true;
+    } catch (error) {
+      errorToast('Unable to delete supplier payment: $error');
+      return false;
+    } finally {
+      isSaving.value = false;
+    }
+  }
+
   Future<bool> _save(
     SupplierPayment payment, {
     required bool isEdit,
@@ -198,6 +304,10 @@ class SupplierPaymentController extends GetxController {
         'Existing attachment data is unavailable. This payment cannot be '
         'updated safely.',
       );
+      return false;
+    }
+    if (isEdit && (existingPayment?.approved == true || payment.approved)) {
+      errorToast('Approved supplier payments cannot be changed.');
       return false;
     }
     if (replaceAttachments && attachments.isEmpty) {

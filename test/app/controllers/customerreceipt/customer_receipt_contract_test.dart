@@ -97,6 +97,47 @@ void main() {
       expect(request['attachment_files'], isA<String>());
     });
 
+    test('parses attachment fields returned as JSON arrays', () {
+      final receipt = CustomerReceipt.fromJson({
+        'id': 'receipt-23',
+        'receipt_no': 'RCP-23',
+        'receipt_date': '2026-10-16',
+        'customer_id': 'customer-4',
+        'attachment_names': ['proof.png'],
+        'attachment_files': ['data:image/png;base64,AQID'],
+      });
+
+      final attachments = CustomerReceiptAttachment.attachmentsFromJson(
+        namesJson: receipt.attachmentNamesJson,
+        filesJson: receipt.attachmentFilesJson,
+      );
+
+      expect(receipt.hasAttachmentFields, isTrue);
+      expect(attachments, hasLength(1));
+      expect(attachments.single.name, 'proof.png');
+      expect(attachments.single.bytes, [1, 2, 3]);
+    });
+
+    test('parses camelCase attachment fields from receipt details', () {
+      final receipt = CustomerReceipt.fromJson({
+        'id': 'receipt-24',
+        'receipt_no': 'RCP-24',
+        'receipt_date': '2026-10-16',
+        'customer_id': 'customer-4',
+        'attachmentNames': ['proof.png'],
+        'attachmentFiles': ['data:image/png;base64,AQID'],
+      });
+
+      final attachments = CustomerReceiptAttachment.attachmentsFromJson(
+        namesJson: receipt.attachmentNamesJson,
+        filesJson: receipt.attachmentFilesJson,
+      );
+
+      expect(receipt.hasAttachmentFields, isTrue);
+      expect(attachments.single.name, 'proof.png');
+      expect(attachments.single.bytes, [1, 2, 3]);
+    });
+
     test('uses the required MIME data URL for each supported file type', () {
       const content = [1, 2, 3];
       for (final entry in const {
@@ -218,8 +259,7 @@ void main() {
 
       expect(receipt, isNull);
       expect(controller.listRefreshes, 0);
-      expect(controller.receiptLoadError.value,
-          'Temporary server error');
+      expect(controller.receiptLoadError.value, 'Temporary server error');
     });
 
     test('rejects non-integer amounts for receipt creation', () {

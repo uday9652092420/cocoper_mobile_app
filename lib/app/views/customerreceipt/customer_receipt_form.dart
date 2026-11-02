@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 
 import '../../controllers/customerreceipt/customer_receipt_controller.dart';
 import '../../models/customer_receipt.dart';
+import 'customer_receipt_attachment_preview.dart';
 import '../../theme/app_theme.dart';
 
 const _kInk = AppColors.textDefaultLight;
@@ -47,6 +48,7 @@ class _CustomerReceiptFormViewState extends State<CustomerReceiptFormView> {
   String _invoiceMode = 'Invoice by Invoice';
   String _paymentMode = 'Cash';
   CustomerReceipt? _receipt;
+  bool _isReadOnly = false;
   bool _loading = true;
   String? _loadError;
   String? _numberError;
@@ -260,6 +262,26 @@ class _CustomerReceiptFormViewState extends State<CustomerReceiptFormView> {
                           _lookupStatus(),
                           const SizedBox(height: 14),
                         ],
+                        if (_isReadOnly) ...[
+                          Container(
+                            width: double.infinity,
+                            margin: const EdgeInsets.only(bottom: 14),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppColors.fieldFill,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: _kLine),
+                            ),
+                            child: const Text(
+                              'Approved · Read-only',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: _kMuted,
+                              ),
+                            ),
+                          ),
+                        ],
                         _twoFields(
                           _receiptNumberField(),
                           _input(
@@ -267,7 +289,7 @@ class _CustomerReceiptFormViewState extends State<CustomerReceiptFormView> {
                             _date,
                             required: true,
                             readOnly: true,
-                            onTap: _pickDate,
+                            onTap: _isReadOnly ? null : _pickDate,
                             suffixIcon:
                                 const Icon(Icons.calendar_today_outlined),
                           ),
@@ -378,7 +400,7 @@ class _CustomerReceiptFormViewState extends State<CustomerReceiptFormView> {
               child: Text(customer.label, overflow: TextOverflow.ellipsis),
             ),
         ],
-        onChanged: _controller.isLoadingForm.value
+        onChanged: _isReadOnly || _controller.isLoadingForm.value
             ? null
             : (value) => setState(() {
                   _customerId = value;
@@ -476,7 +498,7 @@ class _CustomerReceiptFormViewState extends State<CustomerReceiptFormView> {
             ),
           ),
       ],
-      onChanged: _controller.isLoadingForm.value
+      onChanged: _isReadOnly || _controller.isLoadingForm.value
           ? null
           : (value) => setState(() {
                 _invoiceNumber.text = value ?? '';
@@ -512,6 +534,12 @@ class _CustomerReceiptFormViewState extends State<CustomerReceiptFormView> {
             currentReceipt?.attachmentNamesJson,
           )
         : null;
+    final existingAttachments = currentReceipt?.hasAttachmentFields == true
+        ? CustomerReceiptAttachment.attachmentsFromJson(
+            namesJson: currentReceipt?.attachmentNamesJson,
+            filesJson: currentReceipt?.attachmentFilesJson,
+          )
+        : const <CustomerReceiptAttachment>[];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -533,6 +561,8 @@ class _CustomerReceiptFormViewState extends State<CustomerReceiptFormView> {
             ),
           ),
         ],
+        for (final attachment in existingAttachments)
+          _existingAttachmentTile(attachment),
         if (widget.isEdit &&
             (existingNames?.isNotEmpty == true ||
                 _receipt?.hasAttachmentFields != true ||
@@ -546,9 +576,11 @@ class _CustomerReceiptFormViewState extends State<CustomerReceiptFormView> {
               contentPadding: EdgeInsets.zero,
               dense: true,
               value: _replaceExistingAttachments,
-              onChanged: (value) => setState(
-                () => _replaceExistingAttachments = value ?? false,
-              ),
+              onChanged: _isReadOnly
+                  ? null
+                  : (value) => setState(
+                        () => _replaceExistingAttachments = value ?? false,
+                      ),
               title: const Text(
                 'Replace existing attachments with selected files',
                 style: TextStyle(fontSize: 12, color: _kInk),
@@ -558,7 +590,8 @@ class _CustomerReceiptFormViewState extends State<CustomerReceiptFormView> {
           ),
         ],
         OutlinedButton.icon(
-          onPressed: _isPickingAttachments ? null : _pickAttachments,
+          onPressed:
+              _isReadOnly || _isPickingAttachments ? null : _pickAttachments,
           icon: _isPickingAttachments
               ? const SizedBox(
                   width: 18,
@@ -633,13 +666,62 @@ class _CustomerReceiptFormViewState extends State<CustomerReceiptFormView> {
             ),
           ),
           IconButton(
+            tooltip: 'View ${attachment.name}',
+            onPressed: () => showCustomerReceiptAttachmentPreview(
+              context,
+              attachment,
+            ),
+            icon: const Icon(Icons.visibility_outlined, size: 19),
+            visualDensity: VisualDensity.compact,
+          ),
+          IconButton(
             tooltip: 'Remove ${attachment.name}',
-            onPressed: () => setState(() {
-              _attachments.removeAt(index);
-              _attachmentError = null;
-            }),
+            onPressed: _isReadOnly
+                ? null
+                : () => setState(() {
+                      _attachments.removeAt(index);
+                      _attachmentError = null;
+                    }),
             icon: const Icon(Icons.close, size: 18),
             visualDensity: VisualDensity.compact,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _existingAttachmentTile(CustomerReceiptAttachment attachment) {
+    final isPdf = attachment.name.toLowerCase().endsWith('.pdf');
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: AppColors.fieldFill,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _kLine),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            isPdf ? Icons.picture_as_pdf_outlined : Icons.image_outlined,
+            color: _kGreen,
+            size: 20,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              attachment.name,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12, color: _kInk),
+            ),
+          ),
+          TextButton.icon(
+            onPressed: () => showCustomerReceiptAttachmentPreview(
+              context,
+              attachment,
+            ),
+            icon: const Icon(Icons.visibility_outlined, size: 17),
+            label: const Text('View'),
           ),
         ],
       ),
@@ -812,7 +894,7 @@ class _CustomerReceiptFormViewState extends State<CustomerReceiptFormView> {
           for (final value in values)
             DropdownMenuItem(value: value, child: Text(value)),
         ],
-        onChanged: onChanged,
+        onChanged: _isReadOnly ? null : onChanged,
       );
 
   Widget _input(
@@ -830,7 +912,8 @@ class _CustomerReceiptFormViewState extends State<CustomerReceiptFormView> {
       TextFormField(
         controller: controller,
         onChanged: onChanged,
-        readOnly: readOnly,
+        enabled: !_isReadOnly,
+        readOnly: readOnly || _isReadOnly,
         maxLines: maxLines,
         onTap: onTap,
         keyboardType: numeric ? TextInputType.number : TextInputType.text,
@@ -902,43 +985,131 @@ class _CustomerReceiptFormViewState extends State<CustomerReceiptFormView> {
         ),
       );
 
-  Widget _buildSaveButton() => SafeArea(
-        top: false,
-        child: Obx(
-          () => Container(
+  Widget _buildSaveButton() {
+    if (_isReadOnly) return const SizedBox.shrink();
+    return SafeArea(
+      top: false,
+      child: Obx(
+        () {
+          final isSaving = _controller.isSaving.value;
+          final saveDisabled =
+              isSaving || (_replaceExistingAttachments && _attachments.isEmpty);
+          Widget button({
+            required String label,
+            required VoidCallback? onPressed,
+            bool primary = false,
+          }) =>
+              SizedBox(
+                width: double.infinity,
+                child: primary
+                    ? ElevatedButton(
+                        onPressed: onPressed,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _kGreen,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        child: isSaving && label != 'Approve'
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : Text(label),
+                      )
+                    : OutlinedButton(
+                        onPressed: onPressed,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF0E8F86),
+                          side: const BorderSide(color: Color(0xFF0E8F86)),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        child: Text(label),
+                      ),
+              );
+
+          return Container(
             width: double.infinity,
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
             color: Colors.white,
-            child: ElevatedButton(
-              onPressed: _controller.isSaving.value ||
-                      (_replaceExistingAttachments && _attachments.isEmpty)
-                  ? null
-                  : _save,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _kGreen,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-              child: _controller.isSaving.value
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
+            child: widget.isEdit
+                ? Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      button(
+                        label: isSaving ? 'Saving…' : 'Save Changes',
+                        onPressed: saveDisabled ? null : _save,
+                        primary: true,
                       ),
-                    )
-                  : Text(widget.isEdit ? 'Save Changes' : 'Save'),
-            ),
+                      const SizedBox(height: 8),
+                      button(
+                        label: isSaving ? 'Approving…' : 'Approve',
+                        onPressed: isSaving ? null : _confirmApprove,
+                      ),
+                    ],
+                  )
+                : button(
+                    label: isSaving ? 'Saving…' : 'Save',
+                    onPressed: saveDisabled ? null : _save,
+                    primary: true,
+                  ),
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _confirmApprove() async {
+    final receipt = _receipt;
+    if (receipt == null || _controller.isSaving.value) return;
+    if (_formKey.currentState?.validate() != true) return;
+    final editedReceipt = _receiptFromForm();
+    final confirmed = await Get.dialog<bool>(
+      AlertDialog(
+        title: const Text('Approve Customer Receipt'),
+        content: Text('Approve ${receipt.receiptNumber}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back<bool>(result: false),
+            child: const Text('Cancel'),
           ),
-        ),
-      );
+          FilledButton(
+            onPressed: () => Get.back<bool>(result: true),
+            child: const Text('Approve'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final saved = await _persistReceipt(editedReceipt);
+    if (!saved || !mounted) return;
+    final approved = await _controller.approveReceipt(editedReceipt);
+    if (approved && mounted) {
+      setState(() => _isReadOnly = true);
+    }
+  }
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+    final saved = await _persistReceipt(_receiptFromForm());
+    if (saved && mounted) Get.back<void>();
+  }
+
+  Future<bool> _persistReceipt(CustomerReceipt receipt) =>
+      _controller.saveReceipt(
+        receipt,
+        isEdit: widget.isEdit,
+        attachments: _attachments,
+        replaceExistingAttachments: _replaceExistingAttachments,
+      );
+
+  CustomerReceipt _receiptFromForm() {
     final amount = int.parse(_amount.text.trim()).toDouble();
     final date = DateFormat('dd/MM/yyyy').parseStrict(_date.text.trim());
-    final receipt = CustomerReceipt(
+    return CustomerReceipt(
       id: _receipt?.id ?? '',
       receiptNumber: _number.text.trim(),
       date: DateFormat('yyyy-MM-dd').format(date),
@@ -955,13 +1126,6 @@ class _CustomerReceiptFormViewState extends State<CustomerReceiptFormView> {
       attachmentFilesJson: _receipt?.attachmentFilesJson,
       hasAttachmentFields: _receipt?.hasAttachmentFields ?? false,
     );
-    final saved = await _controller.saveReceipt(
-      receipt,
-      isEdit: widget.isEdit,
-      attachments: _attachments,
-      replaceExistingAttachments: _replaceExistingAttachments,
-    );
-    if (saved && mounted) Get.back<void>();
   }
 
   Future<void> _pickDate() async {

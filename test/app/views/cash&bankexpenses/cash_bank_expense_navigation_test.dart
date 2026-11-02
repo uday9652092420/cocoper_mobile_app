@@ -37,9 +37,10 @@ const _expenseWithAttachment = CashBankExpense(
   description: 'Office supplies',
   attachments: [
     CashBankExpenseAttachment(
-      name: 'receipt.pdf',
-      mimeType: 'application/pdf',
-      data: 'data:application/pdf;base64,AQID',
+      name: 'receipt.png',
+      mimeType: 'image/png',
+      data:
+          'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l4sAAAAASUVORK5CYII=',
     ),
   ],
   hasAttachmentField: true,
@@ -207,6 +208,23 @@ void main() {
     expect(_controller.approvedExpenseId, 'expense-1');
   });
 
+  testWidgets('Edit can preview the existing attachment', (tester) async {
+    _controller.expenses.assignAll([_expenseWithAttachment]);
+    await _pumpOperations(tester);
+    await _openSavedList(tester);
+    await tester.ensureVisible(find.text('Edit'));
+    await tester.tap(find.text('Edit'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('receipt.png'), findsOneWidget);
+    await tester.tap(find.byTooltip('Preview receipt.png'));
+    await tester.pumpAndSettle();
+    expect(find.text('receipt.png'), findsWidgets);
+    expect(find.byTooltip('Close preview'), findsOneWidget);
+    await tester.tap(find.byTooltip('Close preview'));
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('Edit can remove the last existing attachment', (tester) async {
     _controller.expenses.assignAll([_expenseWithAttachment]);
     await _pumpOperations(tester);
@@ -215,8 +233,8 @@ void main() {
     await tester.tap(find.text('Edit'));
     await tester.pumpAndSettle();
 
-    expect(find.text('receipt.pdf'), findsOneWidget);
-    await tester.tap(find.byTooltip('Remove receipt.pdf'));
+    expect(find.text('receipt.png'), findsOneWidget);
+    await tester.tap(find.byTooltip('Remove receipt.png'));
     await tester.tap(find.text('Save Changes'));
     await tester.pumpAndSettle();
 

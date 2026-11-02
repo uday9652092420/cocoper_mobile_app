@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 
 import '../../controllers/cash&bankexpenses/cash_bank_expenses_controller.dart';
 import '../../helpers/shared_preferences.dart';
@@ -399,9 +400,16 @@ class _CashBankExpenseFormViewState extends State<CashBankExpenseFormView> {
               _attachments[index].name,
               overflow: TextOverflow.ellipsis,
             ),
-            trailing: _readOnly
-                ? null
-                : IconButton(
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  tooltip: 'Preview ${_attachments[index].name}',
+                  onPressed: () => _previewAttachment(_attachments[index]),
+                  icon: const Icon(Icons.visibility_outlined, color: _green),
+                ),
+                if (!_readOnly)
+                  IconButton(
                     tooltip: 'Remove ${_attachments[index].name}',
                     onPressed: () => setState(() {
                       _attachments.removeAt(index);
@@ -409,6 +417,8 @@ class _CashBankExpenseFormViewState extends State<CashBankExpenseFormView> {
                     }),
                     icon: const Icon(Icons.close),
                   ),
+              ],
+            ),
           ),
         if (_attachmentError != null)
           Padding(
@@ -419,6 +429,73 @@ class _CashBankExpenseFormViewState extends State<CashBankExpenseFormView> {
             ),
           ),
       ],
+    );
+  }
+
+  Future<void> _previewAttachment(
+    CashBankExpenseAttachment attachment,
+  ) async {
+    final comma = attachment.data.indexOf(',');
+    if (!attachment.data.startsWith('data:') || comma < 0) {
+      setState(() {
+        _attachmentError = 'Unable to preview ${attachment.name}: '
+            'attachment data is invalid.';
+      });
+      return;
+    }
+
+    late final Uint8List bytes;
+    try {
+      bytes = Uint8List.fromList(
+        base64Decode(attachment.data.substring(comma + 1)),
+      );
+    } on FormatException {
+      setState(() {
+        _attachmentError = 'Unable to preview ${attachment.name}: '
+            'attachment data is invalid.';
+      });
+      return;
+    }
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) => Dialog(
+        insetPadding: const EdgeInsets.all(12),
+        child: SizedBox(
+          width: 720,
+          height: MediaQuery.sizeOf(context).height * 0.84,
+          child: Column(
+            children: [
+              ListTile(
+                title: Text(
+                  attachment.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                trailing: IconButton(
+                  tooltip: 'Close preview',
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close),
+                ),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: attachment.mimeType == 'application/pdf'
+                    ? SfPdfViewer.memory(bytes)
+                    : InteractiveViewer(
+                        child: Image.memory(
+                          bytes,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => const Center(
+                            child: Text('Unable to preview this image.'),
+                          ),
+                        ),
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

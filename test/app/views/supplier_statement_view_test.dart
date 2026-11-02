@@ -49,7 +49,8 @@ void main() {
     Get.reset();
   });
 
-  testWidgets('supplier statement presents compact table and reconciled totals',
+  testWidgets(
+      'supplier statement fits mobile width and shows full details on wide screens',
       (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
@@ -75,21 +76,20 @@ void main() {
     expect(find.text('Total Purchase'), findsOneWidget);
     expect(find.text('Total Payment'), findsOneWidget);
     expect(find.text('Closing Balance'), findsOneWidget);
-    expect(find.text('Date'), findsOneWidget);
-    expect(find.text('Voucher'), findsOneWidget);
-    expect(find.text('Purchase'), findsWidgets);
-    expect(find.text('Payment'), findsWidgets);
+    expect(find.text('Date / Voucher'), findsOneWidget);
+    expect(find.text('Purchase'), findsOneWidget);
+    expect(find.text('Payment'), findsOneWidget);
     expect(find.text('Running Balance'), findsOneWidget);
-    expect(find.text('GPI-01'), findsOneWidget);
-    expect(find.text('SP-01'), findsOneWidget);
-    expect(find.text('SP-02'), findsOneWidget);
-    expect(find.text('26 Oct 2026'), findsOneWidget);
-    expect(find.text('27 Oct 2026'), findsNWidgets(2));
-    expect(find.text('₹16,17,660.00'), findsWidgets);
+    expect(find.textContaining('GPI-01'), findsOneWidget);
+    expect(find.textContaining('SP-01'), findsOneWidget);
+    expect(find.textContaining('SP-02'), findsOneWidget);
+    expect(find.textContaining('26 Oct 2026'), findsOneWidget);
+    expect(find.textContaining('27 Oct 2026'), findsNWidgets(2));
+    expect(find.text('₹16,17,660.00'), findsNWidgets(4));
     expect(find.text('₹51,000.00'), findsNWidgets(2));
-    expect(find.text('₹15,66,660.00'), findsWidgets);
+    expect(find.text('₹15,66,660.00'), findsNWidgets(3));
     expect(find.text('—'), findsNWidgets(3));
-    final table = tester.widget<Table>(find.byType(Table));
+    final table = tester.widget<Table>(find.byType(Table).last);
     expect(table.children, hasLength(5));
     expect(find.text('TOTAL'), findsOneWidget);
     expect(
@@ -98,13 +98,23 @@ void main() {
             widget is SingleChildScrollView &&
             widget.scrollDirection == Axis.horizontal,
       ),
-      findsOneWidget,
+      findsNothing,
     );
+    expect(tester.getSize(find.byType(Table).last).width, 356);
 
     tester.view.physicalSize = const Size(320, 720);
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
+    expect(tester.getSize(find.byType(Table).last).width, 286);
+    expect(find.text('Payment'), findsOneWidget);
     expect(find.text('Running Balance'), findsOneWidget);
+
+    tester.view.physicalSize = const Size(900, 1000);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.text('Payment'), findsOneWidget);
+    expect(find.text('Running Balance'), findsOneWidget);
+    expect(tester.getSize(find.byType(Table).last).width, 866);
   });
 }
 

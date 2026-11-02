@@ -37,6 +37,10 @@ class CustomerReceipt {
     Map<String, dynamic> json, {
     String? fallbackId,
   }) {
+    final attachmentNames =
+        json['attachment_names'] ?? json['attachmentNames'];
+    final attachmentFiles =
+        json['attachment_files'] ?? json['attachmentFiles'];
     return CustomerReceipt(
       id: _string(json['id'] ?? json['_id'] ?? fallbackId),
       receiptNumber: _string(json['receipt_no']),
@@ -48,10 +52,13 @@ class CustomerReceipt {
       remarks: _string(json['remarks']),
       status: _receiptStatus(json),
       amount: _double(json['amount']),
-      attachmentNamesJson: json['attachment_names']?.toString(),
-      attachmentFilesJson: json['attachment_files']?.toString(),
-      hasAttachmentFields: json.containsKey('attachment_names') &&
-          json.containsKey('attachment_files'),
+        attachmentNamesJson: _attachmentArrayJson(attachmentNames),
+        attachmentFilesJson: _attachmentArrayJson(attachmentFiles),
+        hasAttachmentFields:
+          (json.containsKey('attachment_names') ||
+            json.containsKey('attachmentNames')) &&
+          (json.containsKey('attachment_files') ||
+            json.containsKey('attachmentFiles')),
     );
   }
 
@@ -84,6 +91,19 @@ class CustomerReceipt {
   }
 
   static String _string(dynamic value) => value?.toString().trim() ?? '';
+
+  static String? _attachmentArrayJson(dynamic value) {
+    if (value == null) return null;
+    if (value is List) return jsonEncode(value);
+    final text = value.toString().trim();
+    if (text.isEmpty) return text;
+    try {
+      final decoded = jsonDecode(text);
+      return decoded is List ? jsonEncode(decoded) : text;
+    } on FormatException {
+      return text;
+    }
+  }
 
   static double _double(dynamic value) {
     if (value is num) return value.toDouble();
@@ -142,6 +162,42 @@ class CustomerReceiptAttachment {
 
   static String? attachmentNamesFromJson(String? value) =>
       _decodeArray(value)?.map((item) => item.toString()).join(', ');
+
+  static List<CustomerReceiptAttachment> attachmentsFromJson({
+    required String? namesJson,
+    required String? filesJson,
+  }) {
+    final names = _decodeArray(namesJson);
+    final files = _decodeArray(filesJson);
+    if (names == null || files == null || names.length != files.length) {
+      return const [];
+    }
+
+    final attachments = <CustomerReceiptAttachment>[];
+    for (var index = 0; index < names.length; index++) {
+      final name = names[index].toString().trim();
+      final dataUrl = files[index].toString().trim();
+      final comma = dataUrl.indexOf(',');
+      final expectedMime = mimeTypeForName(name);
+      if (name.isEmpty ||
+          expectedMime == null ||
+          !dataUrl.startsWith('data:') ||
+          comma < 0 ||
+          dataUrl.substring(5, comma).split(';').first.toLowerCase() !=
+              expectedMime) {
+        continue;
+      }
+      try {
+        final bytes = base64Decode(dataUrl.substring(comma + 1));
+        if (bytes.isNotEmpty) {
+          attachments.add(CustomerReceiptAttachment(name: name, bytes: bytes));
+        }
+      } on FormatException {
+        continue;
+      }
+    }
+    return attachments;
+  }
 
   static List<dynamic>? _decodeArray(String? value) {
     if (value == null || value.isEmpty) return null;

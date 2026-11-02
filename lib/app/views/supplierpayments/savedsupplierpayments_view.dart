@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 
 import '../../controllers/supplierpayments/supplier_payment_controller.dart';
+import '../../custome_widgets/custome_confirmation_dialog.dart';
 import '../../models/supplier_payment.dart';
 import '../../routes/app_routes.dart';
 import '../../theme/app_theme.dart';
@@ -340,11 +341,35 @@ class _SavedSupplierPaymentsViewState extends State<SavedSupplierPaymentsView> {
                   'Edit',
                   () => _openPayment(payment, Routes.editSupplierPayment),
                 ),
+                if (!payment.approved && payment.id.isNotEmpty)
+                  _action(
+                    Icons.delete_outline,
+                    'Delete',
+                    () => _confirmDelete(payment),
+                    color: const Color(0xFFB3261E),
+                  ),
               ],
             ),
           ],
         ),
       );
+
+  Future<void> _confirmDelete(SupplierPayment payment) async {
+    final confirmed = await Get.dialog<bool>(
+      CustomConfirmationDialog(
+        header: 'Delete Supplier Payment',
+        body:
+            'Supplier payment ${payment.paymentNumber} will be permanently deleted.',
+        yesText: 'Delete',
+        noText: 'Cancel',
+        onYes: () => Get.back<bool>(result: true),
+        onNo: () => Get.back<bool>(result: false),
+      ),
+    );
+    if (confirmed == true) {
+      await _controller.deleteSupplierPayment(payment);
+    }
+  }
 
   Future<void> _openPayment(SupplierPayment payment, String route) async {
     if (payment.id.isEmpty) return;
@@ -352,7 +377,13 @@ class _SavedSupplierPaymentsViewState extends State<SavedSupplierPaymentsView> {
     await _controller.loadSupplierPayments();
   }
 
-  Widget _action(IconData icon, String label, VoidCallback onTap) => InkWell(
+  Widget _action(
+    IconData icon,
+    String label,
+    VoidCallback onTap, {
+    Color color = _green,
+  }) =>
+      InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(8),
         child: Padding(
@@ -360,14 +391,14 @@ class _SavedSupplierPaymentsViewState extends State<SavedSupplierPaymentsView> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 17, color: _green),
+              Icon(icon, size: 17, color: color),
               const SizedBox(width: 5),
               Text(
                 label,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12.5,
                   fontWeight: FontWeight.w700,
-                  color: _green,
+                  color: color,
                 ),
               ),
             ],

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
@@ -6,8 +7,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 
 import '../../controllers/supplierpayments/supplier_payment_controller.dart';
+import '../../custome_widgets/custome_confirmation_dialog.dart';
 import '../../models/lookup_option.dart';
 import '../../models/purchase_invoice.dart';
 import '../../models/supplier_payment.dart';
@@ -253,7 +256,7 @@ class _SupplierPaymentFormViewState extends State<SupplierPaymentFormView> {
       );
 
   Widget _supplierField() {
-    final suppliers = _controller.suppliers.toList(growable: false);
+    final suppliers = _controller.suppliers.toList();
     if (_supplierId != null &&
         suppliers.every((supplier) => supplier.id != _supplierId)) {
       suppliers.add(
@@ -417,11 +420,11 @@ class _SupplierPaymentFormViewState extends State<SupplierPaymentFormView> {
   }
 
   Widget _attachmentSection() {
-    final names = SupplierPaymentAttachment.decodeStringArray(
-      _existingPayment?.attachmentNamesJson,
-    );
-    final hasData = _existingPayment?.attachmentNamesJson?.isNotEmpty == true ||
-        _existingPayment?.attachmentFilesJson?.isNotEmpty == true;
+    final existingAttachments = _existingAttachments;
+    final hasData = existingAttachments?.isNotEmpty == true;
+    final hasInvalidData = widget.isEdit &&
+        _existingPayment?.hasAttachmentFields == true &&
+        existingAttachments == null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -440,14 +443,36 @@ class _SupplierPaymentFormViewState extends State<SupplierPaymentFormView> {
             'Existing attachment fields were not returned. Saving is blocked '
             'to prevent accidental file loss.',
           ),
+        ] else if (hasInvalidData) ...[
+          const SizedBox(height: 6),
+          _inlineError('Saved attachment data cannot be previewed.'),
         ] else if (widget.isEdit && hasData) ...[
           const SizedBox(height: 6),
-          Text(
-            names == null || names.isEmpty
-                ? 'Existing attachment data is available.'
-                : 'Existing: ${names.join(', ')}',
-            style: const TextStyle(fontSize: 12, color: _muted),
-          ),
+          for (var index = 0; index < existingAttachments!.length; index++)
+            Material(
+              color: Colors.transparent,
+              child: ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                onTap: () => _previewAttachment(existingAttachments[index]),
+                leading: Icon(
+                  existingAttachments[index].name.toLowerCase().endsWith('.pdf')
+                      ? Icons.picture_as_pdf_outlined
+                      : Icons.image_outlined,
+                  color: _green,
+                ),
+                title: Text(
+                  existingAttachments[index].name,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                trailing: IconButton(
+                  tooltip: 'Preview ${existingAttachments[index].name}',
+                  onPressed: () =>
+                      _previewAttachment(existingAttachments[index]),
+                  icon: const Icon(Icons.visibility_outlined, color: _green),
+                ),
+              ),
+            ),
         ] else if (widget.isEdit) ...[
           const SizedBox(height: 6),
           const Text(
@@ -456,17 +481,20 @@ class _SupplierPaymentFormViewState extends State<SupplierPaymentFormView> {
           ),
         ],
         if (widget.isEdit) ...[
-          CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            dense: true,
-            value: _replaceAttachments,
-            onChanged: (value) =>
-                setState(() => _replaceAttachments = value ?? false),
-            title: const Text(
-              'Replace existing attachments with selected files',
-              style: TextStyle(fontSize: 13, color: _ink),
+          Material(
+            color: Colors.transparent,
+            child: CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              value: _replaceAttachments,
+              onChanged: (value) =>
+                  setState(() => _replaceAttachments = value ?? false),
+              title: const Text(
+                'Replace existing attachments with selected files',
+                style: TextStyle(fontSize: 13, color: _ink),
+              ),
+              controlAffinity: ListTileControlAffinity.leading,
             ),
-            controlAffinity: ListTileControlAffinity.leading,
           ),
         ],
         OutlinedButton.icon(
@@ -507,6 +535,7 @@ class _SupplierPaymentFormViewState extends State<SupplierPaymentFormView> {
           ListTile(
             dense: true,
             contentPadding: EdgeInsets.zero,
+            onTap: () => _previewAttachment(_attachments[index]),
             leading: Icon(
               _attachments[index].name.toLowerCase().endsWith('.pdf')
                   ? Icons.picture_as_pdf_outlined
@@ -517,13 +546,23 @@ class _SupplierPaymentFormViewState extends State<SupplierPaymentFormView> {
               _attachments[index].name,
               overflow: TextOverflow.ellipsis,
             ),
-            trailing: IconButton(
-              tooltip: 'Remove ${_attachments[index].name}',
-              onPressed: () => setState(() {
-                _attachments.removeAt(index);
-                _attachmentError = null;
-              }),
-              icon: const Icon(Icons.close),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  tooltip: 'Preview ${_attachments[index].name}',
+                  onPressed: () => _previewAttachment(_attachments[index]),
+                  icon: const Icon(Icons.visibility_outlined, color: _green),
+                ),
+                IconButton(
+                  tooltip: 'Remove ${_attachments[index].name}',
+                  onPressed: () => setState(() {
+                    _attachments.removeAt(index);
+                    _attachmentError = null;
+                  }),
+                  icon: const Icon(Icons.close),
+                ),
+              ],
             ),
           ),
         if (_attachmentError != null)
@@ -536,6 +575,42 @@ class _SupplierPaymentFormViewState extends State<SupplierPaymentFormView> {
           ),
       ],
     );
+  }
+
+  List<SupplierPaymentAttachment>? get _existingAttachments {
+    final payment = _existingPayment;
+    if (payment == null || !payment.hasAttachmentFields) return null;
+    if (payment.attachmentNamesJson == null &&
+        payment.attachmentFilesJson == null) {
+      return [];
+    }
+    final names = SupplierPaymentAttachment.decodeStringArray(
+        payment.attachmentNamesJson);
+    final files = SupplierPaymentAttachment.decodeStringArray(
+        payment.attachmentFilesJson);
+    if (names == null || files == null || names.length != files.length) {
+      return null;
+    }
+
+    try {
+      return [
+        for (var index = 0; index < names.length; index++)
+          SupplierPaymentAttachment(
+            name: names[index],
+            bytes: _decodeAttachmentDataUrl(files[index]),
+          ),
+      ];
+    } on FormatException {
+      return null;
+    }
+  }
+
+  Uint8List _decodeAttachmentDataUrl(String value) {
+    final comma = value.indexOf(',');
+    if (!value.startsWith('data:') || comma < 0) {
+      throw const FormatException('Invalid attachment data URL.');
+    }
+    return Uint8List.fromList(base64Decode(value.substring(comma + 1)));
   }
 
   Future<void> _pickAttachments() async {
@@ -580,6 +655,56 @@ class _SupplierPaymentFormViewState extends State<SupplierPaymentFormView> {
     }
   }
 
+  Future<void> _previewAttachment(SupplierPaymentAttachment attachment) =>
+      showDialog<void>(
+        context: context,
+        builder: (context) => Dialog(
+          insetPadding: const EdgeInsets.all(12),
+          child: SizedBox(
+            width: 900,
+            height: MediaQuery.sizeOf(context).height * 0.84,
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          attachment.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Close attachment preview',
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(Icons.close),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: attachment.name.toLowerCase().endsWith('.pdf')
+                      ? SfPdfViewer.memory(attachment.bytes)
+                      : InteractiveViewer(
+                          child: Image.memory(
+                            attachment.bytes,
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, __, ___) => const Center(
+                              child: Text('Unable to preview this image.'),
+                            ),
+                          ),
+                        ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
   Future<Uint8List> _readFile(PlatformFile file) async {
     final stream = file.readStream;
     if (stream == null) return file.xFile.readAsBytes();
@@ -595,40 +720,104 @@ class _SupplierPaymentFormViewState extends State<SupplierPaymentFormView> {
     return builder.takeBytes();
   }
 
-  Widget _buildSaveButton() => SafeArea(
-        top: false,
-        child: Obx(
-          () => Container(
+  Widget _buildSaveButton() {
+    if (widget.isEdit && _existingPayment?.approved == true) {
+      return const SizedBox.shrink();
+    }
+
+    return SafeArea(
+      top: false,
+      child: Obx(
+        () {
+          final isSaving = _controller.isSaving.value;
+          final canSave = !isSaving &&
+              (!widget.isEdit ||
+                  _existingPayment?.canSafelyPreserveAttachments == true) &&
+              (!_replaceAttachments || _attachments.isNotEmpty);
+          return Container(
             width: double.infinity,
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
             color: Colors.white,
-            child: ElevatedButton(
-              onPressed: _controller.isSaving.value ||
-                      (widget.isEdit &&
-                          _existingPayment?.canSafelyPreserveAttachments !=
-                              true) ||
-                      (_replaceAttachments && _attachments.isEmpty)
-                  ? null
-                  : _save,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _green,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-              child: _controller.isSaving.value
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
+            child: widget.isEdit
+                ? Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: canSave ? _save : null,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _green,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          child: isSaving
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Text('Save Changes'),
+                        ),
                       ),
-                    )
-                  : Text(widget.isEdit ? 'Save Changes' : 'Save Payment'),
-            ),
-          ),
-        ),
-      );
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: isSaving ? null : _confirmApprove,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: _green,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          child: const Text('Approve'),
+                        ),
+                      ),
+                    ],
+                  )
+                : ElevatedButton(
+                    onPressed: canSave ? _save : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _green,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: isSaving
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text('Save Payment'),
+                  ),
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _confirmApprove() async {
+    final payment = _existingPayment;
+    if (payment == null || payment.approved) return;
+    final confirmed = await Get.dialog<bool>(
+      CustomConfirmationDialog(
+        header: 'Approve Supplier Payment',
+        body:
+            'Are you sure you want to approve ${payment.paymentNumber.isEmpty ? 'this payment' : payment.paymentNumber}?',
+        yesText: 'Approve',
+        noText: 'Cancel',
+        onYes: () => Get.back<bool>(result: true),
+        onNo: () => Get.back<bool>(result: false),
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final approved = await _controller.approveSupplierPayment(payment);
+    if (approved && mounted) {
+      setState(() => _existingPayment = payment.withApproved(true));
+    }
+  }
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;

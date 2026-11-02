@@ -88,9 +88,9 @@ void main() {
     expect(find.text('Actual Quantity'), findsOneWidget);
     expect(find.text('75'), findsOneWidget);
     expect(find.text('75.4'), findsNothing);
-    expect(find.text('₹150'), findsOneWidget);
     expect(find.text('Gunny Bag 1'), findsOneWidget);
-    expect(find.text('₹150.00'), findsWidgets);
+    expect(find.text('₹150'), findsWidgets);
+    expect(find.textContaining('.00'), findsNothing);
   });
 
   testWidgets('Save Changes updates a pending sale and returns to the list', (

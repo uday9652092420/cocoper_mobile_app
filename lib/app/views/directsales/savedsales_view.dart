@@ -588,6 +588,6 @@ class _SavedSalesViewState extends State<SavedSalesView> {
   }
 
   String _formatAmount(double value) {
-    return NumberFormat('#,##,##0.00', 'en_IN').format(value);
+    return NumberFormat('#,##,##0', 'en_IN').format(value.round());
   }
 }

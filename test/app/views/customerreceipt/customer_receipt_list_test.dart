@@ -65,6 +65,39 @@ void main() {
     expect(find.text('Edit'), findsOneWidget);
   });
 
+  testWidgets('receipt View fetches and previews saved attachments', (
+    tester,
+  ) async {
+    final controller = _ReceiptListController([_receipt('draft-1', 'Draft')])
+      ..receiptDetails['draft-1'] = const CustomerReceipt(
+        id: 'draft-1',
+        receiptNumber: 'Draft receipt',
+        date: '2026-10-16',
+        customerId: 'customer-1',
+        invoiceMode: 'Cumulative',
+        paymentMode: 'Cash',
+        amount: 120,
+        status: 'Draft',
+        attachmentNamesJson: '["proof.png"]',
+        attachmentFilesJson: '["data:image/png;base64,AQID"]',
+        hasAttachmentFields: true,
+      );
+    await tester.pumpWidget(_App(controller: controller));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('View'));
+    await tester.pumpAndSettle();
+
+    expect(controller.fetchReceiptCalls, ['draft-1']);
+    expect(find.text('Attachments'), findsOneWidget);
+    expect(find.text('proof.png'), findsOneWidget);
+    await tester.tap(find.text('proof.png'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('proof.png'), findsNWidgets(2));
+    expect(find.byType(InteractiveViewer), findsOneWidget);
+  });
+
   testWidgets('list shows its count and clears receipt search', (tester) async {
     final controller = _ReceiptListController([
       _receipt('draft-1', 'Draft'),
@@ -186,12 +219,20 @@ class _ReceiptListController extends CustomerReceiptController {
   }
 
   int deleteCalls = 0;
+  final receiptDetails = <String, CustomerReceipt>{};
+  final fetchReceiptCalls = <String>[];
 
   @override
   Future<void> loadCustomerReceipts() async {}
 
   @override
   Future<void> loadCustomers() async {}
+
+  @override
+  Future<CustomerReceipt?> fetchReceipt(String id) async {
+    fetchReceiptCalls.add(id);
+    return receiptDetails[id];
+  }
 
   @override
   Future<bool> deleteReceipt(CustomerReceipt receipt) async {

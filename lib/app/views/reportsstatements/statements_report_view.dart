@@ -134,11 +134,9 @@ class StatementsReportView extends StatelessWidget {
                           _inlineError(controller),
                         _customerStatementSummary(controller),
                         const SizedBox(height: 8),
-                        _statementTable(
+                        _customerStatementTable(
                           controller,
                           records,
-                          debitLabel: 'Sales',
-                          creditLabel: 'Receipt',
                           emptyMessage:
                               'No transactions match the selected customer and dates.',
                         ),
@@ -774,71 +772,281 @@ class StatementsReportView extends StatelessWidget {
     required String creditLabel,
     required String emptyMessage,
   }) {
-    const columnWidths = <int, TableColumnWidth>{
-      0: FixedColumnWidth(105),
-      1: FixedColumnWidth(90),
-      2: FixedColumnWidth(135),
-      3: FixedColumnWidth(135),
-      4: FixedColumnWidth(165),
-    };
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _line),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: SizedBox(
-          width: 630,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth >= 600;
+        return Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: _line),
+          ),
+          clipBehavior: Clip.antiAlias,
           child: Table(
-            columnWidths: columnWidths,
+            columnWidths: isWide
+                ? const {
+                    0: FlexColumnWidth(1),
+                    1: FlexColumnWidth(0.9),
+                    2: FlexColumnWidth(1),
+                    3: FlexColumnWidth(1),
+                    4: FlexColumnWidth(1.3),
+                  }
+                : const {
+                    0: FlexColumnWidth(1.2),
+                    1: FlexColumnWidth(0.8),
+                    2: FlexColumnWidth(1),
+                  },
             defaultVerticalAlignment: TableCellVerticalAlignment.middle,
             border: const TableBorder(
               horizontalInside: BorderSide(color: _line, width: 0.7),
               bottom: BorderSide(color: _line, width: 0.7),
             ),
-            children: [
-              _statementTableRow(
-                ['Date', 'Voucher', debitLabel, creditLabel, 'Running Balance'],
-                header: true,
-              ),
-              if (records.isEmpty)
-                _statementTableRow([
-                  '',
-                  emptyMessage,
-                  '',
-                  '',
-                  '',
-                ])
-              else
-                for (final record in records)
-                  _statementTableRow([
-                    record.date == null
-                        ? '—'
-                        : DateFormat('dd MMM yyyy').format(record.date!),
-                    record.reference,
-                    record.debit == 0 ? '—' : _currency.format(record.debit),
-                    record.credit == 0 ? '—' : _currency.format(record.credit),
-                    _currency.format(record.balance),
-                  ]),
-              _statementTableRow(
-                [
-                  '',
-                  'TOTAL',
-                  _currency.format(controller.totalDebit),
-                  _currency.format(controller.totalCredit),
-                  _currency.format(controller.closingBalance),
-                ],
-                total: true,
-              ),
-            ],
+            children: isWide
+                ? _supplierStatementDesktopRows(
+                    controller,
+                    records,
+                    debitLabel,
+                    creditLabel,
+                    emptyMessage,
+                  )
+                : _supplierStatementMobileRows(
+                    controller,
+                    records,
+                    emptyMessage,
+                  ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
+
+  List<TableRow> _supplierStatementDesktopRows(
+    StatementsReportController controller,
+    List<StatementsReportRecord> records,
+    String debitLabel,
+    String creditLabel,
+    String emptyMessage,
+  ) =>
+      [
+        _statementTableRow(
+          ['Date', 'Voucher', debitLabel, creditLabel, 'Running Balance'],
+          header: true,
+        ),
+        if (records.isEmpty)
+          _statementTableRow(['', emptyMessage, '', '', ''])
+        else
+          for (final record in records)
+            _statementTableRow([
+              record.date == null
+                  ? '—'
+                  : DateFormat('dd MMM yyyy').format(record.date!),
+              record.reference,
+              record.debit == 0 ? '—' : _currency.format(record.debit),
+              record.credit == 0 ? '—' : _currency.format(record.credit),
+              _currency.format(record.balance),
+            ]),
+        _statementTableRow(
+          [
+            '',
+            'TOTAL',
+            _currency.format(controller.totalDebit),
+            _currency.format(controller.totalCredit),
+            _currency.format(controller.closingBalance),
+          ],
+          total: true,
+        ),
+      ];
+
+  List<TableRow> _supplierStatementMobileRows(
+    StatementsReportController controller,
+    List<StatementsReportRecord> records,
+    String emptyMessage,
+  ) =>
+      [
+        _statementMobileRow(
+          ['Date / Voucher', 'Purchase', 'Payment', 'Running Balance'],
+          header: true,
+        ),
+        if (records.isEmpty)
+          _statementMobileRow([emptyMessage, '', '', ''])
+        else
+          for (final record in records)
+            _statementMobileRow([
+              '${record.date == null ? '—' : DateFormat('dd MMM yyyy').format(record.date!)}\n${record.reference}',
+              record.debit == 0 ? '—' : _currency.format(record.debit),
+              record.credit == 0 ? '—' : _currency.format(record.credit),
+              _currency.format(record.balance),
+            ]),
+        _statementMobileRow(
+          [
+            'TOTAL',
+            _currency.format(controller.totalDebit),
+            _currency.format(controller.totalCredit),
+            _currency.format(controller.closingBalance),
+          ],
+          total: true,
+        ),
+      ];
+
+  Widget _customerStatementTable(
+    StatementsReportController controller,
+    List<StatementsReportRecord> records, {
+    required String emptyMessage,
+  }) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth >= 600;
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: _line),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Table(
+            columnWidths: isWide
+                ? const {
+                    0: FlexColumnWidth(1),
+                    1: FlexColumnWidth(0.9),
+                    2: FlexColumnWidth(1),
+                    3: FlexColumnWidth(1),
+                    4: FlexColumnWidth(1.3),
+                  }
+                : const {
+                    0: FlexColumnWidth(1.3),
+                    1: FlexColumnWidth(1),
+                    2: FlexColumnWidth(1),
+                    3: FlexColumnWidth(1.35),
+                  },
+            defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+            border: const TableBorder(
+              horizontalInside: BorderSide(color: _line, width: 0.7),
+              bottom: BorderSide(color: _line, width: 0.7),
+            ),
+            children: isWide
+                ? _customerStatementDesktopRows(
+                    controller,
+                    records,
+                    emptyMessage,
+                  )
+                : _customerStatementMobileRows(
+                    controller,
+                    records,
+                    emptyMessage,
+                  ),
+          ),
+        );
+      },
+    );
+  }
+
+  List<TableRow> _customerStatementDesktopRows(
+    StatementsReportController controller,
+    List<StatementsReportRecord> records,
+    String emptyMessage,
+  ) =>
+      [
+        _statementTableRow(
+          ['Date', 'Voucher', 'Sales', 'Receipt', 'Running Balance'],
+          header: true,
+        ),
+        if (records.isEmpty)
+          _statementTableRow(['', emptyMessage, '', '', ''])
+        else
+          for (final record in records)
+            _statementTableRow([
+              record.date == null
+                  ? '—'
+                  : DateFormat('dd MMM yyyy').format(record.date!),
+              record.reference,
+              record.debit == 0 ? '—' : _currency.format(record.debit),
+              record.credit == 0 ? '—' : _currency.format(record.credit),
+              _currency.format(record.balance),
+            ]),
+        _statementTableRow(
+          [
+            '',
+            'TOTAL',
+            _currency.format(controller.totalDebit),
+            _currency.format(controller.totalCredit),
+            _currency.format(controller.closingBalance),
+          ],
+          total: true,
+        ),
+      ];
+
+  List<TableRow> _customerStatementMobileRows(
+    StatementsReportController controller,
+    List<StatementsReportRecord> records,
+    String emptyMessage,
+  ) =>
+      [
+        _statementMobileRow(
+          ['Date / Voucher', 'Sales', 'Receipt', 'Running Balance'],
+          header: true,
+        ),
+        if (records.isEmpty)
+          _statementMobileRow([emptyMessage, '', '', ''])
+        else
+          for (final record in records)
+            _statementMobileRow([
+              '${record.date == null ? '—' : DateFormat('dd MMM yyyy').format(record.date!)}\n${record.reference}',
+              record.debit == 0 ? '—' : _currency.format(record.debit),
+              record.credit == 0 ? '—' : _currency.format(record.credit),
+              _currency.format(record.balance),
+            ]),
+        _statementMobileRow(
+          [
+            'TOTAL',
+            _currency.format(controller.totalDebit),
+            _currency.format(controller.totalCredit),
+            _currency.format(controller.closingBalance),
+          ],
+          total: true,
+        ),
+      ];
+
+  TableRow _statementMobileRow(
+    List<String> values, {
+    bool header = false,
+    bool total = false,
+  }) =>
+      TableRow(
+        decoration: BoxDecoration(
+          color: header
+              ? const Color(0xFFF2F6F2)
+              : total
+                  ? const Color(0xFFEAF3E9)
+                  : Colors.white,
+        ),
+        children: [
+          for (var index = 0; index < values.length; index++)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 10),
+              child: Align(
+                alignment:
+                    index == 0 ? Alignment.centerLeft : Alignment.centerRight,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment:
+                      index == 0 ? Alignment.centerLeft : Alignment.centerRight,
+                  child: Text(
+                    values[index],
+                    maxLines: index == 0 && !header && !total ? 2 : 1,
+                    textAlign: index == 0 ? TextAlign.left : TextAlign.right,
+                    style: TextStyle(
+                      fontSize: header ? 10 : 10.5,
+                      fontWeight:
+                          header || total ? FontWeight.w800 : FontWeight.w600,
+                      color: _ink,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      );
 
   TableRow _statementTableRow(
     List<String> values, {

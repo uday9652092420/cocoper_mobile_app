@@ -59,6 +59,12 @@ class SupplierPaymentRepository {
   ) =>
       ApiService.put(EndPoints.supplierPayment(id), body);
 
+  Future<Response<dynamic>?> deleteSupplierPayment(String id) =>
+      ApiService.delete(EndPoints.supplierPayment(id));
+
+  Future<Response<dynamic>?> approveSupplierPayment(String id) =>
+      ApiService.post(EndPoints.supplierPaymentApproval(id), null);
+
   static bool isSuccessfulResponse(Response<dynamic>? response) =>
       response != null &&
       (response.statusCode == 200 ||

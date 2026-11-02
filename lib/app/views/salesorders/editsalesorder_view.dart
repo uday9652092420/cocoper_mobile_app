@@ -196,13 +196,20 @@ class _EditSalesOrderViewState extends State<EditSalesOrderView> {
             Text(message, textAlign: TextAlign.center),
             const SizedBox(height: 10),
             TextButton(
-              onPressed: () => setState(() => _orderFuture = _fetchOrder()),
+              onPressed: _retryFetchOrder,
               child: const Text('Retry'),
             ),
           ],
         ),
       ),
     );
+  }
+
+  void _retryFetchOrder() {
+    final orderFuture = _fetchOrder();
+    setState(() {
+      _orderFuture = orderFuture;
+    });
   }
 
   Widget _buildOrder(SalesOrder order) {
