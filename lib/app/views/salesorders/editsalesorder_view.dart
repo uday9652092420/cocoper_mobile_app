@@ -49,7 +49,7 @@ class _EditSalesOrderViewState extends State<EditSalesOrderView> {
   bool get _canApprove =>
       _order != null &&
       SalesOrderController.canEditSalesOrder(_order!) &&
-      SalesOrderController.hasPermission('approve') &&
+      SalesOrderController.hasSalesOrderActionPermission('approve') &&
       _hasSupportedMode;
 
   bool get _canShowApprove =>

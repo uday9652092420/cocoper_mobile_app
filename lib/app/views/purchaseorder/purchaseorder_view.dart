@@ -331,8 +331,12 @@ class _PurchaseOrderViewState extends State<PurchaseOrderView> {
     );
   }
 
-  bool _isDraft(PurchaseOrder po) {
-    return po.status.trim().isEmpty || po.status.toLowerCase() == 'draft';
+  bool _isNotApproved(PurchaseOrder po) {
+    return po.status.trim().toLowerCase() != 'approved';
+  }
+
+  bool _isApproved(PurchaseOrder po) {
+    return po.status.trim().toLowerCase() == 'approved';
   }
 
   bool _hasPermission(String permission) {
@@ -351,16 +355,21 @@ class _PurchaseOrderViewState extends State<PurchaseOrderView> {
     final conversionStatusVerified =
         !_salesOrderController.isLoadingList.value &&
             !_salesOrderController.hasListError.value;
-    final isUnconvertedDraft =
-        _isDraft(po) && conversionStatusVerified && linkedSalesOrder == null;
-    final canEdit = isUnconvertedDraft && _hasPermission('purchase-order.edit');
+    final isUnconvertedOrder =
+        conversionStatusVerified && linkedSalesOrder == null;
+    final isEditableUnconvertedOrder =
+        _isNotApproved(po) && isUnconvertedOrder;
+    final canEdit =
+        isEditableUnconvertedOrder && _hasPermission('purchase-order.edit');
     final canDelete =
-        isUnconvertedDraft && _hasPermission('purchase-order.delete');
+        isEditableUnconvertedOrder && _hasPermission('purchase-order.delete');
     final canView = _hasPermission('purchase-order.read') ||
         _hasPermission('purchase-order.edit');
-    if (!canView && !canEdit && !canDelete) return const SizedBox.shrink();
-
-    if (!canView && !canEdit && !canDelete) return const SizedBox.shrink();
+    final canConvert =
+        _isApproved(po) && isUnconvertedOrder && canView;
+    if (!canView && !canEdit && !canDelete && !canConvert) {
+      return const SizedBox.shrink();
+    }
 
     return Align(
       alignment: Alignment.centerRight,
@@ -373,6 +382,13 @@ class _PurchaseOrderViewState extends State<PurchaseOrderView> {
               onPressed: () => _openPurchaseOrder(po, readOnly: true),
               icon: const Icon(Icons.visibility_outlined),
               color: _kGreen,
+            ),
+          if (canConvert)
+            IconButton(
+              tooltip: 'Convert to Sales Order',
+              onPressed: () => _convertToSalesOrder(po),
+              icon: const Icon(Icons.swap_horiz),
+              color: const Color(0xFF0E8F86),
             ),
           if (canEdit)
             IconButton(
@@ -391,6 +407,16 @@ class _PurchaseOrderViewState extends State<PurchaseOrderView> {
         ],
       ),
     );
+  }
+
+  Future<void> _convertToSalesOrder(PurchaseOrder po) async {
+    await Get.toNamed<dynamic>(
+      Routes.newSaleOrder,
+      arguments: po,
+    );
+    if (!mounted) return;
+    await _controller.loadPurchaseOrders();
+    await _salesOrderController.loadSalesOrders(showErrors: false);
   }
 
   void _openPurchaseOrder(PurchaseOrder po, {required bool readOnly}) {

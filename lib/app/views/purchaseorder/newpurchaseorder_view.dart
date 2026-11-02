@@ -149,8 +149,7 @@ class _NewPurchaseOrderViewState extends State<NewPurchaseOrderView> {
       return true;
     }
     return !_isReadOnly &&
-        MobileAppPermissions.current?.hasPermission('purchase-order.edit') ==
-            true;
+        _hasPermission('purchase-order.edit');
   }
 
   bool get _isReadOnly =>
@@ -159,9 +158,8 @@ class _NewPurchaseOrderViewState extends State<NewPurchaseOrderView> {
       _isLoadingOrder ||
       !_hasAuthoritativeConversionStatus ||
       _isConverted ||
-      _currentOrder?.status.trim().toLowerCase() != 'draft' ||
-      MobileAppPermissions.current?.hasPermission('purchase-order.edit') !=
-          true;
+      _isApproved ||
+      !_hasPermission('purchase-order.edit');
 
   bool get _isApproved =>
       _currentOrder?.status.trim().toLowerCase() == 'approved';
@@ -174,9 +172,20 @@ class _NewPurchaseOrderViewState extends State<NewPurchaseOrderView> {
       _hasAuthoritativeOrder &&
       _hasAuthoritativeConversionStatus &&
       !_isConverted &&
-      _currentOrder?.status.trim().toLowerCase() == 'draft' &&
-      MobileAppPermissions.current?.hasPermission('purchase-order.approve') ==
-          true;
+      !_isApproved &&
+      _hasPermission('purchase-order.approve');
+
+  bool _hasPermission(String permission) {
+    final permissions = MobileAppPermissions.current;
+    if (permissions == null) return false;
+    if (permissions.hasPermission(permission)) return true;
+
+    final hasPurchaseOrderPermissions = permissions.modulePermissions.any(
+      (configuredPermission) =>
+          configuredPermission.startsWith('purchase-order.'),
+    );
+    return permissions.canAccessMainApp && !hasPurchaseOrderPermissions;
+  }
 
   bool get _hasUnsavedChanges =>
       _persistedFormSnapshot != null &&

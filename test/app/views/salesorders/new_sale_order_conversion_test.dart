@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cocoper_mobile/app/controllers/salesorders/sales_order_controller.dart';
 import 'package:cocoper_mobile/app/models/lookup_option.dart';
 import 'package:cocoper_mobile/app/models/purchase_order.dart';
@@ -18,13 +20,22 @@ class _StubSalesOrderController extends SalesOrderController {
   }
 
   bool createCalled = false;
+  Completer<void>? lookupsCompleter;
+  Completer<void>? salesOrdersCompleter;
   List<SalesOrderLine> submittedLines = const [];
 
   @override
-  Future<void> loadLookups() async {}
+  Future<void> loadLookups() async {
+    await lookupsCompleter?.future;
+  }
 
   @override
-  Future<bool> loadSalesOrders({bool showErrors = true}) async => true;
+  Future<bool> loadSalesOrders({bool showErrors = true}) async {
+    isLoadingList.value = true;
+    await salesOrdersCompleter?.future;
+    isLoadingList.value = false;
+    return true;
+  }
 
   @override
   Future<String> generateSoNumber() async => 'SO-01';
@@ -148,6 +159,28 @@ void main() {
     expect(Get.currentRoute, Routes.newSaleOrder);
   });
 
+  testWidgets('SO number appears while background requests are pending', (
+    tester,
+  ) async {
+    controller.lookupsCompleter = Completer<void>();
+    controller.salesOrdersCompleter = Completer<void>();
+    await openConversion(tester);
+
+    final soNumberField = tester.widget<TextField>(find.byType(TextField).first);
+    expect(soNumberField.controller!.text, 'SO-01');
+    final saveButton = tester.widget<ElevatedButton>(
+      find.ancestor(
+        of: find.text('Save'),
+        matching: find.byType(ElevatedButton),
+      ),
+    );
+    expect(saveButton.onPressed, isNotNull);
+
+    controller.lookupsCompleter!.complete();
+    controller.salesOrdersCompleter!.complete();
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('entered Sale Price is sent separately and recalculates amount', (
     tester,
   ) async {
@@ -166,6 +199,7 @@ void main() {
     expect(controller.submittedLines.single.salePrice, 6000);
     expect(controller.submittedLines.single.saleAmount, 60000);
     expect(controller.submittedLines.single.baseCost, 6000);
-    expect(Get.currentRoute, '/');
+    expect(Get.currentRoute, Routes.savedSalesOrders);
+    expect(find.text('Saved Sales Orders'), findsOneWidget);
   });
 }

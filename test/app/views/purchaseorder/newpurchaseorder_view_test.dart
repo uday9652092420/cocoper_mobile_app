@@ -277,6 +277,7 @@ void main() {
     expect(find.byTooltip('View Purchase Order'), findsOneWidget);
     expect(find.byTooltip('Edit Purchase Order'), findsNothing);
     expect(find.byTooltip('Delete Purchase Order'), findsNothing);
+    expect(find.byTooltip('Convert to Sales Order'), findsNothing);
     expect(find.text('Converted to GSO-10'), findsOneWidget);
     expect(find.text('View Sales Order'), findsOneWidget);
   });
@@ -294,9 +295,29 @@ void main() {
     expect(find.byTooltip('View Purchase Order'), findsOneWidget);
     expect(find.byTooltip('Edit Purchase Order'), findsOneWidget);
     expect(find.byTooltip('Delete Purchase Order'), findsOneWidget);
+    expect(find.byTooltip('Convert to Sales Order'), findsNothing);
   });
 
-  testWidgets('approved Purchase Order offers View only', (tester) async {
+  testWidgets('unapproved non-Draft Purchase Order offers edit and delete', (
+    tester,
+  ) async {
+    _stub.purchaseOrders.assignAll([
+      _testOrder(status: 'Awaiting Review'),
+    ]);
+
+    await tester.pumpWidget(
+      const GetMaterialApp(home: PurchaseOrderView()),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byTooltip('Edit Purchase Order'), findsOneWidget);
+    expect(find.byTooltip('Delete Purchase Order'), findsOneWidget);
+    expect(find.byTooltip('Convert to Sales Order'), findsNothing);
+  });
+
+  testWidgets('approved unconverted Purchase Order offers conversion', (
+    tester,
+  ) async {
     _stub.purchaseOrders.assignAll([_testOrder(status: 'Approved')]);
 
     await tester.pumpWidget(
@@ -307,6 +328,35 @@ void main() {
     expect(find.byTooltip('View Purchase Order'), findsOneWidget);
     expect(find.byTooltip('Edit Purchase Order'), findsNothing);
     expect(find.byTooltip('Delete Purchase Order'), findsNothing);
+    expect(find.byTooltip('Convert to Sales Order'), findsOneWidget);
+  });
+
+  testWidgets('approved Purchase Order conversion passes the selected order', (
+    tester,
+  ) async {
+    final order = _testOrder(status: 'Approved');
+    _stub.purchaseOrders.assignAll([order]);
+
+    await tester.pumpWidget(
+      GetMaterialApp(
+        home: const PurchaseOrderView(),
+        getPages: [
+          GetPage<dynamic>(
+            name: Routes.newSaleOrder,
+            page: () => Scaffold(
+              body: Text(
+                'Convert ${(Get.arguments as PurchaseOrder).poNumber}',
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Convert to Sales Order'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Convert TPO-01'), findsOneWidget);
   });
 
   testWidgets('draft View action opens a read-only form', (tester) async {
@@ -334,6 +384,29 @@ void main() {
     );
   });
 
+  testWidgets('draft Edit action opens an editable form with actions', (
+    tester,
+  ) async {
+    final order = _testOrder();
+    _stub.purchaseOrders.assignAll([order]);
+    _stub.authoritativeOrder = order;
+
+    await tester.pumpWidget(
+      GetMaterialApp(
+        home: const PurchaseOrderView(),
+        getPages: AppPages.routes,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Edit Purchase Order'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Edit Purchase Order'), findsOneWidget);
+    expect(find.text('Save Changes'), findsOneWidget);
+    expect(find.text('Approve'), findsOneWidget);
+    expect(tester.widget<TextField>(_fieldUnder('Qty (Tons)')).readOnly, isFalse);
+  });
+
   testWidgets('users without main-app access do not see the action menu', (
     tester,
   ) async {
@@ -356,19 +429,31 @@ void main() {
   });
 
   testWidgets(
-      'main-app user without a PO permission catalog sees Draft actions',
+      'main-app user without PO permissions can edit and approve Draft orders',
       (tester) async {
     _setPermissions(const ['sales-order.read']);
-    _stub.purchaseOrders.assignAll([_testOrder()]);
+    final order = _testOrder();
+    _stub.purchaseOrders.assignAll([order]);
+    _stub.authoritativeOrder = order;
 
     await tester.pumpWidget(
-      const GetMaterialApp(home: PurchaseOrderView()),
+      GetMaterialApp(
+        home: const PurchaseOrderView(),
+        getPages: AppPages.routes,
+      ),
     );
     await tester.pumpAndSettle();
 
     expect(find.byTooltip('View Purchase Order'), findsOneWidget);
     expect(find.byTooltip('Edit Purchase Order'), findsOneWidget);
     expect(find.byTooltip('Delete Purchase Order'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Edit Purchase Order'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Edit Purchase Order'), findsOneWidget);
+    expect(find.text('Save Changes'), findsOneWidget);
+    expect(find.text('Approve'), findsOneWidget);
   });
 
   testWidgets('purchase order data entry fields are left aligned and LTR', (
@@ -665,27 +750,16 @@ void main() {
     );
   });
 
-  testWidgets('unknown persisted status remains read-only', (tester) async {
+  testWidgets('unapproved non-Draft status can be edited and approved', (
+    tester,
+  ) async {
     _stub.authoritativeOrder = _testOrder(status: ' Awaiting Review ');
     await _pumpEditForm(tester, _testOrder());
 
-    expect(find.text('Save Changes'), findsNothing);
-    expect(find.text('Approve'), findsNothing);
+    expect(find.text('Save Changes'), findsOneWidget);
+    expect(find.text('Approve'), findsOneWidget);
     expect(find.text('Convert to Sales Order'), findsNothing);
-    expect(
-      tester
-          .widgetList<TextField>(find.byType(TextField))
-          .every((field) => field.readOnly),
-      isTrue,
-    );
-    expect(
-      tester
-          .widgetList<DropdownButtonFormField<String>>(
-            find.byType(DropdownButtonFormField<String>),
-          )
-          .every((field) => field.onChanged == null),
-      isTrue,
-    );
+    expect(tester.widget<TextField>(_fieldUnder('Qty (Tons)')).readOnly, isFalse);
   });
 
   testWidgets('approved order opens the registered Sales Order draft route', (

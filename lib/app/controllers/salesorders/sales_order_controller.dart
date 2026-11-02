@@ -814,7 +814,7 @@ class SalesOrderController extends GetxController {
     required List<SalesOrderLine> lines,
   }) async {
     if (isSaving.value) return false;
-    if (!hasPermission('approve')) {
+    if (!hasSalesOrderActionPermission('approve')) {
       errorToast('You do not have permission to approve Sales Orders.');
       return false;
     }
@@ -876,23 +876,10 @@ class SalesOrderController extends GetxController {
         return false;
       }
 
-      final payload = SalesOrder(
-        soNumber: soNumber,
-        organizationId: effectiveOrganizationId,
-        date: date,
-        customerId: customerId,
-        remarks: remarks,
-        status: 'Approved',
-        mode: mode,
-        sourcePoId: latestOrder.sourcePoId,
-        poNumber: latestOrder.poNumber,
-        lines: lines,
-      ).toUpdateRequestJson()
-        ..['status'] = 'Approved';
       approvalSubmitted = true;
       final response = await _put(
         '${EndPoints.salesOrders}/$id',
-        payload,
+        const <String, dynamic>{'status': 'Approved'},
         showServerErrors: false,
         diagnosticLabel: 'sales-order.approve',
       );

@@ -631,6 +631,12 @@ void main() {
         () async {
       SharedPreferences.setMockInitialValues({});
       await SharedPrefsHelper.init();
+      MobileAppPermissions.current = const MobileAppPermissions(
+        mobileAppLogin: true,
+        mobileAppLabourAttendance: false,
+        modulePermissions: {'purchase-order.read'},
+        hasModulePermissions: true,
+      );
       final line = _validLine();
       final getPaths = <String>[];
       Map<String, dynamic>? putBody;
@@ -676,10 +682,7 @@ void main() {
       );
 
       expect(approved, isTrue);
-      expect(putBody?['status'], 'Approved');
-      expect(putBody?['organizationId'], 'organization-1');
-      expect(putBody?.containsKey('branchId'), isFalse);
-      expect(putBody?['soNumber'], 'SO-1');
+      expect(putBody, const {'status': 'Approved'});
       expect(getPaths, ['sales-orders/so-1', 'sales-orders']);
       expect(controller.salesOrders.single.status, 'Approved');
       expect(controller.isSaving.value, isFalse);

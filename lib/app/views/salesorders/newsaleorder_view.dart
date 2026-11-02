@@ -72,14 +72,27 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
   }
 
   Future<void> _init() async {
-    await Future.wait([
-      _controller.loadLookups(),
-      _controller.loadSalesOrders(),
-    ]);
+    final lookupsFuture = _controller.loadLookups();
+    final salesOrdersFuture = _controller.loadSalesOrders();
+    String? generatedSoNumber;
 
     if (_order != null) {
-      _soNumberController.text = await _controller.generateSoNumber();
+      generatedSoNumber = await _controller.generateSoNumber();
+      if (!mounted) return;
+      _soNumberController.text = generatedSoNumber;
     }
+
+    await salesOrdersFuture;
+
+    if (_order != null) {
+      final soNumber = await _controller.generateSoNumber();
+      if (!mounted) return;
+      if (_soNumberController.text == generatedSoNumber) {
+        _soNumberController.text = soNumber;
+      }
+    }
+
+    await lookupsFuture;
   }
 
   @override
@@ -438,7 +451,7 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
                           ? 'Saving…'
                           : isCheckingStatus
                               ? 'Checking…'
-                              : conversionBlocked
+                            : conversionBlocked
                                   ? existingSalesOrderId?.isNotEmpty == true
                                       ? 'View Sales Order'
                                       : 'Check status'
@@ -1031,15 +1044,7 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
     );
 
     if (success && mounted) {
-      final salesOrderId = _controller.lastCreatedSalesOrderId;
-      final salesOrderReference = _controller.lastCreatedSalesOrderReference ??
-          _soNumberController.text.trim();
-      Get.back<Map<String, String>>(
-        result: {
-          if (salesOrderId != null) 'salesOrderId': salesOrderId,
-          'salesOrderReference': salesOrderReference,
-        },
-      );
+      await Get.offNamed<void>(Routes.savedSalesOrders);
       return;
     }
 

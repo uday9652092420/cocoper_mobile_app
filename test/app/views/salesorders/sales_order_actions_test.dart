@@ -606,6 +606,12 @@ void main() {
   testWidgets('confirmed approval returns to the list as Approved', (
     tester,
   ) async {
+    MobileAppPermissions.current = const MobileAppPermissions(
+      mobileAppLogin: true,
+      mobileAppLabourAttendance: false,
+      modulePermissions: {'purchase-order.read'},
+      hasModulePermissions: true,
+    );
     _controller.orders = [
       _order(
         id: 'approved-now',
