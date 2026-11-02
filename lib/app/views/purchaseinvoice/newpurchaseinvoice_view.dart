@@ -8,6 +8,7 @@ import '../../models/lookup_option.dart';
 import '../../models/purchase_invoice.dart';
 import '../../models/purchase_invoice_line.dart';
 import '../../models/purchase_order.dart';
+import '../../routes/app_routes.dart';
 import '../../theme/app_theme.dart';
 
 const _kInk = AppColors.textDefaultLight;
@@ -870,53 +871,81 @@ class _NewPurchaseInvoiceViewState extends State<NewPurchaseInvoiceView> {
 
   Widget _buildPurchaseOrderDropdown() {
     return Obx(
-      () => DropdownButtonFormField<String>(
-        key: ValueKey(_purchaseOrder),
-        initialValue: _purchaseOrder,
-        isExpanded: true,
-        hint: const Text(
-          'Select purchase order (optional)',
-          style: TextStyle(fontSize: 14, color: Color(0xFF9AA69F)),
-        ),
-        icon: const Icon(
-          Icons.keyboard_arrow_down_rounded,
-          color: _kMuted,
-        ),
-        decoration: InputDecoration(
-          isDense: true,
-          filled: true,
-          fillColor: _kFieldFill,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 14,
-            vertical: 13,
+      () {
+        final options = <LookupOption>[];
+        final seenIds = <String>{};
+        for (final option in _controller.purchaseOrderOptions) {
+          if (seenIds.add(option.id)) options.add(option);
+        }
+
+        final selectedId = _purchaseOrder;
+        if (selectedId != null && seenIds.add(selectedId)) {
+          PurchaseOrder? selectedOrder;
+          for (final order in _controller.purchaseOrders) {
+            if (order.id == selectedId) {
+              selectedOrder = order;
+              break;
+            }
+          }
+          final label = selectedOrder == null
+              ? selectedId
+              : selectedOrder.poNumber.isEmpty
+                  ? selectedOrder.supplierName
+                  : selectedOrder.supplierName.isEmpty
+                      ? selectedOrder.poNumber
+                      : '${selectedOrder.poNumber} — '
+                          '${selectedOrder.supplierName}';
+          options.add(LookupOption(id: selectedId, label: label));
+        }
+
+        return DropdownButtonFormField<String>(
+          key: ValueKey(_purchaseOrder),
+          initialValue: _purchaseOrder,
+          isExpanded: true,
+          hint: const Text(
+            'Select purchase order (optional)',
+            style: TextStyle(fontSize: 14, color: Color(0xFF9AA69F)),
           ),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(color: _kLine),
+          icon: const Icon(
+            Icons.keyboard_arrow_down_rounded,
+            color: _kMuted,
           ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(color: _kLine),
+          decoration: InputDecoration(
+            isDense: true,
+            filled: true,
+            fillColor: _kFieldFill,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 13,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: _kLine),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: _kLine),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: _kGreen, width: 1.2),
+            ),
           ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(color: _kGreen, width: 1.2),
-          ),
-        ),
-        items: _controller.purchaseOrderOptions
-            .map(
-              (option) => DropdownMenuItem<String>(
-                value: option.id,
-                child: Text(
-                  option.label,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 14, color: _kInk),
+          items: options
+              .map(
+                (option) => DropdownMenuItem<String>(
+                  value: option.id,
+                  child: Text(
+                    option.label,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 14, color: _kInk),
+                  ),
                 ),
-              ),
-            )
-            .toList(),
-        onChanged: _onPurchaseOrderChanged,
-      ),
+              )
+              .toList(),
+          onChanged: _onPurchaseOrderChanged,
+        );
+      },
     );
   }
 
@@ -1289,28 +1318,9 @@ class _NewPurchaseInvoiceViewState extends State<NewPurchaseInvoiceView> {
   Future<void> _onApprove() async {
     final invoice = widget.invoice;
     if (invoice == null) return;
-    if (!_validate()) return;
-
-    final lines = _lineItems.map(_buildLinePayload).toList();
-    final grandTotal = _round2(_grandTotal());
-
-    await _controller.updatePurchaseInvoice(
-      id: invoice.id,
-      status: 'Approved',
-      invoiceNo: _invoiceNoController.text.trim(),
-      supplierId: _supplier?.trim() ?? '',
-      branchId: _branch?.trim() ?? '',
-      purchaseOrderId: _purchaseOrder?.trim() ?? '',
-      date: _dateController.text.trim(),
-      mode: _apiMode(),
-      loadingCost: _parse(_loadingCostController),
-      marketCess: _parse(_marketCessController),
-      bagsAndSticks: _parse(_bagsSticksController),
-      freight: _parse(_freightController),
-      grandTotal: grandTotal,
-      outstandingAmount: grandTotal,
-      lines: lines,
-    );
+    final approved = await _controller.approvePurchaseInvoice(invoice.id);
+    if (!mounted || !approved) return;
+    await Get.offNamed<void>(Routes.purchaseInvoices);
   }
 
   void _prefillFromInvoice(PurchaseInvoice invoice) {
