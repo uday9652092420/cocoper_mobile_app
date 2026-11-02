@@ -1169,6 +1169,21 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
       );
     }
 
+    Widget cancelButton() {
+      return OutlinedButton(
+        onPressed: () => Get.back<void>(),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: _kGreen,
+          side: const BorderSide(color: _kGreen),
+          padding: const EdgeInsets.symmetric(vertical: 15),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        child: const Text('Cancel'),
+      );
+    }
+
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
@@ -1180,26 +1195,13 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: SafeArea(
         top: false,
-        child: Row(
-          children: [
-            Expanded(
-              child: OutlinedButton(
-                onPressed: () => Get.back<void>(),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: _kGreen,
-                  side: const BorderSide(color: _kGreen),
-                  padding: const EdgeInsets.symmetric(vertical: 15),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                ),
-                child: const Text('Cancel'),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: widget.sale != null
-                  ? saveButton(onPressed: null, label: 'Save Changes')
-                  : Obx(
+        child: widget.sale == null
+            ? Row(
+                children: [
+                  Expanded(child: cancelButton()),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Obx(
                       () {
                         final isOrderUnresolved =
                             _selectedSalesOrderId != null &&
@@ -1222,11 +1224,82 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
                         );
                       },
                     ),
-            ),
-          ],
-        ),
+                  ),
+                ],
+              )
+            : widget.sale!.approved == true
+                ? const SizedBox.shrink()
+                : Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Obx(
+                        () => SizedBox(
+                          width: double.infinity,
+                          child: saveButton(
+                            onPressed:
+                                _controller.isSaving.value ? null : _save,
+                            label: _controller.isSaving.value
+                                ? 'Saving…'
+                                : 'Save Changes',
+                          ),
+                        ),
+                      ),
+                      if (widget.sale!.approved == false) ...[
+                        const SizedBox(height: 8),
+                        Obx(() {
+                          final isApproving =
+                              _controller.actionInProgressId.value ==
+                                  widget.sale!.id;
+                          return SizedBox(
+                            width: double.infinity,
+                            child: saveButton(
+                              onPressed: _controller.isSaving.value ||
+                                      _controller
+                                          .actionInProgressId.value.isNotEmpty
+                                  ? null
+                                  : _approveEdit,
+                              label: isApproving
+                                  ? 'Approving…'
+                                  : _controller.isSaving.value
+                                      ? 'Saving…'
+                                      : 'Approve',
+                            ),
+                          );
+                        }),
+                      ],
+                    ],
+                  ),
       ),
     );
+  }
+
+  Future<void> _approveEdit() async {
+    final sale = widget.sale;
+    if (sale == null || sale.approved != false) return;
+
+    final confirmed = await Get.dialog<bool>(
+      AlertDialog(
+        title: const Text('Approve Direct Sale'),
+        content: Text(
+          'Approve ${sale.directSaleNo.isEmpty ? 'this direct sale' : sale.directSaleNo}?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back<bool>(result: false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Get.back<bool>(result: true),
+            child: const Text('Approve'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final approved = await _controller.approveSale(sale);
+    if (!mounted || !approved) return;
+    Get.back<bool>(result: true);
   }
 
   Widget _buildLookupError() {
@@ -1430,15 +1503,6 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
   }
 
   Future<void> _save() async {
-    if (widget.sale != null) {
-      Get.snackbar(
-        'Edit not supported',
-        'Direct sale updates are not available in the current backend contract.',
-        snackPosition: SnackPosition.BOTTOM,
-      );
-      return;
-    }
-
     if (_selectedSalesOrderId != null &&
         (_controller.isLoadingSalesOrderDetails.value ||
             _controller.selectedSalesOrderDetails.value?.id !=
@@ -1481,20 +1545,37 @@ class _NewDirectSaleViewState extends State<NewDirectSaleView> {
 
     final parsedDate =
         DateFormat('dd/MM/yyyy').parseStrict(_dateController.text);
-    final saved = await _controller.createDirectSale(
-      customerId: _customerId!,
-      branchId: _branchId!,
-      invoiceDate: DateFormat('yyyy-MM-dd').format(parsedDate),
-      mode: _mode,
-      lines: _lines.map(_buildLine).toList(),
-      gunnyBags: _bags
-          .where((bag) => bag.bagTypeId.isNotEmpty)
-          .map(_buildBag)
-          .toList(),
-      additionalCharges: _number(_additionalChargesController),
-      loadingCharges: _number(_loadingChargesController),
-      salesOrderNo: _selectedSalesOrderNo,
-    );
+    final lines = _lines.map(_buildLine).toList();
+    final gunnyBags =
+        _bags.where((bag) => bag.bagTypeId.isNotEmpty).map(_buildBag).toList();
+    final sale = widget.sale;
+    final salesOrderNo = _selectedSalesOrderNo.isNotEmpty
+        ? _selectedSalesOrderNo
+        : sale?.salesOrderNo ?? '';
+    final saved = sale == null
+        ? await _controller.createDirectSale(
+            customerId: _customerId!,
+            branchId: _branchId!,
+            invoiceDate: DateFormat('yyyy-MM-dd').format(parsedDate),
+            mode: _mode,
+            lines: lines,
+            gunnyBags: gunnyBags,
+            additionalCharges: _number(_additionalChargesController),
+            loadingCharges: _number(_loadingChargesController),
+            salesOrderNo: salesOrderNo,
+          )
+        : await _controller.updateDirectSale(
+            sale: sale,
+            customerId: _customerId!,
+            branchId: _branchId!,
+            invoiceDate: DateFormat('yyyy-MM-dd').format(parsedDate),
+            mode: _mode,
+            lines: lines,
+            gunnyBags: gunnyBags,
+            additionalCharges: _number(_additionalChargesController),
+            loadingCharges: _number(_loadingChargesController),
+            salesOrderNo: salesOrderNo,
+          );
     if (saved && mounted) Get.back<dynamic>(result: true);
   }
 

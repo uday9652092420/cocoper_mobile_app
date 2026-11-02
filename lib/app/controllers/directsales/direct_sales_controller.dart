@@ -21,6 +21,11 @@ typedef DirectSalesCreateRequest = Future<Response<dynamic>?> Function(
   dynamic body,
 );
 
+typedef DirectSalesUpdateRequest = Future<Response<dynamic>?> Function(
+  String endpoint,
+  Map<String, dynamic> body,
+);
+
 class DirectSaleLineValues {
   final double discount;
   final double piecesPercentage;
@@ -39,11 +44,14 @@ class DirectSalesController extends GetxController {
   DirectSalesController({
     DirectSalesOrderGetRequest? salesOrderGetRequest,
     DirectSalesCreateRequest? directSalesCreateRequest,
+    DirectSalesUpdateRequest? directSalesUpdateRequest,
   })  : _salesOrderGetRequest = salesOrderGetRequest,
-        _directSalesCreateRequest = directSalesCreateRequest;
+        _directSalesCreateRequest = directSalesCreateRequest,
+        _directSalesUpdateRequest = directSalesUpdateRequest;
 
   final DirectSalesOrderGetRequest? _salesOrderGetRequest;
   final DirectSalesCreateRequest? _directSalesCreateRequest;
+  final DirectSalesUpdateRequest? _directSalesUpdateRequest;
   final salesOrdersForCustomer = <SalesOrder>[].obs;
   final selectedSalesOrderDetails = Rxn<SalesOrder>();
   final isLoadingSalesOrders = false.obs;
@@ -566,6 +574,83 @@ class DirectSalesController extends GetxController {
       return false;
     } catch (error) {
       errorToast('Unable to create direct sale. $error');
+      return false;
+    } finally {
+      isSaving.value = false;
+    }
+  }
+
+  Future<bool> updateDirectSale({
+    required DirectSale sale,
+    required String customerId,
+    required String branchId,
+    required String invoiceDate,
+    required String mode,
+    required List<DirectSaleLine> lines,
+    required List<DirectSaleGunnyBag> gunnyBags,
+    required double additionalCharges,
+    required double loadingCharges,
+    String salesOrderNo = '',
+  }) async {
+    if (isSaving.value || sale.id.trim().isEmpty || sale.approved != false) {
+      return false;
+    }
+    isSaving.value = true;
+
+    try {
+      final organizationId = await SharedPrefsHelper.getString(
+        SharedPrefsHelper.organizationId,
+      );
+      if (organizationId.trim().isEmpty) {
+        errorToast(
+          'Organization context is unavailable. Please sign in again.',
+        );
+        return false;
+      }
+
+      final lineTotal = lines.fold<double>(
+        0,
+        (sum, line) => sum + line.salesAmount,
+      );
+      final bagTotal = gunnyBags.fold<double>(
+        0,
+        (sum, bag) => sum + bag.amount,
+      );
+      final body = <String, dynamic>{
+        'directSaleNo': sale.directSaleNo,
+        'salesOrderNo': salesOrderNo.trim(),
+        'organizationId': organizationId,
+        'customerId': customerId,
+        'branchId': branchId,
+        'invoiceDate': invoiceDate,
+        'mode': mode,
+        'invoiceTotal': calculateInvoiceTotal(
+          salesAmount: lineTotal,
+          gunnyBagAmount: bagTotal,
+          additionalCharges: additionalCharges,
+          loadingCharges: loadingCharges,
+        ),
+        'charges': <dynamic>[],
+        'lines': lines.map((line) => line.toJson()).toList(),
+        'gunnyBags': gunnyBags.map((bag) => bag.toJson()).toList(),
+      };
+
+      final response = await (_directSalesUpdateRequest ??
+          (endpoint, payload) => ApiService.put(endpoint, payload))(
+        '${EndPoints.directSales}/${sale.id}',
+        body,
+      );
+      if (_isSuccessful(response)) {
+        successToast('Direct sale updated successfully.');
+        return true;
+      }
+
+      errorToast(
+        _extractError(response?.data, 'Unable to update direct sale.'),
+      );
+      return false;
+    } catch (error) {
+      errorToast('Unable to update direct sale. $error');
       return false;
     } finally {
       isSaving.value = false;

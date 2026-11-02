@@ -328,6 +328,68 @@ void main() {
           .setMockMethodCallHandler(toastChannel, null);
     });
 
+    test('updates an existing Direct Sale using PUT and its existing number',
+        () async {
+      const toastChannel = MethodChannel('PonnamKarthik/fluttertoast');
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(toastChannel, (_) async => true);
+      Map<String, dynamic>? submittedBody;
+      final controller = _TestDirectSalesController(
+        updateRequest: (endpoint, body) async {
+          expect(endpoint, '${EndPoints.directSales}/sale-1');
+          submittedBody = Map<String, dynamic>.from(body as Map);
+          return _response(endpoint, {'success': true});
+        },
+      );
+
+      final updated = await controller.updateDirectSale(
+        sale: const DirectSale(
+          id: 'sale-1',
+          directSaleNo: 'RDSO-04',
+          approved: false,
+        ),
+        customerId: 'customer-a',
+        branchId: 'branch-1',
+        invoiceDate: '2026-11-02',
+        mode: 'tonage',
+        lines: const [
+          DirectSaleLine(
+            itemId: 'item-1',
+            quantity: 3,
+            actualQuantity: 3,
+            salesPrice: 20,
+            salesAmount: 60,
+          ),
+        ],
+        gunnyBags: const [
+          DirectSaleGunnyBag(
+            bagTypeId: 'bag-1',
+            quantity: 2,
+            rate: 5,
+            amount: 10,
+          ),
+        ],
+        additionalCharges: 4,
+        loadingCharges: 6,
+        salesOrderNo: 'SO-12',
+      );
+
+      expect(updated, isTrue);
+      expect(submittedBody?['directSaleNo'], 'RDSO-04');
+      expect(submittedBody?['salesOrderNo'], 'SO-12');
+      expect(submittedBody?['organizationId'], 'org-1');
+      expect(submittedBody?['customerId'], 'customer-a');
+      expect(submittedBody?['branchId'], 'branch-1');
+      expect(submittedBody?['invoiceDate'], '2026-11-02');
+      expect(submittedBody?['invoiceTotal'], 80);
+      expect(submittedBody?['lines'], hasLength(1));
+      expect(submittedBody?['gunnyBags'], hasLength(1));
+      expect(submittedBody?.containsKey('approved'), isFalse);
+      expect(controller.isSaving.value, isFalse);
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(toastChannel, null);
+    });
+
     test('surfaces detail errors and retries the same selected order',
         () async {
       var detailRequests = 0;
@@ -771,9 +833,11 @@ class _TestDirectSalesController extends DirectSalesController {
   _TestDirectSalesController({
     DirectSalesOrderGetRequest? request,
     DirectSalesCreateRequest? createRequest,
+    DirectSalesUpdateRequest? updateRequest,
   }) : super(
           salesOrderGetRequest: request,
           directSalesCreateRequest: createRequest,
+          directSalesUpdateRequest: updateRequest,
         ) {
     items.assignAll(const [LookupOption(id: 'item-1', label: 'Item One')]);
   }

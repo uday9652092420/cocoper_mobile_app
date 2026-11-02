@@ -146,7 +146,7 @@ HTTP 401 on an authenticated request clears the session. HTTP 403 retains the ex
 | --- | --- | --- | --- |
 | Purchase Order | GET/POST /purchase-orders; PUT /purchase-orders/:id | PUT same resource with full verified payload and status=Approved | DELETE /purchase-orders/:id |
 | Purchase Invoice | GET/POST /purchase-invoices; PUT /purchase-invoices/:id | PUT same resource with status=Approved | DELETE /purchase-invoices/:id |
-| Sales | GET/POST /direct-sales; **no edit route** | POST /direct-sales/:id/approve | DELETE /direct-sales/:id |
+| Sales | GET/POST /direct-sales; PUT /direct-sales/:id | POST /direct-sales/:id/approve | DELETE /direct-sales/:id |
 | Loading & Dispatch | GET/POST /loading-dispatch; update is POST with body id | PATCH /loading-dispatch/:id/status {status} | DELETE /loading-dispatch/:id |
 | Customer Receipt | GET/POST /customer-receipts; PUT /customer-receipts/:id | POST /customer-receipts/:id/approve | DELETE /customer-receipts/:id |
 | Supplier Payment | GET/POST /supplier-payments; PUT /supplier-payments/:id | POST /supplier-payments/:id/approve | DELETE /supplier-payments/:id |
