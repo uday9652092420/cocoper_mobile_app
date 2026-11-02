@@ -13,6 +13,21 @@ class LoadingDispatchService {
 
   final LoadingDispatchRepository _repository;
 
+  Future<String> fetchNextDispatchNumber() async {
+    final response = await _repository.fetchNextDispatchNumber();
+    _requireSuccess(response, 'Unable to generate a dispatch number.');
+    final body = response!.data;
+    final data = body is Map ? body['data'] : null;
+    final number =
+        data is Map ? data['dispatchNumber']?.toString().trim() ?? '' : '';
+    if (number.isEmpty) {
+      throw const LoadingDispatchException(
+        'The server did not return a dispatch number.',
+      );
+    }
+    return number;
+  }
+
   Future<List<LoadingDispatch>> fetchDispatches() async {
     final response = await _repository.fetchDispatches();
     _requireSuccess(response, 'Unable to load dispatches.');
@@ -92,8 +107,39 @@ class LoadingDispatchService {
   Future<void> saveDispatch(LoadingDispatch dispatch) async {
     final error = validate(dispatch);
     if (error != null) throw LoadingDispatchException(error);
-    final response = await _repository.saveDispatch(dispatch.toRequestJson());
+    final dispatchNumber = dispatch.dispatchNumber.trim().isNotEmpty
+        ? dispatch.dispatchNumber.trim()
+        : dispatch.id.isEmpty
+            ? await fetchNextDispatchNumber()
+            : '';
+    final response = await _repository.saveDispatch(
+      dispatch.toRequestJson(dispatchNumber: dispatchNumber),
+    );
     _requireSuccess(response, 'Unable to save dispatch.');
+  }
+
+  Future<void> approveDispatch({
+    required String id,
+    required String dispatchDate,
+  }) async {
+    if (id.trim().isEmpty) {
+      throw const LoadingDispatchException(
+        'The dispatch ID is missing; it cannot be approved.',
+      );
+    }
+    if (dispatchDate.trim().isEmpty) {
+      throw const LoadingDispatchException(
+        'The dispatch date is missing; it cannot be approved.',
+      );
+    }
+    final response = await _repository.approveDispatch(
+      id,
+      <String, dynamic>{
+        'status': 'Approved',
+        'dispatchDate': dispatchDate,
+      },
+    );
+    _requireSuccess(response, 'Unable to approve dispatch.');
   }
 
   Future<void> deleteDispatch(String id) async {
@@ -184,8 +230,7 @@ class LoadingDispatchService {
     final message = body is Map
         ? (body['message'] ?? body['error'])?.toString().trim()
         : null;
-    final requestId =
-        body is Map ? body['requestId']?.toString().trim() : null;
+    final requestId = body is Map ? body['requestId']?.toString().trim() : null;
     final requestReference = requestId == null || requestId.isEmpty
         ? ''
         : ' Request ID: $requestId.';

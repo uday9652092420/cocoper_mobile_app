@@ -357,16 +357,14 @@ class _PurchaseOrderViewState extends State<PurchaseOrderView> {
             !_salesOrderController.hasListError.value;
     final isUnconvertedOrder =
         conversionStatusVerified && linkedSalesOrder == null;
-    final isEditableUnconvertedOrder =
-        _isNotApproved(po) && isUnconvertedOrder;
+    final isEditableUnconvertedOrder = _isNotApproved(po) && isUnconvertedOrder;
     final canEdit =
         isEditableUnconvertedOrder && _hasPermission('purchase-order.edit');
     final canDelete =
         isEditableUnconvertedOrder && _hasPermission('purchase-order.delete');
     final canView = _hasPermission('purchase-order.read') ||
         _hasPermission('purchase-order.edit');
-    final canConvert =
-        _isApproved(po) && isUnconvertedOrder && canView;
+    final canConvert = _isApproved(po) && isUnconvertedOrder && canView;
     if (!canView && !canEdit && !canDelete && !canConvert) {
       return const SizedBox.shrink();
     }

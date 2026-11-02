@@ -303,21 +303,25 @@ class _SavedLoadingDispatchesViewState
                       icon: const Icon(Icons.visibility_outlined, size: 18),
                       label: const Text('View'),
                     ),
-                    TextButton.icon(
-                      onPressed: () => _openEdit(dispatch.id),
-                      icon: const Icon(Icons.edit_outlined, size: 18),
-                      label: const Text('Edit'),
-                    ),
-                    TextButton.icon(
-                      onPressed: _controller.actionInProgressId.value.isEmpty
-                          ? () => _confirmDelete(dispatch)
-                          : null,
-                      style: TextButton.styleFrom(
-                        foregroundColor: const Color(0xFFB3261E),
+                    if (dispatch.dispatchStatus.trim().toLowerCase() !=
+                        'approved') ...[
+                      TextButton.icon(
+                        onPressed: () => _openEdit(dispatch.id),
+                        icon: const Icon(Icons.edit_outlined, size: 18),
+                        label: const Text('Edit'),
                       ),
-                      icon: const Icon(Icons.delete_outline, size: 18),
-                      label: const Text('Delete'),
-                    ),
+                      TextButton.icon(
+                        onPressed:
+                            _controller.actionInProgressId.value.isEmpty
+                                ? () => _confirmDelete(dispatch)
+                                : null,
+                        style: TextButton.styleFrom(
+                          foregroundColor: const Color(0xFFB3261E),
+                        ),
+                        icon: const Icon(Icons.delete_outline, size: 18),
+                        label: const Text('Delete'),
+                      ),
+                    ],
                   ],
                 ),
               ],

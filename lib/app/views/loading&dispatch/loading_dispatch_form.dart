@@ -9,6 +9,7 @@ import '../../controllers/loading&dispatch/loading_dispatch_controller.dart';
 import '../../helpers/form_validations_helper.dart';
 import '../../models/loading_dispatch.dart';
 import '../../models/lookup_option.dart';
+import '../../routes/app_routes.dart';
 import '../../theme/app_theme.dart';
 
 const _ink = AppColors.textDefaultLight;
@@ -43,6 +44,9 @@ class _LoadingDispatchFormViewState extends State<LoadingDispatchFormView> {
   LoadingDispatch? _existingDispatch;
   bool _loading = true;
   String? _loadError;
+
+  bool get _isApproved =>
+      _existingDispatch?.dispatchStatus.trim().toLowerCase() == 'approved';
 
   @override
   void initState() {
@@ -161,49 +165,57 @@ class _LoadingDispatchFormViewState extends State<LoadingDispatchFormView> {
           child: Column(
             children: [
               Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 860),
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          border: Border.all(color: _line),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _sectionTitle('Dispatch Details'),
-                            const SizedBox(height: 14),
-                            _customerField(),
-                            const SizedBox(height: 14),
-                            _twoFields(_lorryField(), _driverNameField()),
-                            const SizedBox(height: 14),
-                            _driverMobileField(),
-                            const SizedBox(height: 22),
-                            Row(
-                              children: [
-                                Expanded(child: _sectionTitle('Loading Lines')),
-                                OutlinedButton.icon(
-                                  onPressed: _addLine,
-                                  icon: const Icon(Icons.add, size: 18),
-                                  label: const Text('Add Line'),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            for (var index = 0; index < _lines.length; index++)
-                              Padding(
-                                padding: EdgeInsets.only(
-                                  bottom: index == _lines.length - 1 ? 0 : 12,
-                                ),
-                                child: _lineCard(index, _lines[index]),
+                child: AbsorbPointer(
+                  absorbing: _isApproved,
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 860),
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            border: Border.all(color: _line),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _sectionTitle('Dispatch Details'),
+                              const SizedBox(height: 14),
+                              _customerField(),
+                              const SizedBox(height: 14),
+                              _twoFields(_lorryField(), _driverNameField()),
+                              const SizedBox(height: 14),
+                              _driverMobileField(),
+                              const SizedBox(height: 22),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _sectionTitle('Loading Lines'),
+                                  ),
+                                  OutlinedButton.icon(
+                                    onPressed: _addLine,
+                                    icon: const Icon(Icons.add, size: 18),
+                                    label: const Text('Add Line'),
+                                  ),
+                                ],
                               ),
-                          ],
+                              const SizedBox(height: 10),
+                              for (var index = 0;
+                                  index < _lines.length;
+                                  index++)
+                                Padding(
+                                  padding: EdgeInsets.only(
+                                    bottom:
+                                        index == _lines.length - 1 ? 0 : 12,
+                                  ),
+                                  child: _lineCard(index, _lines[index]),
+                                ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -420,34 +432,57 @@ class _LoadingDispatchFormViewState extends State<LoadingDispatchFormView> {
 
   Widget _saveButton() => SafeArea(
         top: false,
-        child: Obx(
-          () => Container(
+        child: Obx(() {
+          if (_isApproved) return const SizedBox.shrink();
+          final isSaving = _controller.isSaving.value;
+          return Container(
             width: double.infinity,
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
             color: Colors.white,
-            child: ElevatedButton(
-              onPressed: _controller.isSaving.value ? null : _save,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _green,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-              child: _controller.isSaving.value
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : Text(widget.isEdit ? 'Save Changes' : 'Save Draft'),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: isSaving ? null : _save,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _green,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: isSaving
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : Text(
+                            widget.isEdit ? 'Save Changes' : 'Save Dispatch',
+                          ),
+                  ),
+                ),
+                if (widget.isEdit) ...[
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: isSaving ? null : _confirmApprove,
+                      child: const Text('Approve'),
+                    ),
+                  ),
+                ],
+              ],
             ),
-          ),
-        ),
+          );
+        }),
       );
 
   Future<void> _save() async {
+    if (_isApproved) return;
     if (!_formKey.currentState!.validate()) return;
     final lineModels = <LoadingDispatchLine>[];
     for (final line in _lines) {
@@ -476,12 +511,40 @@ class _LoadingDispatchFormViewState extends State<LoadingDispatchFormView> {
       driverName: _driverName.text.trim(),
       driverMobile: _driverMobile.text.trim(),
       dispatchDate: lineModels.first.date,
-      dispatchStatus: _existingDispatch?.dispatchStatus ?? 'Draft',
+      dispatchStatus: _existingDispatch?.dispatchStatus ?? 'Pending',
       invoiceGenerated: _existingDispatch?.invoiceGenerated ?? false,
       lines: lineModels,
     );
     final saved = await _controller.saveDispatch(dispatch);
-    if (saved && mounted) Get.back<bool>(result: true);
+    if (saved && mounted) {
+      await Get.offNamed<void>(Routes.savedLoadingDispatches);
+    }
+  }
+
+  Future<void> _confirmApprove() async {
+    final dispatch = _existingDispatch;
+    if (dispatch == null || _isApproved || _controller.isSaving.value) return;
+    final confirmed = await Get.dialog<bool>(
+      AlertDialog(
+        title: const Text('Approve dispatch?'),
+        content: Text('Approve ${dispatch.dispatchNumber}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back<bool>(result: false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Get.back<bool>(result: true),
+            child: const Text('Approve'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final approved = await _controller.approveDispatch(dispatch);
+    if (approved && mounted) {
+      await Get.offNamed<void>(Routes.savedLoadingDispatches);
+    }
   }
 
   Future<void> _pickLineDate(_DispatchLineEditor line) async {

@@ -166,7 +166,8 @@ void main() {
     controller.salesOrdersCompleter = Completer<void>();
     await openConversion(tester);
 
-    final soNumberField = tester.widget<TextField>(find.byType(TextField).first);
+    final soNumberField =
+        tester.widget<TextField>(find.byType(TextField).first);
     expect(soNumberField.controller!.text, 'SO-01');
     final saveButton = tester.widget<ElevatedButton>(
       find.ancestor(

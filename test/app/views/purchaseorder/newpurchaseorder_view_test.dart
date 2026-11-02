@@ -404,7 +404,8 @@ void main() {
     expect(find.text('Edit Purchase Order'), findsOneWidget);
     expect(find.text('Save Changes'), findsOneWidget);
     expect(find.text('Approve'), findsOneWidget);
-    expect(tester.widget<TextField>(_fieldUnder('Qty (Tons)')).readOnly, isFalse);
+    expect(
+        tester.widget<TextField>(_fieldUnder('Qty (Tons)')).readOnly, isFalse);
   });
 
   testWidgets('users without main-app access do not see the action menu', (
@@ -759,7 +760,8 @@ void main() {
     expect(find.text('Save Changes'), findsOneWidget);
     expect(find.text('Approve'), findsOneWidget);
     expect(find.text('Convert to Sales Order'), findsNothing);
-    expect(tester.widget<TextField>(_fieldUnder('Qty (Tons)')).readOnly, isFalse);
+    expect(
+        tester.widget<TextField>(_fieldUnder('Qty (Tons)')).readOnly, isFalse);
   });
 
   testWidgets('approved order opens the registered Sales Order draft route', (

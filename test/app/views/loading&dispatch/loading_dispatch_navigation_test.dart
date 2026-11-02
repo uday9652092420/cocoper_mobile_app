@@ -119,14 +119,14 @@ void main() {
 
     expect(Get.currentRoute, Routes.newLoadingDispatch);
     expect(find.text('Dispatch Number'), findsNothing);
-    await tester.ensureVisible(find.text('Save Draft'));
-    await tester.tap(find.text('Save Draft'));
+    await tester.ensureVisible(find.text('Save Dispatch'));
+    await tester.tap(find.text('Save Dispatch'));
     await tester.pumpAndSettle();
     expect(find.text('Select a customer.'), findsOneWidget);
     expect(_controller.savedDispatch, isNull);
 
     await _fillDraftFields(tester);
-    await tester.tap(find.text('Save Draft'));
+    await tester.tap(find.text('Save Dispatch'));
     await tester.pumpAndSettle();
 
     expect(_controller.savedDispatch?.id, isEmpty);
@@ -136,6 +136,7 @@ void main() {
     expect(_controller.savedDispatch?.lines.single.itemId, 'item-1');
     expect(_controller.savedDispatch?.lines.single.quantity, 25.5);
     expect(_controller.savedDispatch?.lines.single.bharthi, 'Jute Bag');
+    expect(_controller.savedDispatch?.dispatchStatus, 'Pending');
     expect(Get.currentRoute, Routes.savedLoadingDispatches);
   });
 
@@ -175,6 +176,37 @@ void main() {
     expect(_controller.savedDispatch?.lines.single.id, 'line-1');
     expect(_controller.savedDispatch?.driverName, 'Updated Driver');
     expect(Get.currentRoute, Routes.savedLoadingDispatches);
+  });
+
+  testWidgets('approving an edit returns to the list with view-only actions', (
+    tester,
+  ) async {
+    _controller.dispatches.assignAll([_dispatch]);
+    await _pumpOperations(tester);
+    await _openSavedList(tester);
+    await tester.ensureVisible(find.text('Edit'));
+    await tester.tap(find.text('Edit'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Save Changes'), findsOneWidget);
+    expect(find.text('Approve'), findsOneWidget);
+    await tester.tap(find.text('Approve'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(FilledButton),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(_controller.approvedDispatchId, 'dispatch-1');
+    expect(Get.currentRoute, Routes.savedLoadingDispatches);
+    expect(find.text('Approved'), findsOneWidget);
+    expect(find.text('View'), findsOneWidget);
+    expect(find.text('Edit'), findsNothing);
+    expect(find.text('Delete'), findsNothing);
+    expect(find.text('Approve'), findsNothing);
   });
 
   testWidgets('view details is read-only and back returns to saved list',
@@ -254,6 +286,7 @@ class _TestLoadingDispatchController extends LoadingDispatchController {
 
   LoadingDispatch? savedDispatch;
   String? deletedDispatchId;
+  String? approvedDispatchId;
 
   @override
   Future<void> loadLookups() async {}
@@ -281,6 +314,25 @@ class _TestLoadingDispatchController extends LoadingDispatchController {
   @override
   Future<bool> deleteDispatch(LoadingDispatch dispatch) async {
     deletedDispatchId = dispatch.id;
+    return true;
+  }
+
+  @override
+  Future<bool> approveDispatch(LoadingDispatch dispatch) async {
+    approvedDispatchId = dispatch.id;
+    final approvedDispatch = LoadingDispatch(
+      id: dispatch.id,
+      dispatchNumber: dispatch.dispatchNumber,
+      customerId: dispatch.customerId,
+      lorryNumber: dispatch.lorryNumber,
+      driverName: dispatch.driverName,
+      driverMobile: dispatch.driverMobile,
+      dispatchDate: dispatch.dispatchDate,
+      dispatchStatus: 'Approved',
+      invoiceGenerated: dispatch.invoiceGenerated,
+      lines: dispatch.lines,
+    );
+    this.dispatches.assignAll([approvedDispatch]);
     return true;
   }
 }

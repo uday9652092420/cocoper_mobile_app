@@ -148,8 +148,7 @@ class _NewPurchaseOrderViewState extends State<NewPurchaseOrderView> {
     if (widget.order == null) {
       return true;
     }
-    return !_isReadOnly &&
-        _hasPermission('purchase-order.edit');
+    return !_isReadOnly && _hasPermission('purchase-order.edit');
   }
 
   bool get _isReadOnly =>

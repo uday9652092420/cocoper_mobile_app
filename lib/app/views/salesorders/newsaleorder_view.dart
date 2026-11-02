@@ -451,7 +451,7 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
                           ? 'Saving…'
                           : isCheckingStatus
                               ? 'Checking…'
-                            : conversionBlocked
+                              : conversionBlocked
                                   ? existingSalesOrderId?.isNotEmpty == true
                                       ? 'View Sales Order'
                                       : 'Check status'
@@ -727,7 +727,8 @@ class _NewSaleOrderViewState extends State<NewSaleOrderView> {
         isDense: true,
         filled: true,
         fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: const BorderSide(color: _kLine),

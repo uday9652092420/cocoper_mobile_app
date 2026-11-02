@@ -175,7 +175,11 @@ class EndPoints {
   // ============================================================
 
   static const String loadingDispatches = 'loading-dispatch';
+  static const String nextLoadingDispatchNumber =
+      '$loadingDispatches/next-number';
   static String loadingDispatch(String id) => '$loadingDispatches/$id';
+  static String loadingDispatchStatus(String id) =>
+      '${loadingDispatch(id)}/status';
 
   // ============================================================
   // CUSTOMER RECEIPTS

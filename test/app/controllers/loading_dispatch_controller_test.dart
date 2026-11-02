@@ -1,17 +1,53 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
+import 'package:cocoper_mobile/app/controllers/loading&dispatch/loading_dispatch_controller.dart';
 import 'package:cocoper_mobile/app/models/loading_dispatch.dart';
 import 'package:cocoper_mobile/app/repositories/loading_dispatch_repository.dart';
 import 'package:cocoper_mobile/app/services/loading_dispatch_service.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:get/get.dart' hide Response;
 
 void main() {
+  testWidgets('dispatch list can start loading during a widget build', (
+    tester,
+  ) async {
+    final controller = LoadingDispatchController(
+      service: LoadingDispatchService(
+        repository: _FakeLoadingDispatchRepository(),
+      ),
+    );
+    var requested = false;
+    bool? loadingDuringBuild;
+
+    await tester.pumpWidget(
+      GetMaterialApp(
+        home: Obx(() {
+          final isLoading = controller.isLoadingList.value;
+          if (!requested) {
+            requested = true;
+            unawaited(controller.loadDispatches());
+            loadingDuringBuild = controller.isLoadingList.value;
+          }
+          return Text(isLoading ? 'Loading' : 'Ready');
+        }),
+      ),
+    );
+    expect(loadingDuringBuild, isFalse);
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(controller.isLoadingList.value, isFalse);
+  });
+
   const validDispatch = LoadingDispatch(
     customerId: 'customer-id',
     lorryNumber: 'TN-01-AB-1234',
     driverName: 'Driver One',
     driverMobile: '9876543210',
     dispatchDate: '2026-10-17',
-    dispatchStatus: 'Draft',
+    dispatchStatus: 'Pending',
     lines: [
       LoadingDispatchLine(
         branchId: 'branch-id',
@@ -145,14 +181,16 @@ void main() {
     final service = LoadingDispatchService(repository: repository);
 
     await service.saveDispatch(validDispatch);
+    expect(repository.nextDispatchNumberCalls, 1);
     expect(
       repository.savedPayloads.single,
       {
+        'dispatchNumber': 'LD-2026-0001',
         'customerId': 'customer-id',
         'lorryNumber': 'TN-01-AB-1234',
         'driverName': 'Driver One',
         'driverMobile': '9876543210',
-        'dispatchStatus': 'Draft',
+        'dispatchStatus': 'Pending',
         'dispatchDate': '2026-10-17',
         'invoiceGenerated': false,
         'lines': [
@@ -176,11 +214,24 @@ void main() {
       ),
     );
     expect(repository.savedPayloads.last['id'], 'dispatch-1');
-    expect(
-      repository.savedPayloads.last.containsKey('dispatchNumber'),
-      isFalse,
-    );
+    expect(repository.savedPayloads.last['dispatchNumber'], 'DSP-2026-1');
     expect(repository.savedPayloads.last['lines'], isA<List<dynamic>>());
+  });
+
+  test('approval patches status and dispatch date for the selected ID', () async {
+    final repository = _FakeLoadingDispatchRepository();
+    final service = LoadingDispatchService(repository: repository);
+
+    await service.approveDispatch(
+      id: 'dispatch-1',
+      dispatchDate: '2026-11-02',
+    );
+
+    expect(repository.approvedDispatchIds, ['dispatch-1']);
+    expect(repository.approvalPayloads.single, {
+      'status': 'Approved',
+      'dispatchDate': '2026-11-02',
+    });
   });
 
   test('serializes the reported quantity as a JSON number', () async {
@@ -382,6 +433,9 @@ extension on LoadingDispatch {
 class _FakeLoadingDispatchRepository extends LoadingDispatchRepository {
   final savedPayloads = <Map<String, dynamic>>[];
   final deletedIds = <String>[];
+  final approvedDispatchIds = <String>[];
+  final approvalPayloads = <Map<String, dynamic>>[];
+  int nextDispatchNumberCalls = 0;
   dynamic dispatchResponse = const <dynamic>[];
   dynamic gunnyBagResponse = const <dynamic>[];
   int gunnyBagStatusCode = 200;
@@ -401,6 +455,15 @@ class _FakeLoadingDispatchRepository extends LoadingDispatchRepository {
       _response(dispatchResponse);
 
   @override
+  Future<Response<dynamic>?> fetchNextDispatchNumber() async {
+    nextDispatchNumberCalls++;
+    return _response({
+      'success': true,
+      'data': {'dispatchNumber': 'LD-2026-0001'},
+    });
+  }
+
+  @override
   Future<Response<dynamic>?> fetchGunnyBags() async => gunnyBagNoResponse
       ? null
       : _response(gunnyBagResponse, statusCode: gunnyBagStatusCode);
@@ -411,6 +474,16 @@ class _FakeLoadingDispatchRepository extends LoadingDispatchRepository {
   ) async {
     savedPayloads.add(payload);
     return _response(saveResponse, statusCode: saveStatusCode);
+  }
+
+  @override
+  Future<Response<dynamic>?> approveDispatch(
+    String id,
+    Map<String, dynamic> payload,
+  ) async {
+    approvedDispatchIds.add(id);
+    approvalPayloads.add(payload);
+    return _response({'success': true});
   }
 
   @override

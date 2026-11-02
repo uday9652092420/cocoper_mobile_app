@@ -50,17 +50,22 @@ class LoadingDispatch {
     );
   }
 
-  Map<String, dynamic> toRequestJson() => <String, dynamic>{
-        if (id.isNotEmpty) 'id': id,
-        'customerId': customerId,
-        'lorryNumber': lorryNumber.trim(),
-        'driverName': driverName.trim(),
-        'driverMobile': driverMobile.trim(),
-        'dispatchStatus': dispatchStatus,
-        if (dispatchDate.isNotEmpty) 'dispatchDate': dispatchDate,
-        'invoiceGenerated': invoiceGenerated,
-        'lines': lines.map((line) => line.toRequestJson()).toList(),
-      };
+  Map<String, dynamic> toRequestJson({String? dispatchNumber}) {
+    final requestDispatchNumber = dispatchNumber ?? this.dispatchNumber;
+    return <String, dynamic>{
+      if (id.isNotEmpty) 'id': id,
+      if (requestDispatchNumber.trim().isNotEmpty)
+        'dispatchNumber': requestDispatchNumber.trim(),
+      'customerId': customerId,
+      'lorryNumber': lorryNumber.trim(),
+      'driverName': driverName.trim(),
+      'driverMobile': driverMobile.trim(),
+      'dispatchStatus': dispatchStatus,
+      if (dispatchDate.isNotEmpty) 'dispatchDate': dispatchDate,
+      'invoiceGenerated': invoiceGenerated,
+      'lines': lines.map((line) => line.toRequestJson()).toList(),
+    };
+  }
 
   static String _text(dynamic value) => value?.toString().trim() ?? '';
 

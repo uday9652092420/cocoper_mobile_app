@@ -1,3 +1,4 @@
+import 'package:flutter/scheduler.dart';
 import 'package:get/get.dart';
 
 import '../../helpers/flutter_toast.dart';
@@ -59,13 +60,21 @@ class LoadingDispatchController extends GetxController {
       if (!force) return running;
       await running;
     }
-    final request = _performLoadDispatches();
+    final request = _performLoadDispatchesAfterFrame();
     _listRequest = request;
     try {
       await request;
     } finally {
       if (identical(_listRequest, request)) _listRequest = null;
     }
+  }
+
+  Future<void> _performLoadDispatchesAfterFrame() async {
+    final scheduler = SchedulerBinding.instance;
+    if (scheduler.schedulerPhase == SchedulerPhase.persistentCallbacks) {
+      await scheduler.endOfFrame;
+    }
+    await _performLoadDispatches();
   }
 
   Future<void> _performLoadDispatches() async {
@@ -170,7 +179,7 @@ class LoadingDispatchController extends GetxController {
       } else {
         await successToast(
           dispatch.id.isEmpty
-              ? 'Dispatch saved as draft.'
+              ? 'Dispatch saved successfully.'
               : 'Dispatch updated successfully.',
         );
       }
@@ -203,6 +212,36 @@ class LoadingDispatchController extends GetxController {
       return false;
     } finally {
       actionInProgressId.value = '';
+    }
+  }
+
+  Future<bool> approveDispatch(LoadingDispatch dispatch) async {
+    if (isSaving.value ||
+        dispatch.id.trim().isEmpty ||
+        dispatch.dispatchStatus.trim().toLowerCase() == 'approved') {
+      return false;
+    }
+    isSaving.value = true;
+    try {
+      await _service.approveDispatch(
+        id: dispatch.id,
+        dispatchDate: dispatch.dispatchDate,
+      );
+      await refreshDispatches();
+      if (hasListError.value) {
+        await errorToast(
+          'Dispatch approved, but the list could not be refreshed: '
+          '${listError.value}',
+        );
+      } else {
+        await successToast('Dispatch approved successfully.');
+      }
+      return true;
+    } catch (error) {
+      await errorToast('Unable to approve dispatch: $error');
+      return false;
+    } finally {
+      isSaving.value = false;
     }
   }
 

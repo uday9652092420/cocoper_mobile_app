@@ -147,7 +147,7 @@ HTTP 401 on an authenticated request clears the session. HTTP 403 retains the ex
 | Purchase Order | GET/POST /purchase-orders; PUT /purchase-orders/:id | PUT same resource with full verified payload and status=Approved | DELETE /purchase-orders/:id |
 | Purchase Invoice | GET/POST /purchase-invoices; PUT /purchase-invoices/:id | PUT same resource with status=Approved | DELETE /purchase-invoices/:id |
 | Sales | GET/POST /direct-sales; PUT /direct-sales/:id | POST /direct-sales/:id/approve | DELETE /direct-sales/:id |
-| Loading & Dispatch | GET/POST /loading-dispatch; update is POST with body id | PATCH /loading-dispatch/:id/status {status} | DELETE /loading-dispatch/:id |
+| Loading & Dispatch | GET/POST /loading-dispatch; GET /loading-dispatch/next-number; update is POST with body id | PATCH /loading-dispatch/:id/status {status, dispatchDate} | DELETE /loading-dispatch/:id |
 | Customer Receipt | GET/POST /customer-receipts; PUT /customer-receipts/:id | POST /customer-receipts/:id/approve | DELETE /customer-receipts/:id |
 | Supplier Payment | GET/POST /supplier-payments; PUT /supplier-payments/:id | POST /supplier-payments/:id/approve | DELETE /supplier-payments/:id |
 | Labour Payment | GET /labour-attendance; POST {records:[...]}; PUT /labour-attendance/:id | PATCH /labour-attendance/group/:groupId/status {status} | DELETE /labour-attendance/group/:groupId |
@@ -285,10 +285,10 @@ Loading & Dispatch reads the full nested-line collection from
 `GET /loading-dispatch`; there is no verified detail endpoint, so View and Edit
 refresh the list and resolve the selected database ID. Create and update both
 use `POST /loading-dispatch`; updates include the existing dispatch ID and
-loading-line IDs in the request body. The mobile form does not collect a
-dispatch number; it omits the number on create and preserves the number
-returned for an existing dispatch on update. The backend uses its generated
-dispatch ID as the dispatch number when create omits it. Delete uses
+loading-line IDs in the request body. Create first requests
+`GET /loading-dispatch/next-number` and submits its `data.dispatchNumber` in the
+request body, preserving the existing number on update. New dispatches use the
+`Pending` status. Delete uses
 `DELETE /loading-dispatch/:id`. Customer, branch, and item selectors reuse the
 existing `GET /customers`, `GET /branches`, and `GET /items` lookups. The
 `GET /gunny-bags` master lookup also populates the line's Bharthi selector,

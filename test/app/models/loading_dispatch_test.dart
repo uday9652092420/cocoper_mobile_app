@@ -37,7 +37,7 @@ void main() {
     expect(dispatch.lines.single.pendingQuantity, 10.5);
   });
 
-  test('serializes edits with the existing ID but no dispatch number', () {
+  test('serializes edits with the existing ID and dispatch number', () {
     const dispatch = LoadingDispatch(
       id: 'LD-42',
       dispatchNumber: 'DSP-2026-42',
@@ -62,7 +62,7 @@ void main() {
 
     final payload = dispatch.toRequestJson();
     expect(payload['id'], 'LD-42');
-    expect(payload.containsKey('dispatchNumber'), isFalse);
+    expect(payload['dispatchNumber'], 'DSP-2026-42');
     expect(payload['dispatchStatus'], 'Draft');
     expect((payload['lines'] as List).single['branchId'], 'branch-id');
   });

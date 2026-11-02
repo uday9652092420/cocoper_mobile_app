@@ -7,14 +7,16 @@ class LoadingDispatchRepository {
   Future<Response<dynamic>?> fetchDispatches() =>
       ApiService.get(EndPoints.loadingDispatches);
 
+  Future<Response<dynamic>?> fetchNextDispatchNumber() =>
+      ApiService.get(EndPoints.nextLoadingDispatchNumber);
+
   Future<Response<dynamic>?> fetchCustomers() =>
       ApiService.get(EndPoints.customers);
 
   Future<Response<dynamic>?> fetchBranches() =>
       ApiService.get(EndPoints.branches);
 
-  Future<Response<dynamic>?> fetchItems() =>
-      ApiService.get(EndPoints.items);
+  Future<Response<dynamic>?> fetchItems() => ApiService.get(EndPoints.items);
 
   Future<Response<dynamic>?> fetchGunnyBags() =>
       ApiService.get(EndPoints.gunnyBags);
@@ -25,6 +27,16 @@ class LoadingDispatchRepository {
         payload,
         diagnosticLabel: 'LoadingDispatchApi',
       );
+
+    Future<Response<dynamic>?> approveDispatch(
+        String id,
+        Map<String, dynamic> payload,
+    ) =>
+            ApiService.patch(
+                EndPoints.loadingDispatchStatus(id),
+                body: payload,
+                diagnosticLabel: 'LoadingDispatchApprovalApi',
+            );
 
   Future<Response<dynamic>?> deleteDispatch(String id) =>
       ApiService.delete(EndPoints.loadingDispatch(id));
