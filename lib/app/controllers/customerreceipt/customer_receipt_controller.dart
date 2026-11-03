@@ -147,6 +147,32 @@ class CustomerReceiptController extends GetxController {
     }
   }
 
+  Future<CustomerReceiptCumulative> fetchCustomerReceiptCumulative(
+    String customerId, {
+    String? excludeReceiptId,
+  }) async {
+    final response = await ApiService.get(
+      EndPoints.customerReceiptCumulative(customerId),
+      queryParameters: {
+        if (excludeReceiptId != null && excludeReceiptId.trim().isNotEmpty)
+          'excludeReceiptId': excludeReceiptId,
+      },
+    );
+    if (!_isSuccessful(response)) {
+      throw Exception(
+        _message(response?.data, 'Unable to load the customer balance.'),
+      );
+    }
+    final body = response!.data;
+    final data = body is Map && body['success'] == true ? body['data'] : null;
+    if (data is! Map) {
+      throw const FormatException(
+        'The server returned an invalid cumulative customer receipt response.',
+      );
+    }
+    return CustomerReceiptCumulative.fromJson(Map<String, dynamic>.from(data));
+  }
+
   Future<String?> generateReceiptNumber() async {
     try {
       final response =

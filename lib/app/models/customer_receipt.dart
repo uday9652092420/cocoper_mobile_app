@@ -1,6 +1,35 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+class CustomerReceiptCumulative {
+  final double totalInvoices;
+  final double paid;
+  final double outstanding;
+
+  const CustomerReceiptCumulative({
+    required this.totalInvoices,
+    required this.paid,
+    required this.outstanding,
+  });
+
+  factory CustomerReceiptCumulative.fromJson(Map<String, dynamic> json) {
+    return CustomerReceiptCumulative(
+      totalInvoices: _amount(json['totalInvoices'], 'totalInvoices'),
+      paid: _amount(json['paid'], 'paid'),
+      outstanding: _amount(json['outstanding'], 'outstanding'),
+    );
+  }
+
+  static double _amount(dynamic value, String field) {
+    final amount = value is num ? value.toDouble() : double.tryParse('$value');
+    if (amount == null || !amount.isFinite || amount < 0) {
+      throw FormatException(
+          'The cumulative customer receipt $field is invalid.');
+    }
+    return amount;
+  }
+}
+
 /// Customer Receipt fields documented by the mobile API contract.
 class CustomerReceipt {
   final String id;
@@ -37,10 +66,8 @@ class CustomerReceipt {
     Map<String, dynamic> json, {
     String? fallbackId,
   }) {
-    final attachmentNames =
-        json['attachment_names'] ?? json['attachmentNames'];
-    final attachmentFiles =
-        json['attachment_files'] ?? json['attachmentFiles'];
+    final attachmentNames = json['attachment_names'] ?? json['attachmentNames'];
+    final attachmentFiles = json['attachment_files'] ?? json['attachmentFiles'];
     return CustomerReceipt(
       id: _string(json['id'] ?? json['_id'] ?? fallbackId),
       receiptNumber: _string(json['receipt_no']),
@@ -52,13 +79,12 @@ class CustomerReceipt {
       remarks: _string(json['remarks']),
       status: _receiptStatus(json),
       amount: _double(json['amount']),
-        attachmentNamesJson: _attachmentArrayJson(attachmentNames),
-        attachmentFilesJson: _attachmentArrayJson(attachmentFiles),
-        hasAttachmentFields:
-          (json.containsKey('attachment_names') ||
-            json.containsKey('attachmentNames')) &&
+      attachmentNamesJson: _attachmentArrayJson(attachmentNames),
+      attachmentFilesJson: _attachmentArrayJson(attachmentFiles),
+      hasAttachmentFields: (json.containsKey('attachment_names') ||
+              json.containsKey('attachmentNames')) &&
           (json.containsKey('attachment_files') ||
-            json.containsKey('attachmentFiles')),
+              json.containsKey('attachmentFiles')),
     );
   }
 

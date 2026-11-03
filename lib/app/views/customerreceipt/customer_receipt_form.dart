@@ -48,9 +48,14 @@ class _CustomerReceiptFormViewState extends State<CustomerReceiptFormView> {
   String _invoiceMode = 'Invoice by Invoice';
   String _paymentMode = 'Cash';
   CustomerReceipt? _receipt;
+  CustomerReceiptCumulative? _cumulativeSummary;
   bool _isReadOnly = false;
   bool _loading = true;
+  bool _loadingCumulative = false;
+  bool _prefillCumulativeAmount = false;
   String? _loadError;
+  String? _cumulativeError;
+  int _cumulativeRequest = 0;
   String? _numberError;
   bool _isGeneratingNumber = false;
   bool _hasUserEditedNumber = false;
@@ -150,7 +155,12 @@ class _CustomerReceiptFormViewState extends State<CustomerReceiptFormView> {
       unawaited(_generateReceiptNumber());
       return;
     }
-    if (mounted) setState(() => _loading = false);
+    if (mounted) {
+      setState(() => _loading = false);
+      if (_invoiceMode == 'Cumulative') {
+        unawaited(_loadCumulativeBalance(_customerId!));
+      }
+    }
   }
 
   Future<void> _loadNewReceiptLookups() async {
@@ -306,7 +316,16 @@ class _CustomerReceiptFormViewState extends State<CustomerReceiptFormView> {
                                 _invoiceMode = value!;
                                 _invoiceNumber.clear();
                                 _amount.clear();
+                                _clearCumulativeBalance();
+                                _prefillCumulativeAmount =
+                                    _invoiceMode == 'Cumulative';
                               });
+                              if (_invoiceMode == 'Cumulative' &&
+                                  _customerId != null) {
+                                unawaited(
+                                  _loadCumulativeBalance(_customerId!),
+                                );
+                              }
                             },
                           ),
                         ),
@@ -371,8 +390,10 @@ class _CustomerReceiptFormViewState extends State<CustomerReceiptFormView> {
                             required: true,
                             numeric: true,
                             prefixText: '₹ ',
+                            onChanged: (_) => _prefillCumulativeAmount = false,
                           ),
                         ),
+                        if (_invoiceMode == 'Cumulative') _cumulativeBalance(),
                         const SizedBox(height: 14),
                         _attachmentSection(),
                         const SizedBox(height: 14),
@@ -402,11 +423,7 @@ class _CustomerReceiptFormViewState extends State<CustomerReceiptFormView> {
         ],
         onChanged: _isReadOnly || _controller.isLoadingForm.value
             ? null
-            : (value) => setState(() {
-                  _customerId = value;
-                  _invoiceNumber.clear();
-                  _amount.clear();
-                }),
+            : _onCustomerChanged,
         validator: (value) =>
             (value?.isNotEmpty ?? false) ? null : 'Select a customer.',
       );
@@ -464,6 +481,132 @@ class _CustomerReceiptFormViewState extends State<CustomerReceiptFormView> {
         ],
       );
 
+  void _onCustomerChanged(String? customerId) {
+    setState(() {
+      _customerId = customerId;
+      _invoiceNumber.clear();
+      _amount.clear();
+      _clearCumulativeBalance();
+      _prefillCumulativeAmount =
+          _invoiceMode == 'Cumulative' && customerId != null;
+    });
+    if (_invoiceMode == 'Cumulative' && customerId != null) {
+      unawaited(_loadCumulativeBalance(customerId));
+    }
+  }
+
+  void _clearCumulativeBalance() {
+    _cumulativeRequest++;
+    _cumulativeSummary = null;
+    _loadingCumulative = false;
+    _cumulativeError = null;
+  }
+
+  String? get _excludedReceiptId {
+    if (!widget.isEdit || _receipt?.customerId != _customerId) return null;
+    return _receipt?.id;
+  }
+
+  Future<void> _loadCumulativeBalance(String customerId) async {
+    final request = ++_cumulativeRequest;
+    setState(() {
+      _cumulativeSummary = null;
+      _loadingCumulative = true;
+      _cumulativeError = null;
+    });
+    try {
+      final summary = await _controller.fetchCustomerReceiptCumulative(
+        customerId,
+        excludeReceiptId: _excludedReceiptId,
+      );
+      if (!mounted ||
+          request != _cumulativeRequest ||
+          customerId != _customerId ||
+          _invoiceMode != 'Cumulative') {
+        return;
+      }
+      setState(() {
+        _cumulativeSummary = summary;
+        _loadingCumulative = false;
+        if (_prefillCumulativeAmount) {
+          _amount.text = _wholeRupeeAmount(summary.outstanding);
+          _prefillCumulativeAmount = false;
+        }
+      });
+    } catch (error) {
+      if (!mounted ||
+          request != _cumulativeRequest ||
+          customerId != _customerId ||
+          _invoiceMode != 'Cumulative') {
+        return;
+      }
+      setState(() {
+        _loadingCumulative = false;
+        _cumulativeError = 'Unable to load the customer balance: $error';
+      });
+    }
+  }
+
+  Widget _cumulativeBalance() {
+    final summary = _cumulativeSummary;
+    if (_loadingCumulative) {
+      return const Padding(
+        padding: EdgeInsets.only(top: 8),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            'Loading customer balance…',
+            style: TextStyle(fontSize: 12, color: _kMuted),
+          ),
+        ),
+      );
+    }
+    if (_cumulativeError != null) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFF1F0),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFF1C7C4)),
+          ),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.error_outline,
+                color: Color(0xFFB3261E),
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  _cumulativeError!,
+                  style: const TextStyle(fontSize: 12, color: _kMuted),
+                ),
+              ),
+              if (_customerId != null)
+                TextButton(
+                  onPressed: () => _loadCumulativeBalance(_customerId!),
+                  child: const Text('Retry'),
+                ),
+            ],
+          ),
+        ),
+      );
+    }
+    if (summary == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Text(
+        'Total invoices: ₹${_formatAmount(summary.totalInvoices)} · '
+        'Paid: ₹${_formatAmount(summary.paid)} · '
+        'Outstanding: ₹${_formatAmount(summary.outstanding)}',
+        style: const TextStyle(fontSize: 12, color: _kMuted),
+      ),
+    );
+  }
+
   Widget _invoiceField() {
     final invoices = _controller.invoicesForCustomer(
       _customerId ?? '',
@@ -509,8 +652,9 @@ class _CustomerReceiptFormViewState extends State<CustomerReceiptFormView> {
                         value,
                         excludingReceiptId: widget.isEdit ? _receipt?.id : null,
                       );
-                _amount.text =
-                    invoice == null ? '' : _formatAmount(invoice.outstanding);
+                _amount.text = invoice == null
+                    ? ''
+                    : _wholeRupeeAmount(invoice.outstanding);
               }),
       validator: (value) {
         if (value?.isNotEmpty != true) return 'Select an invoice.';
@@ -1149,4 +1293,6 @@ class _CustomerReceiptFormViewState extends State<CustomerReceiptFormView> {
   String _formatAmount(double value) => value == value.roundToDouble()
       ? value.toInt().toString()
       : value.toString();
+
+  String _wholeRupeeAmount(double value) => (value + 1e-9).floor().toString();
 }

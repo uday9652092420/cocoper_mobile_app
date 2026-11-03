@@ -187,6 +187,8 @@ class EndPoints {
 
   static const String customerReceipts = 'customer-receipts';
   static const String nextCustomerReceiptNumber = '$customerReceipts/next-no';
+  static String customerReceiptCumulative(String customerId) =>
+      '$customerReceipts/cumulative/$customerId';
   static String customerReceipt(String id) => '$customerReceipts/$id';
   static String customerReceiptApproval(String id) =>
       '${customerReceipt(id)}/approve';

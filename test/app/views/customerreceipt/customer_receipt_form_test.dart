@@ -198,7 +198,94 @@ void main() {
     );
   });
 
-  testWidgets('changing customer or invoice mode clears invoice amount',
+  testWidgets('invoice balance prefill uses whole rupees without overpaying',
+      (tester) async {
+    final controller = _FakeCustomerReceiptController()
+      ..invoiceRows = const [
+        CustomerReceiptInvoice(
+          id: 'sale-1',
+          number: 'INV-001',
+          displayNumber: 'RSO-04',
+          customerId: 'customer-1',
+          customerName: 'Acme Foods',
+          total: 71750,
+        ),
+      ]
+      ..receiptRows = const [
+        CustomerReceipt(
+          id: 'previous-receipt',
+          customerId: 'customer-1',
+          invoiceMode: 'Invoice by Invoice',
+          invoiceNumber: 'INV-001',
+          amount: 31750.47,
+        ),
+      ];
+
+    await tester.pumpWidget(
+      GetMaterialApp(
+        initialBinding: _TestReceiptBinding(controller),
+        home: const NewCustomerReceiptView(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(DropdownButtonFormField<String>).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Acme Foods').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(DropdownButtonFormField<String>).at(2));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('INV-001 · 71750').last);
+    await tester.pumpAndSettle();
+
+    final amountField = tester
+        .widgetList<TextFormField>(
+          find.byType(TextFormField),
+        )
+        .elementAt(2);
+    expect(amountField.controller?.text, '39999');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(controller.saveCalls, 1);
+    expect(controller.savedReceipt?.amount, 39999);
+  });
+
+  testWidgets('cumulative receipt loads and prefills customer outstanding',
+      (tester) async {
+    final controller = _FakeCustomerReceiptController();
+
+    await tester.pumpWidget(
+      GetMaterialApp(
+        initialBinding: _TestReceiptBinding(controller),
+        home: const NewCustomerReceiptView(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(DropdownButtonFormField<String>).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Acme Foods').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(DropdownButtonFormField<String>).at(1));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cumulative').last);
+    await tester.pumpAndSettle();
+
+    expect(controller.cumulativeCustomerIds, ['customer-1']);
+    expect(controller.cumulativeExcludedReceiptIds, [null]);
+    expect(
+      tester
+          .widgetList<TextFormField>(find.byType(TextFormField))
+          .elementAt(2)
+          .controller
+          ?.text,
+      '39254',
+    );
+    expect(
+      find.text('Total invoices: ₹71750 · Paid: ₹32496 · Outstanding: ₹39254'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('changing customer or invoice mode updates the amount',
       (tester) async {
     final controller = _FakeCustomerReceiptController()
       ..invoiceRows = const [
@@ -260,7 +347,7 @@ void main() {
           .elementAt(2)
           .controller
           ?.text,
-      isEmpty,
+      '39254',
     );
     expect(find.text('DS-001 · 1000'), findsNothing);
 
@@ -304,6 +391,8 @@ void main() {
     expect(find.text('Acme Foods'), findsOneWidget);
     expect(find.text('Cumulative'), findsOneWidget);
     expect(find.text('UPI'), findsOneWidget);
+    expect(controller.cumulativeCustomerIds, ['customer-1']);
+    expect(controller.cumulativeExcludedReceiptIds, ['receipt-7']);
 
     final fieldControllers = tester
         .widgetList<TextFormField>(find.byType(TextFormField))
@@ -363,7 +452,9 @@ void main() {
     expect(controller.saveCalls, 0);
 
     await tester.enterText(find.byType(TextFormField).last, 'Updated remark');
-    await tester.tap(find.text('Attach File / Upload Attachment'));
+    final attachmentButton = find.text('Attach File / Upload Attachment');
+    await tester.ensureVisible(attachmentButton);
+    await tester.tap(attachmentButton);
     await tester.pumpAndSettle();
     expect(find.text('replacement.png'), findsOneWidget);
     await tester
@@ -817,6 +908,8 @@ class _FakeCustomerReceiptController extends CustomerReceiptController {
   List<CustomerReceipt> receiptRows = [];
   List<CustomerReceipt?>? fetchResults;
   int fetchCalls = 0;
+  final List<String> cumulativeCustomerIds = [];
+  final List<String?> cumulativeExcludedReceiptIds = [];
 
   @override
   Future<void> loadFormLookups() async {
@@ -847,6 +940,20 @@ class _FakeCustomerReceiptController extends CustomerReceiptController {
       return result;
     }
     return id == receipt.id ? receipt : null;
+  }
+
+  @override
+  Future<CustomerReceiptCumulative> fetchCustomerReceiptCumulative(
+    String customerId, {
+    String? excludeReceiptId,
+  }) async {
+    cumulativeCustomerIds.add(customerId);
+    cumulativeExcludedReceiptIds.add(excludeReceiptId);
+    return const CustomerReceiptCumulative(
+      totalInvoices: 71750,
+      paid: 32496,
+      outstanding: 39254,
+    );
   }
 
   @override
