@@ -1,6 +1,35 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+class SupplierPaymentCumulative {
+  final double totalInvoices;
+  final double paid;
+  final double outstanding;
+
+  const SupplierPaymentCumulative({
+    required this.totalInvoices,
+    required this.paid,
+    required this.outstanding,
+  });
+
+  factory SupplierPaymentCumulative.fromJson(Map<String, dynamic> json) {
+    return SupplierPaymentCumulative(
+      totalInvoices: _amount(json['totalInvoices'], 'totalInvoices'),
+      paid: _amount(json['paid'], 'paid'),
+      outstanding: _amount(json['outstanding'], 'outstanding'),
+    );
+  }
+
+  static double _amount(dynamic value, String field) {
+    final amount = value is num ? value.toDouble() : double.tryParse('$value');
+    if (amount == null || !amount.isFinite || amount < 0) {
+      throw FormatException(
+          'The cumulative supplier payment $field is invalid.');
+    }
+    return amount;
+  }
+}
+
 class SupplierPayment {
   final String id;
   final String paymentNumber;

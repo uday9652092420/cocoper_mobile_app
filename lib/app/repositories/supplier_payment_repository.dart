@@ -35,6 +35,23 @@ class SupplierPaymentRepository {
     return _mapRows(raw).map(PurchaseInvoice.fromJson).toList(growable: false);
   }
 
+  Future<SupplierPaymentCumulative> fetchSupplierPaymentCumulative(
+    String supplierId,
+  ) async {
+    final response = await ApiService.get(
+      EndPoints.supplierPaymentCumulative(supplierId),
+    );
+    _requireSuccess(response, 'Unable to load the supplier balance.');
+    final body = response!.data;
+    final data = body is Map && body['success'] == true ? body['data'] : null;
+    if (data is! Map) {
+      throw const SupplierPaymentApiException(
+        'The server returned an invalid cumulative supplier payment response.',
+      );
+    }
+    return SupplierPaymentCumulative.fromJson(Map<String, dynamic>.from(data));
+  }
+
   Future<String> fetchNextPaymentNumber() async {
     final response = await ApiService.get(EndPoints.nextSupplierPaymentNumber);
     _requireSuccess(response, 'Unable to generate a supplier payment number.');

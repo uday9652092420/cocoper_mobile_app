@@ -98,6 +98,11 @@ class SupplierPaymentController extends GetxController {
     });
   }
 
+  Future<SupplierPaymentCumulative> fetchSupplierPaymentCumulative(
+    String supplierId,
+  ) =>
+      _repository.fetchSupplierPaymentCumulative(supplierId);
+
   Future<void> _performLoadLookups() async {
     isLoadingLookups.value = true;
     lookupError.value = '';

@@ -7,6 +7,7 @@ import 'package:cocoper_mobile/app/models/supplier_payment.dart';
 import 'package:cocoper_mobile/app/repositories/supplier_payment_repository.dart';
 import 'package:cocoper_mobile/app/views/supplierpayments/supplier_payment_form.dart';
 import 'package:dio/dio.dart' as dio;
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 
@@ -70,6 +71,38 @@ void main() {
     expect(find.text('Save Changes'), findsNothing);
     expect(find.text('Approve'), findsNothing);
   });
+
+  testWidgets('new cumulative payment defaults amount to outstanding balance',
+      (tester) async {
+    final repository = _SupplierPaymentFormRepository();
+    final controller = SupplierPaymentController(repository: repository);
+    Get.put<SupplierPaymentController>(controller);
+
+    await tester.pumpWidget(
+      const GetMaterialApp(home: SupplierPaymentFormView(isEdit: false)),
+    );
+    await tester.pumpAndSettle();
+
+    final dropdowns = find.byType(DropdownButtonFormField<String>);
+    await tester.tap(dropdowns.at(0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('ABC Supplier').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(dropdowns.at(1));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cumulative').last);
+    await tester.pumpAndSettle();
+
+    final amountField = tester.widget<TextFormField>(
+      find.byKey(const ValueKey('supplier-payment-amount')),
+    );
+    expect(amountField.controller?.text, '900');
+    expect(
+      find.text('Total invoices: ₹1500 · Paid: ₹600 · Outstanding: ₹900'),
+      findsOneWidget,
+    );
+  });
 }
 
 class _SupplierPaymentFormRepository extends SupplierPaymentRepository {
@@ -96,10 +129,25 @@ class _SupplierPaymentFormRepository extends SupplierPaymentRepository {
   Future<List<SupplierPayment>> fetchSupplierPayments() async => [_payment];
 
   @override
-  Future<List<LookupOption>> fetchSuppliers() async => const [];
+  Future<List<PurchaseInvoice>> fetchPurchaseInvoices() async => const [];
 
   @override
-  Future<List<PurchaseInvoice>> fetchPurchaseInvoices() async => const [];
+  Future<List<LookupOption>> fetchSuppliers() async => const [
+        LookupOption(id: 'supplier-id', label: 'ABC Supplier'),
+      ];
+
+  @override
+  Future<String> fetchNextPaymentNumber() async => 'SP-13';
+
+  @override
+  Future<SupplierPaymentCumulative> fetchSupplierPaymentCumulative(
+    String supplierId,
+  ) async =>
+      const SupplierPaymentCumulative(
+        totalInvoices: 1500,
+        paid: 600,
+        outstanding: 900,
+      );
 
   @override
   Future<dio.Response<dynamic>?> approveSupplierPayment(String id) async {

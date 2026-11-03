@@ -197,6 +197,8 @@ class EndPoints {
 
   static const String supplierPayments = 'supplier-payments';
   static const String nextSupplierPaymentNumber = '$supplierPayments/next-no';
+  static String supplierPaymentCumulative(String supplierId) =>
+      '$supplierPayments/cumulative/$supplierId';
   static String supplierPayment(String id) => '$supplierPayments/$id';
   static String supplierPaymentApproval(String id) =>
       '${supplierPayment(id)}/approve';

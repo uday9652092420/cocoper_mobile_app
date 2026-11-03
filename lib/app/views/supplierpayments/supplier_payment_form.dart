@@ -50,8 +50,12 @@ class _SupplierPaymentFormViewState extends State<SupplierPaymentFormView> {
   String _invoiceMode = 'Invoice by Invoice';
   String _paymentMode = 'Cash';
   SupplierPayment? _existingPayment;
+  SupplierPaymentCumulative? _cumulativeSummary;
   bool _loading = true;
+  bool _loadingCumulative = false;
   String? _loadError;
+  String? _cumulativeError;
+  int _cumulativeRequest = 0;
   bool _replaceAttachments = false;
   bool _pickingAttachments = false;
   String? _attachmentError;
@@ -231,6 +235,8 @@ class _SupplierPaymentFormViewState extends State<SupplierPaymentFormView> {
                               const SizedBox(height: 14),
                             ],
                             _twoFields(_paymentModeField(), _amountField()),
+                            if (_invoiceMode == 'Cumulative')
+                              _cumulativeBalance(),
                             const SizedBox(height: 14),
                             _attachmentSection(),
                             const SizedBox(height: 14),
@@ -280,10 +286,7 @@ class _SupplierPaymentFormViewState extends State<SupplierPaymentFormView> {
             child: Text(supplier.label, overflow: TextOverflow.ellipsis),
           ),
       ],
-      onChanged: (value) => setState(() {
-        _supplierId = value;
-        _invoiceId = null;
-      }),
+      onChanged: _onSupplierChanged,
       validator: (value) =>
           value == null || value.isEmpty ? 'Select a supplier.' : null,
     );
@@ -305,9 +308,107 @@ class _SupplierPaymentFormViewState extends State<SupplierPaymentFormView> {
           setState(() {
             _invoiceMode = value;
             if (value == 'Cumulative') _invoiceId = null;
+            if (!widget.isEdit) _amount.clear();
+            if (value != 'Cumulative') _clearCumulativeLookup();
           });
+          if (value == 'Cumulative' && _supplierId != null) {
+            _loadCumulativeBalance(_supplierId!);
+          }
         },
       );
+
+  void _onSupplierChanged(String? supplierId) {
+    setState(() {
+      _supplierId = supplierId;
+      _invoiceId = null;
+      if (!widget.isEdit) _amount.clear();
+      _clearCumulativeLookup();
+    });
+    if (_invoiceMode == 'Cumulative' && supplierId != null) {
+      _loadCumulativeBalance(supplierId);
+    }
+  }
+
+  void _clearCumulativeLookup() {
+    _cumulativeRequest++;
+    _cumulativeSummary = null;
+    _loadingCumulative = false;
+    _cumulativeError = null;
+  }
+
+  Future<void> _loadCumulativeBalance(String supplierId) async {
+    final request = ++_cumulativeRequest;
+    setState(() {
+      _cumulativeSummary = null;
+      _loadingCumulative = true;
+      _cumulativeError = null;
+    });
+    try {
+      final summary =
+          await _controller.fetchSupplierPaymentCumulative(supplierId);
+      if (!mounted ||
+          request != _cumulativeRequest ||
+          supplierId != _supplierId ||
+          _invoiceMode != 'Cumulative') {
+        return;
+      }
+      setState(() {
+        _cumulativeSummary = summary;
+        _loadingCumulative = false;
+        if (!widget.isEdit) {
+          _amount.text = _formatAmount(summary.outstanding);
+        }
+      });
+    } catch (error) {
+      if (!mounted ||
+          request != _cumulativeRequest ||
+          supplierId != _supplierId ||
+          _invoiceMode != 'Cumulative') {
+        return;
+      }
+      setState(() {
+        _loadingCumulative = false;
+        _cumulativeError = 'Unable to load the supplier balance: $error';
+      });
+    }
+  }
+
+  Widget _cumulativeBalance() {
+    final summary = _cumulativeSummary;
+    if (_loadingCumulative) {
+      return const Padding(
+        padding: EdgeInsets.only(top: 8),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            'Loading supplier balance…',
+            style: TextStyle(fontSize: 12, color: _muted),
+          ),
+        ),
+      );
+    }
+    if (_cumulativeError != null) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: _inlineError(
+          _cumulativeError!,
+          onRetry: _supplierId == null
+              ? null
+              : () => _loadCumulativeBalance(_supplierId!),
+        ),
+      );
+    }
+    if (summary == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Text(
+        'Total invoices: ₹${_formatAmount(summary.totalInvoices)} · '
+        'Paid: ₹${_formatAmount(summary.paid)} · '
+        'Outstanding: ₹${_formatAmount(summary.outstanding)}',
+        style: const TextStyle(fontSize: 12, color: _muted),
+      ),
+    );
+  }
 
   Widget _invoiceField() {
     final editing = _existingPayment;
@@ -388,6 +489,7 @@ class _SupplierPaymentFormViewState extends State<SupplierPaymentFormView> {
             editing: _existingPayment,
           );
     return TextFormField(
+      key: const ValueKey('supplier-payment-amount'),
       controller: _amount,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
       inputFormatters: [
@@ -397,7 +499,10 @@ class _SupplierPaymentFormViewState extends State<SupplierPaymentFormView> {
         prefixText: '₹ ',
         helperText: _invoiceMode == 'Invoice by Invoice' && available != null
             ? 'Available balance: ₹${_formatAmount(available)}'
-            : null,
+            : _invoiceMode == 'Cumulative' && _cumulativeSummary != null
+                ? 'Outstanding balance: '
+                    '₹${_formatAmount(_cumulativeSummary!.outstanding)}'
+                : null,
       ),
       validator: (value) {
         final amount = double.tryParse(value?.trim() ?? '');
