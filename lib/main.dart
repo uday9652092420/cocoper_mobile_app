@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/cupertino.dart'
+    show CupertinoLocalizations, DefaultCupertinoLocalizations;
 import 'package:get/get.dart';
 
 import 'app/config/environment.dart';
+import 'app/helpers/shared_preferences.dart';
 import 'app/localization/localization.dart';
 import 'app/routes/app_pages.dart';
 import 'app/theme/app_theme.dart';
 
 final Stopwatch _startupStopwatch = Stopwatch();
 
-void main() {
+Future<void> main() async {
   if (!Environment.isProduction) {
     _startupStopwatch.start();
   }
@@ -17,7 +20,23 @@ void main() {
   WidgetsFlutterBinding.ensureInitialized();
   _logStartupTiming('Flutter binding initialized');
 
-  runApp(const MyApp());
+  await SharedPrefsHelper.init();
+  final localeValues = await Future.wait([
+    SharedPrefsHelper.getString(
+      SharedPrefsHelper.languageCode,
+      defaultValue: Localization.defaultLocale.languageCode,
+    ),
+    SharedPrefsHelper.getString(
+      SharedPrefsHelper.countryCode,
+      defaultValue: Localization.defaultLocale.countryCode ?? '',
+    ),
+  ]);
+  final savedLocale = Locale(localeValues[0], localeValues[1]);
+  final initialLocale = Localization.supportedLocales.contains(savedLocale)
+      ? savedLocale
+      : Localization.defaultLocale;
+
+  runApp(MyApp(initialLocale: initialLocale));
   _logStartupTiming('runApp invoked');
 
   WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -49,18 +68,30 @@ void _logStartupTiming(String step) {
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  const MyApp({
+    super.key,
+    this.initialLocale = Localization.defaultLocale,
+  });
+
+  final Locale initialLocale;
 
   @override
   Widget build(BuildContext context) {
     return GetMaterialApp(
       title: Environment.appName,
 
-      locale: Localization.defaultLocale,
+      locale: initialLocale,
 
       fallbackLocale: Localization.fallbackLocale,
 
       translations: Localization(),
+
+      supportedLocales: Localization.supportedLocales,
+
+      localizationsDelegates: const [
+        _EnglishFallbackMaterialLocalizationsDelegate(),
+        _EnglishFallbackCupertinoLocalizationsDelegate(),
+      ],
 
       debugShowCheckedModeBanner: false,
 
@@ -91,6 +122,46 @@ class MyApp extends StatelessWidget {
       },
     );
   }
+}
+
+class _EnglishFallbackMaterialLocalizationsDelegate
+    extends LocalizationsDelegate<MaterialLocalizations> {
+  const _EnglishFallbackMaterialLocalizationsDelegate();
+
+  @override
+  bool isSupported(Locale locale) => true;
+
+  @override
+  Future<MaterialLocalizations> load(Locale locale) =>
+      DefaultMaterialLocalizations.delegate.load(
+        Localization.localeEnglishUS,
+      );
+
+  @override
+  bool shouldReload(
+    covariant _EnglishFallbackMaterialLocalizationsDelegate old,
+  ) =>
+      false;
+}
+
+class _EnglishFallbackCupertinoLocalizationsDelegate
+    extends LocalizationsDelegate<CupertinoLocalizations> {
+  const _EnglishFallbackCupertinoLocalizationsDelegate();
+
+  @override
+  bool isSupported(Locale locale) => true;
+
+  @override
+  Future<CupertinoLocalizations> load(Locale locale) =>
+      DefaultCupertinoLocalizations.delegate.load(
+        Localization.localeEnglishUS,
+      );
+
+  @override
+  bool shouldReload(
+    covariant _EnglishFallbackCupertinoLocalizationsDelegate old,
+  ) =>
+      false;
 }
 
 class _RouteNotFoundView extends StatelessWidget {

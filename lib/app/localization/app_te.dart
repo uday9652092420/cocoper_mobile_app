@@ -13,5 +13,25 @@ const Map<String, String> teIN = {
   "active_branch": "క్రియాశీల శాఖ",
   "role": "పాత్ర",
   "select_branch": "శాఖను ఎంచుకోండి",
-  "no_branches": "శాఖలు కేటాయించబడలేదు"
+  "no_branches": "శాఖలు కేటాయించబడలేదు",
+  "home_tagline": "కొబ్బరి కార్యకలాపాలన్నీ",
+  "home_banner_title": "కొబ్బరి కార్యకలాపాలన్నీ.\nఒకే సరళమైన యాప్.",
+  "home_banner_description":
+      "కొనుగోలు, అమ్మకం, పంపిణీ, వసూళ్లు మరియు ట్రాకింగ్ - స్పష్టమైన దశలతో.",
+  "home_search_hint": "పని, కస్టమర్ లేదా వౌచర్‌ను వెతకండి",
+  "home_purchased": "కొనుగోలు",
+  "home_sold": "అమ్మకం",
+  "home_received": "వసూలు",
+  "home_workers": "కార్మికులు",
+  "home_short_steps": "ఎక్కువగా ఉపయోగించే పనులు, సులభమైన చిన్న దశల్లో.",
+  "home_fast_transactions": "త్వరిత లావాదేవీలు",
+  "home_see_all": "అన్నీ చూడండి",
+  "home_purchase_entry": "కొనుగోలు నమోదు",
+  "home_purchase_entry_description":
+      "రైతుల నుంచి కొబ్బరి కొనుగోళ్లను నమోదు చేయండి",
+  "home_sales_order": "కొత్త అమ్మకపు ఆర్డర్",
+  "home_sales_order_description": "కస్టమర్ ఆర్డర్లను సృష్టించి పంపండి",
+  "home_payment_receipt": "చెల్లింపు రసీదు",
+  "home_payment_receipt_description":
+      "కస్టమర్ చెల్లింపులను వసూలు చేసి నమోదు చేయండి"
 };

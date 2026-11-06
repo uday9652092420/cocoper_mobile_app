@@ -13,5 +13,23 @@ const Map<String, String> hiIN = {
   "active_branch": "सक्रिय शाखा",
   "role": "भूमिका",
   "select_branch": "शाखा चुनें",
-  "no_branches": "कोई शाखा असाइन नहीं"
+  "no_branches": "कोई शाखा असाइन नहीं",
+  "home_tagline": "नारियल से जुड़े सभी काम",
+  "home_banner_title": "नारियल का हर काम।\nएक आसान ऐप।",
+  "home_banner_description":
+      "खरीदें, बेचें, भेजें, भुगतान लें और ट्रैक करें - आसान चरणों में।",
+  "home_search_hint": "काम, ग्राहक या वाउचर खोजें",
+  "home_purchased": "खरीदा",
+  "home_sold": "बेचा",
+  "home_received": "प्राप्त",
+  "home_workers": "कर्मचारी",
+  "home_short_steps": "सबसे ज़्यादा इस्तेमाल होने वाले काम, आसान चरणों में।",
+  "home_fast_transactions": "तेज़ लेन-देन",
+  "home_see_all": "सभी देखें",
+  "home_purchase_entry": "खरीद दर्ज करें",
+  "home_purchase_entry_description": "किसानों से नारियल की खरीद दर्ज करें",
+  "home_sales_order": "नया बिक्री ऑर्डर",
+  "home_sales_order_description": "ग्राहक ऑर्डर बनाएं और भेजें",
+  "home_payment_receipt": "भुगतान रसीद",
+  "home_payment_receipt_description": "ग्राहक भुगतान लें और दर्ज करें"
 };

@@ -87,11 +87,11 @@ class HomeView extends GetView<DashboardController> {
           ),
         ),
         const SizedBox(width: 12),
-        const Expanded(
+        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
+              const Text(
                 'COCOPER',
                 style: TextStyle(
                   fontSize: 18,
@@ -101,8 +101,8 @@ class HomeView extends GetView<DashboardController> {
                 ),
               ),
               Text(
-                'All coconut operations',
-                style: TextStyle(fontSize: 13, color: _kMuted),
+                'home_tagline'.tr,
+                style: const TextStyle(fontSize: 13, color: _kMuted),
               ),
             ],
           ),
@@ -185,7 +185,7 @@ class HomeView extends GetView<DashboardController> {
     await SharedPrefsHelper.setString(SharedPrefsHelper.languageCode, code);
     await SharedPrefsHelper.setString(SharedPrefsHelper.countryCode, country);
 
-    Get.updateLocale(Locale(code, country));
+    await Get.updateLocale(Locale(code, country));
   }
 
   Future<void> _logout() async {
@@ -401,11 +401,11 @@ class HomeView extends GetView<DashboardController> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                const Text(
                   'COCOPER INDIA PVT. LTD.',
                   style: TextStyle(
                     fontSize: 11.5,
@@ -414,21 +414,20 @@ class HomeView extends GetView<DashboardController> {
                     color: Color(0xFF9FC0AE),
                   ),
                 ),
-                SizedBox(height: 8),
+                const SizedBox(height: 8),
                 Text(
-                  'Every coconut operation.\nOne simple app.',
-                  style: TextStyle(
+                  'home_banner_title'.tr,
+                  style: const TextStyle(
                     fontSize: 20,
                     height: 1.15,
                     fontWeight: FontWeight.w800,
                     color: Colors.white,
                   ),
                 ),
-                SizedBox(height: 8),
+                const SizedBox(height: 8),
                 Text(
-                  'Buy, sell, dispatch, collect and track - all with clear '
-                  'guided steps.',
-                  style: TextStyle(
+                  'home_banner_description'.tr,
+                  style: const TextStyle(
                     fontSize: 12.5,
                     height: 1.45,
                     color: Color(0xFFB8D2C4),
@@ -473,23 +472,23 @@ class HomeView extends GetView<DashboardController> {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: _kLine),
       ),
-      child: const Row(
+      child: Row(
         children: [
-          Icon(Icons.search, size: 19, color: _kMuted),
-          SizedBox(width: 8),
+          const Icon(Icons.search, size: 19, color: _kMuted),
+          const SizedBox(width: 8),
           Expanded(
             child: TextField(
               textAlign: TextAlign.start,
               decoration: InputDecoration(
                 isDense: true,
                 border: InputBorder.none,
-                hintText: 'Search work, customer or voucher',
-                hintStyle: TextStyle(fontSize: 13.5, color: _kInk),
-                contentPadding: EdgeInsets.symmetric(vertical: 14),
+                hintText: 'home_search_hint'.tr,
+                hintStyle: const TextStyle(fontSize: 13.5, color: _kInk),
+                contentPadding: const EdgeInsets.symmetric(vertical: 14),
               ),
             ),
           ),
-          Icon(Icons.mic_none_outlined, size: 19, color: _kMuted),
+          const Icon(Icons.mic_none_outlined, size: 19, color: _kMuted),
         ],
       ),
     );
@@ -502,7 +501,7 @@ class HomeView extends GetView<DashboardController> {
           children: [
             Expanded(
               child: _statCard(
-                'Purchased',
+                'home_purchased'.tr,
                 '2.5 t',
                 Icons.trending_up,
                 _kGreen,
@@ -512,7 +511,7 @@ class HomeView extends GetView<DashboardController> {
             const SizedBox(width: 12),
             Expanded(
               child: _statCard(
-                'Sold',
+                'home_sold'.tr,
                 '\u20B981K',
                 Icons.trending_up,
                 const Color(0xFFE9A23B),
@@ -526,7 +525,7 @@ class HomeView extends GetView<DashboardController> {
           children: [
             Expanded(
               child: _statCard(
-                'Received',
+                'home_received'.tr,
                 '\u20B952K',
                 Icons.currency_rupee,
                 const Color(0xFF0E8F86),
@@ -536,7 +535,7 @@ class HomeView extends GetView<DashboardController> {
             const SizedBox(width: 12),
             Expanded(
               child: _statCard(
-                'Workers',
+                'home_workers'.tr,
                 '18',
                 Icons.people_alt_outlined,
                 const Color(0xFF7C5CD6),
@@ -601,20 +600,20 @@ class HomeView extends GetView<DashboardController> {
   Widget _buildFastTransactions() {
     final items = <(String, String, IconData, String)>[
       (
-        'Purchase entry',
-        'Record coconut purchases from farmers',
+        'home_purchase_entry'.tr,
+        'home_purchase_entry_description'.tr,
         Icons.shopping_cart_outlined,
         Routes.newPurchaseInvoice,
       ),
       (
-        'New Sales order',
-        'Create and dispatch customer orders',
+        'home_sales_order'.tr,
+        'home_sales_order_description'.tr,
         Icons.local_shipping_outlined,
         Routes.newSaleOrder,
       ),
       (
-        'Payment receipt',
-        'Collect and post customer payments',
+        'home_payment_receipt'.tr,
+        'home_payment_receipt_description'.tr,
         Icons.receipt_long_outlined,
         Routes.newCustomerReceipt,
       ),
@@ -623,9 +622,9 @@ class HomeView extends GetView<DashboardController> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'THE MOST-USED WORK, SIMPLIFIED INTO SHORT STEPS.',
-          style: TextStyle(
+        Text(
+          'home_short_steps'.tr,
+          style: const TextStyle(
             fontSize: 11.5,
             fontWeight: FontWeight.w700,
             letterSpacing: 0.6,
@@ -633,12 +632,12 @@ class HomeView extends GetView<DashboardController> {
           ),
         ),
         const SizedBox(height: 6),
-        const Row(
+        Row(
           children: [
             Expanded(
               child: Text(
-                'Fast transactions',
-                style: TextStyle(
+                'home_fast_transactions'.tr,
+                style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w800,
                   color: _kInk,
@@ -646,8 +645,8 @@ class HomeView extends GetView<DashboardController> {
               ),
             ),
             Text(
-              'See all',
-              style: TextStyle(
+              'home_see_all'.tr,
+              style: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
                 color: _kGreen,

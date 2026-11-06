@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../controllers/auth/lang_selection_controller.dart';
+import '../../localization/localization.dart';
 
 class LangSelectionView extends GetView<LangSelectionController> {
   const LangSelectionView({super.key});
@@ -14,20 +15,14 @@ class LangSelectionView extends GetView<LangSelectionController> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            ElevatedButton(
-              onPressed: () {
-                controller.selectedValue.value = 'en';
-                controller.changeLanguage();
-              },
-              child: Text('english'.tr),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                controller.selectedValue.value = 'ar';
-                controller.changeLanguage();
-              },
-              child: Text('arabic'.tr),
-            ),
+            for (final option in Localization.languageOptions)
+              ElevatedButton(
+                onPressed: () async {
+                  controller.selectedValue.value = option['code']!;
+                  await controller.changeLanguage();
+                },
+                child: Text(option['name']!),
+              ),
           ],
         ),
       ),

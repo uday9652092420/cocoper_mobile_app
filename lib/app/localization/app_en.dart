@@ -505,5 +505,23 @@ const Map<String, String> enUS = {
   "active_branch": "Active branch",
   "role": "Role",
   "select_branch": "Select branch",
-  "no_branches": "No branches assigned"
+  "no_branches": "No branches assigned",
+  "home_tagline": "All coconut operations",
+  "home_banner_title": "Every coconut operation.\nOne simple app.",
+  "home_banner_description":
+      "Buy, sell, dispatch, collect and track - all with clear guided steps.",
+  "home_search_hint": "Search work, customer or voucher",
+  "home_purchased": "Purchased",
+  "home_sold": "Sold",
+  "home_received": "Received",
+  "home_workers": "Workers",
+  "home_short_steps": "THE MOST-USED WORK, SIMPLIFIED INTO SHORT STEPS.",
+  "home_fast_transactions": "Fast transactions",
+  "home_see_all": "See all",
+  "home_purchase_entry": "Purchase entry",
+  "home_purchase_entry_description": "Record coconut purchases from farmers",
+  "home_sales_order": "New Sales order",
+  "home_sales_order_description": "Create and dispatch customer orders",
+  "home_payment_receipt": "Payment receipt",
+  "home_payment_receipt_description": "Collect and post customer payments"
 };

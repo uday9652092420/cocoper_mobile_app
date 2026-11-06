@@ -32,6 +32,7 @@ class Localization extends Translations {
     {'code': 'en', 'country': 'US', 'name': 'English'},
     {'code': 'te', 'country': 'IN', 'name': 'తెలుగు'},
     {'code': 'hi', 'country': 'IN', 'name': 'हिन्दी'},
+    {'code': 'ar', 'country': 'SA', 'name': 'العربية'},
   ];
 
   @override
