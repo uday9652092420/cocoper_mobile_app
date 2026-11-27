@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 
+import '../../controllers/auth/lang_selection_controller.dart';
 import '../../controllers/labourattendance/labour_attendance_controller.dart';
 import '../../helpers/secure_store.dart';
 import '../../helpers/shared_preferences.dart';
@@ -47,6 +48,7 @@ class LabourAttendanceDashboardView extends StatelessWidget {
       SharedPrefsHelper.countryCode,
       defaultValue: 'US',
     );
+    await Get.find<LangSelectionController>().clearOrganizationScope();
     await FlutterSecureStore().deleteAllData();
     await SharedPrefsHelper.clearAll();
     await SharedPrefsHelper.setString(

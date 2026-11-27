@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../controllers/auth/lang_selection_controller.dart';
 import '../../controllers/dashboard/profile_controller.dart';
 import '../../helpers/secure_store.dart';
 import '../../helpers/shared_preferences.dart';
@@ -41,6 +42,7 @@ class ProfileView extends GetView<ProfileController> {
   String _value(String value) => value.isEmpty ? '-' : value;
 
   Future<void> _logout() async {
+    await Get.find<LangSelectionController>().clearOrganizationScope();
     await FlutterSecureStore().deleteAllData();
     await SharedPrefsHelper.clearAll();
     MobileAppPermissions.clear();

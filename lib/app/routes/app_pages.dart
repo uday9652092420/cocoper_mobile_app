@@ -1,6 +1,5 @@
 import 'package:cocoper_mobile/app/bindings/auth/login_binding.dart';
 import 'package:cocoper_mobile/app/bindings/bagpurchase/bag_purchase_binding.dart';
-import 'package:cocoper_mobile/app/bindings/cash&bankexpenses/cash_bank_expenses_binding.dart';
 import 'package:cocoper_mobile/app/bindings/dashboard/dashboard_bindings.dart';
 import 'package:cocoper_mobile/app/bindings/labourattendance/labour_attendance_binding.dart';
 import 'package:cocoper_mobile/app/bindings/loading&dispatch/loading_dispatch_binding.dart';
@@ -24,10 +23,6 @@ import 'package:cocoper_mobile/app/views/loading&dispatch/editloading&dispatch_v
 import 'package:cocoper_mobile/app/views/loading&dispatch/newloading&dispatch_view.dart';
 import 'package:cocoper_mobile/app/views/loading&dispatch/savedloading&dispatches_view.dart';
 import 'package:cocoper_mobile/app/views/loading&dispatch/viewloading&dispacth_view.dart';
-import 'package:cocoper_mobile/app/views/cash&bankexpenses/editcash&bankexpenses_view.dart';
-import 'package:cocoper_mobile/app/views/cash&bankexpenses/newbank&cashexpenses_view.dart';
-import 'package:cocoper_mobile/app/views/cash&bankexpenses/savedcash&bankexpenses_view.dart';
-import 'package:cocoper_mobile/app/views/cash&bankexpenses/viewcash&bankexpenses_view.dart';
 import 'package:cocoper_mobile/app/views/directsales/editsales_view.dart';
 import 'package:cocoper_mobile/app/views/directsales/savedsales_view.dart';
 import 'package:cocoper_mobile/app/views/directsales/viewsavedsale_view.dart';
@@ -51,6 +46,7 @@ import 'package:cocoper_mobile/app/views/splash_screen_view.dart';
 import 'package:cocoper_mobile/app/services/mobile_app_permissions.dart';
 import 'package:get/get.dart';
 import 'package:cocoper_mobile/app/views/directsales/new_direct_sale_view.dart';
+import 'package:cocoper_mobile/app/views/finance/finance_journal_views.dart';
 import 'package:cocoper_mobile/app/models/statements_report.dart';
 import 'package:cocoper_mobile/app/views/reportsstatements/customerstatement_view.dart';
 import 'package:cocoper_mobile/app/views/reportsstatements/pending&dispatch_view.dart';
@@ -268,34 +264,38 @@ class AppPages {
     ),
 
     GetPage(
-      name: Routes.savedCashBankExpenses,
-      page: () => const SavedCashBankExpensesView(),
-      binding: CashBankExpensesBinding(),
+      name: Routes.financeJournals,
+      page: () => const FinanceJournalListView(
+        sourceType: 'journal-entry',
+      ),
     ),
     GetPage(
-      name: Routes.newCashBankExpense,
-      page: () => const NewCashBankExpenseView(),
-      binding: CashBankExpensesBinding(),
+      name: Routes.pettyCash,
+      page: () => const FinanceJournalListView(
+        sourceType: 'petty-cash',
+      ),
     ),
     GetPage(
-      name: Routes.editCashBankExpense,
+      name: Routes.financeJournalForm,
       page: () {
         final argument = Get.arguments;
-        return EditCashBankExpenseView(
-          expenseId: argument is String ? argument : '',
+        final values = argument is Map ? argument : const <String, dynamic>{};
+        return FinanceJournalFormView(
+          sourceType: values['sourceType']?.toString() ?? 'journal-entry',
+          journalId: values['journalId']?.toString(),
         );
       },
-      binding: CashBankExpensesBinding(),
     ),
     GetPage(
-      name: Routes.viewCashBankExpense,
+      name: Routes.financeJournalDetail,
       page: () {
         final argument = Get.arguments;
-        return ViewCashBankExpenseView(
-          expenseId: argument is String ? argument : '',
+        final values = argument is Map ? argument : const <String, dynamic>{};
+        return FinanceJournalDetailView(
+          sourceType: values['sourceType']?.toString() ?? 'journal-entry',
+          journalId: values['journalId']?.toString() ?? '',
         );
       },
-      binding: CashBankExpensesBinding(),
     ),
 
     GetPage(

@@ -9,8 +9,7 @@ class SplashScreenView extends GetView<SplashScreenController> {
 
   @override
   Widget build(BuildContext context) {
-    // Start navigation timer in controller
-    controller.startTimer(context);
+    controller.startSessionRestore();
 
     final customTheme = CustomTheme.of(context);
     final textTheme = Theme.of(context).textTheme;

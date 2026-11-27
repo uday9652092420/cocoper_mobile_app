@@ -1,5 +1,6 @@
 import 'package:get/get.dart';
 
+import '../controllers/auth/lang_selection_controller.dart';
 import '../helpers/secure_store.dart';
 import '../services/mobile_app_permissions.dart';
 import '../routes/app_routes.dart';
@@ -27,6 +28,9 @@ Future<void> logout({bool forceLogout = true}) async {
 }
 
 Future<void> deleteDataAndRedirectLoginPage() async {
+  if (Get.isRegistered<LangSelectionController>()) {
+    await Get.find<LangSelectionController>().clearOrganizationScope();
+  }
   await FlutterSecureStore().deleteAllData();
   MobileAppPermissions.clear();
 

@@ -47,10 +47,10 @@ abstract class Routes {
   static const editLoadingDispatch = '/edit_loading_dispatch_view';
   static const viewLoadingDispatch = '/view_loading_dispatch_view';
 
-  static const savedCashBankExpenses = '/saved_cash_bank_expenses_view';
-  static const newCashBankExpense = '/new_cash_bank_expense_view';
-  static const editCashBankExpense = '/edit_cash_bank_expense_view';
-  static const viewCashBankExpense = '/view_cash_bank_expense_view';
+  static const financeJournals = '/finance_journals_view';
+  static const pettyCash = '/petty_cash_view';
+  static const financeJournalForm = '/finance_journal_form_view';
+  static const financeJournalDetail = '/finance_journal_detail_view';
 
   static const savedDirectSales = '/saved_direct_sales_view';
   static const newDirectSale = '/new_direct_sale_view';

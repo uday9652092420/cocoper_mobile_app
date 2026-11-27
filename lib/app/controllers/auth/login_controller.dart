@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import 'package:cocoper_mobile/app/config/environment.dart';
+import 'package:cocoper_mobile/app/controllers/auth/lang_selection_controller.dart';
 import 'package:cocoper_mobile/app/helpers/secure_store.dart';
 import 'package:cocoper_mobile/app/helpers/shared_preferences.dart';
 import 'package:cocoper_mobile/app/localization/localization.dart';
@@ -103,6 +106,9 @@ class LoginController extends GetxController {
     }
 
     MobileAppPermissions.clear();
+    if (Get.isRegistered<LangSelectionController>()) {
+      await Get.find<LangSelectionController>().clearOrganizationScope();
+    }
 
     final email = emailController.text.trim();
     final password = passwordController.text;
@@ -343,6 +349,11 @@ class LoginController extends GetxController {
           'reason=login_and_bootstrap_permissions_match',
         );
         Get.offAllNamed<void>(destination);
+        if (Get.isRegistered<LangSelectionController>()) {
+          unawaited(
+            Get.find<LangSelectionController>().onAuthenticatedSessionChanged(),
+          );
+        }
 
         return;
       }
@@ -366,6 +377,9 @@ class LoginController extends GetxController {
         'http_status=${response.statusCode} '
         'permission_result=not_requested',
       );
+      if (Get.isRegistered<LangSelectionController>()) {
+        await Get.find<LangSelectionController>().clearOrganizationScope();
+      }
       await FlutterSecureStore().deleteAllData();
       if (response.statusCode == 403) {
         _showError(
@@ -387,6 +401,9 @@ class LoginController extends GetxController {
         'authentication_result=error exception=${e.runtimeType} '
         'permission_result=not_requested',
       );
+      if (Get.isRegistered<LangSelectionController>()) {
+        await Get.find<LangSelectionController>().clearOrganizationScope();
+      }
       await FlutterSecureStore().deleteAllData();
 
       _showError(
@@ -501,6 +518,9 @@ class LoginController extends GetxController {
   }
 
   Future<void> _clearRejectedLogin() async {
+    if (Get.isRegistered<LangSelectionController>()) {
+      await Get.find<LangSelectionController>().clearOrganizationScope();
+    }
     await FlutterSecureStore().deleteAllData();
     await _clearStoredUserIdentity();
     MobileAppPermissions.clear();
@@ -653,28 +673,12 @@ class LoginController extends GetxController {
 
   Future<void> _restoreSavedLocale() async {
     try {
-      final localeValues = await Future.wait([
-        SharedPrefsHelper.getString(
-          SharedPrefsHelper.languageCode,
-          defaultValue: 'en',
-        ),
-        SharedPrefsHelper.getString(
-          SharedPrefsHelper.countryCode,
-          defaultValue: 'US',
-        ),
-      ]);
-      final languageCode = localeValues[0].isEmpty ? 'en' : localeValues[0];
-      final countryCode = localeValues[1].isEmpty ? 'US' : localeValues[1];
-      final locale = Locale(languageCode, countryCode);
-      if (Localization.supportedLocales.contains(locale)) {
-        Get.updateLocale(locale);
-      } else {
-        debugPrint(
-          'Saved locale $languageCode-$countryCode is unsupported; using '
-          '${Localization.defaultLocale.languageCode}-'
-          '${Localization.defaultLocale.countryCode}.',
-        );
-      }
+      final languageCode = await SharedPrefsHelper.getString(
+        SharedPrefsHelper.languageCode,
+        defaultValue: Localization.defaultLocale.languageCode,
+      );
+      final locale = Localization.localeForLanguageCode(languageCode);
+      await Get.updateLocale(locale);
     } catch (error) {
       debugPrint('Unable to restore saved locale: $error');
     }

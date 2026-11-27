@@ -102,7 +102,7 @@ class _ViewSupplierPaymentViewState extends State<ViewSupplierPaymentView> {
               return IconButton(
                 tooltip: 'Edit',
                 onPressed: () async {
-                  final result = await Get.toNamed<bool>(
+                  final result = await Get.toNamed<dynamic>(
                     Routes.editSupplierPayment,
                     arguments: payment.id,
                   );

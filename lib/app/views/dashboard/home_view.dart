@@ -3,9 +3,10 @@ import 'package:get/get.dart';
 
 import '../../controllers/dashboard/dashboard_controller.dart';
 import '../../controllers/dashboard/profile_controller.dart';
+import '../../controllers/auth/lang_selection_controller.dart';
 import '../../helpers/secure_store.dart';
 import '../../helpers/shared_preferences.dart';
-import '../../localization/localization.dart';
+import '../../models/app_language.dart';
 import '../../routes/app_routes.dart';
 import '../../services/mobile_app_permissions.dart';
 import '../../theme/app_theme.dart';
@@ -115,48 +116,79 @@ class HomeView extends GetView<DashboardController> {
   }
 
   Widget _buildLanguageButton() {
-    return PopupMenuButton<Map<String, String>>(
-      tooltip: 'language'.tr,
-      onSelected: (option) => _changeLanguage(
-        option['code'] ?? 'en',
-        option['country'] ?? 'US',
-      ),
-      itemBuilder: (context) => [
-        for (final option in Localization.languageOptions)
-          PopupMenuItem<Map<String, String>>(
-            value: option,
-            child: Row(
-              children: [
-                Icon(
-                  Get.locale?.languageCode == option['code']
-                      ? Icons.check_circle
-                      : Icons.circle_outlined,
-                  size: 16,
-                  color: Get.locale?.languageCode == option['code']
-                      ? _kGreen
-                      : _kMuted,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  option['name'] ?? '',
-                  style: const TextStyle(fontSize: 15, color: _kInk),
-                ),
-              ],
+    final languageController = Get.find<LangSelectionController>();
+
+    return Obx(() {
+      final options = languageController.languages.toList(growable: false);
+      return PopupMenuButton<AppLanguage>(
+        tooltip: 'language'.tr,
+        onSelected: (option) => languageController.selectLanguage(option.code),
+        itemBuilder: (context) => [
+          if (languageController.isLoadingLanguages.value)
+            const PopupMenuItem<AppLanguage>(
+              enabled: false,
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  SizedBox(width: 8),
+                  Text('Loading languages'),
+                ],
+              ),
             ),
+          if (languageController.languageError.value.isNotEmpty)
+            PopupMenuItem<AppLanguage>(
+              enabled: false,
+              child: Text(
+                languageController.languageError.value,
+                style: const TextStyle(fontSize: 12, color: _kMuted),
+              ),
+            ),
+          for (final option in options)
+            PopupMenuItem<AppLanguage>(
+              value: option,
+              child: Row(
+                children: [
+                  Icon(
+                    Get.locale?.languageCode == option.code
+                        ? Icons.check_circle
+                        : Icons.circle_outlined,
+                    size: 16,
+                    color: Get.locale?.languageCode == option.code
+                        ? _kGreen
+                        : _kMuted,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    option.name,
+                    style: const TextStyle(fontSize: 15, color: _kInk),
+                  ),
+                ],
+              ),
+            ),
+        ],
+        child: Container(
+          width: 38,
+          height: 38,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: _kLine),
           ),
-      ],
-      child: Container(
-        width: 38,
-        height: 38,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: _kLine),
+          child: languageController.isChangingLanguage.value
+              ? const SizedBox(
+                  width: 17,
+                  height: 17,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.translate, size: 19, color: _kGreen),
         ),
-        child: const Icon(Icons.translate, size: 19, color: _kGreen),
-      ),
-    );
+      );
+    });
   }
 
   Widget _buildLogoutButton() {
@@ -181,13 +213,6 @@ class HomeView extends GetView<DashboardController> {
     );
   }
 
-  Future<void> _changeLanguage(String code, String country) async {
-    await SharedPrefsHelper.setString(SharedPrefsHelper.languageCode, code);
-    await SharedPrefsHelper.setString(SharedPrefsHelper.countryCode, country);
-
-    await Get.updateLocale(Locale(code, country));
-  }
-
   Future<void> _logout() async {
     final languageCode = await SharedPrefsHelper.getString(
       SharedPrefsHelper.languageCode,
@@ -198,6 +223,7 @@ class HomeView extends GetView<DashboardController> {
       defaultValue: 'US',
     );
 
+    await Get.find<LangSelectionController>().clearOrganizationScope();
     await FlutterSecureStore().deleteAllData();
     await SharedPrefsHelper.clearAll();
     MobileAppPermissions.clear();

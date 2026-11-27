@@ -5,6 +5,7 @@ import 'package:flutter/cupertino.dart'
 import 'package:get/get.dart';
 
 import 'app/config/environment.dart';
+import 'app/controllers/auth/lang_selection_controller.dart';
 import 'app/helpers/shared_preferences.dart';
 import 'app/localization/localization.dart';
 import 'app/routes/app_pages.dart';
@@ -77,50 +78,65 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GetMaterialApp(
-      title: Environment.appName,
+    final languageController = Get.isRegistered<LangSelectionController>()
+        ? Get.find<LangSelectionController>()
+        : Get.put(LangSelectionController(), permanent: true);
 
-      locale: initialLocale,
+    return Obx(() {
+      final supportedLocales = languageController.supportedLocales;
+      return GetMaterialApp(
+        title: Environment.appName,
 
-      fallbackLocale: Localization.fallbackLocale,
+        locale: Get.locale ?? initialLocale,
 
-      translations: Localization(),
+        fallbackLocale: Localization.fallbackLocale,
 
-      supportedLocales: Localization.supportedLocales,
+        translations: Localization(),
 
-      localizationsDelegates: const [
-        _EnglishFallbackMaterialLocalizationsDelegate(),
-        _EnglishFallbackCupertinoLocalizationsDelegate(),
-      ],
+        supportedLocales: supportedLocales,
+        localeResolutionCallback: (locale, supportedLocales) =>
+            locale ?? initialLocale,
 
-      debugShowCheckedModeBanner: false,
+        localizationsDelegates: const [
+          _EnglishFallbackMaterialLocalizationsDelegate(),
+          _EnglishFallbackCupertinoLocalizationsDelegate(),
+        ],
 
-      theme: AppTheme.lightTheme,
+        debugShowCheckedModeBanner: false,
 
-      // ----------------------------------------------------------
-      // INITIAL ROUTE
-      // ----------------------------------------------------------
+        theme: AppTheme.lightTheme,
 
-      initialRoute: AppPages.initialPage,
+        // ----------------------------------------------------------
+        // INITIAL ROUTE
+        // ----------------------------------------------------------
 
-      // ----------------------------------------------------------
-      // GETX ROUTES
-      // ----------------------------------------------------------
+        initialRoute: AppPages.initialPage,
 
-      getPages: AppPages.routes,
-      unknownRoute: GetPage(
-        name: '/not-found',
-        page: () => const _RouteNotFoundView(),
-      ),
+        // ----------------------------------------------------------
+        // GETX ROUTES
+        // ----------------------------------------------------------
 
-      builder: (context, child) {
-        if (child == null) {
-          return const SizedBox.shrink();
-        }
+        getPages: AppPages.routes,
+        unknownRoute: GetPage(
+          name: '/not-found',
+          page: () => const _RouteNotFoundView(),
+        ),
 
-        return child;
-      },
-    );
+        builder: (context, child) {
+          if (child == null) {
+            return const SizedBox.shrink();
+          }
+
+          final locale = Get.locale ?? initialLocale;
+          return Directionality(
+            textDirection: Localization.isRightToLeft(locale)
+                ? TextDirection.rtl
+                : TextDirection.ltr,
+            child: child,
+          );
+        },
+      );
+    });
   }
 }
 

@@ -833,4 +833,82 @@ void main() {
     expect(result.status, MobilePermissionReconciliationStatus.denied);
     expect(result.permissions?.destination, MobileAppDestination.denied);
   });
+
+  test('finance actions require their exact permission or an elevated role',
+      () {
+    final worker = MobileAppPermissions.fromLoginResponse({
+      'user': {
+        'mobile_app_login': true,
+        'mobile_app_labour_attendance': false,
+        'role': 'Worker',
+        'permissions': ['sales-order.read'],
+      },
+    });
+    final owner = MobileAppPermissions.fromBootstrapResponse({
+      'user': {
+        'mobile_app_login': true,
+        'mobile_app_labour_attendance': false,
+        'role': 'OWNER',
+      },
+    });
+
+    expect(worker?.hasFinancePermission('read'), isFalse);
+    expect(owner?.hasFinancePermission('read'), isTrue);
+    expect(owner?.hasFinancePermission('delete'), isTrue);
+  });
+
+  test('finance action permissions are retained from login during bootstrap',
+      () {
+    final login = MobileAppPermissions.fromLoginResponse({
+      'user': {
+        'mobile_app_login': true,
+        'mobile_app_labour_attendance': false,
+        'role': 'Worker',
+        'permissions': [
+          'finance-transactions.read',
+          'finance-transactions.post',
+        ],
+      },
+    });
+    final bootstrap = MobileAppPermissions.fromBootstrapResponse({
+      'user': {
+        'mobile_app_login': true,
+        'mobile_app_labour_attendance': false,
+        'role': 'Worker',
+      },
+    });
+
+    final result = MobileAppPermissions.reconcile(login, bootstrap);
+
+    expect(result.permissions?.hasFinancePermission('read'), isTrue);
+    expect(result.permissions?.hasFinancePermission('post'), isTrue);
+    expect(result.permissions?.hasFinancePermission('delete'), isFalse);
+  });
+
+  test('finance journal actions are gated by status and exact permissions', () {
+    const permissions = MobileAppPermissions(
+      mobileAppLogin: true,
+      mobileAppLabourAttendance: false,
+      modulePermissions: {
+        'finance-transactions.edit',
+        'finance-transactions.delete',
+        'finance-transactions.post',
+      },
+    );
+
+    expect(permissions.canEditFinanceJournal('Draft'), isTrue);
+    expect(permissions.canDeleteFinanceJournal('Draft'), isTrue);
+    expect(permissions.canPostFinanceJournal('Draft'), isTrue);
+    expect(permissions.canReverseFinanceJournal('Posted'), isFalse);
+    expect(permissions.canEditFinanceJournal('Posted'), isFalse);
+    expect(permissions.canDeleteFinanceJournal('Posted'), isFalse);
+
+    const approver = MobileAppPermissions(
+      mobileAppLogin: true,
+      mobileAppLabourAttendance: false,
+      modulePermissions: {'finance-transactions.approve'},
+    );
+    expect(approver.canReverseFinanceJournal('Posted'), isTrue);
+    expect(approver.canPostFinanceJournal('Draft'), isFalse);
+  });
 }

@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:get/get.dart';
 
+import '../auth/lang_selection_controller.dart';
 import '../../helpers/console_print.dart';
 import '../../helpers/flutter_toast.dart';
 import '../../helpers/shared_preferences.dart';
@@ -84,6 +87,9 @@ class ProfileController extends GetxController {
   // ============================================================
 
   Future<void> _parseBootstrap(Map<String, dynamic> data) async {
+    final previousOrganizationId = await SharedPrefsHelper.getString(
+      SharedPrefsHelper.organizationId,
+    );
     final user = data['user'];
     if (user is Map) {
       final u = Map<String, dynamic>.from(user);
@@ -126,6 +132,12 @@ class ProfileController extends GetxController {
     consolePrint('PROFILE BRANCH COUNT: ${branches.length}');
 
     await _persistToPreferences();
+    if (previousOrganizationId != organizationId.value &&
+        Get.isRegistered<LangSelectionController>()) {
+      unawaited(
+        Get.find<LangSelectionController>().onAuthenticatedSessionChanged(),
+      );
+    }
   }
 
   // ============================================================

@@ -151,8 +151,40 @@ HTTP 401 on an authenticated request clears the session. HTTP 403 retains the ex
 | Customer Receipt | GET/POST /customer-receipts; PUT /customer-receipts/:id | POST /customer-receipts/:id/approve | DELETE /customer-receipts/:id |
 | Supplier Payment | GET/POST /supplier-payments; PUT /supplier-payments/:id | POST /supplier-payments/:id/approve | DELETE /supplier-payments/:id |
 | Labour Payment | GET /labour-attendance; POST {records:[...]}; PUT /labour-attendance/:id | PATCH /labour-attendance/group/:groupId/status {status} | DELETE /labour-attendance/group/:groupId |
-| Cash & Bank Expenses | GET/POST /cash-bank-expenses; PUT /cash-bank-expenses/:id | POST /cash-bank-expenses/:id/approve | DELETE /cash-bank-expenses/:id |
+| Cash & Bank Expenses (P&L read only in mobile) | GET/POST /cash-bank-expenses; PUT /cash-bank-expenses/:id | POST /cash-bank-expenses/:id/approve | DELETE /cash-bank-expenses/:id |
+| Journal Entries and Petty Cash | GET/POST /finance/journals; GET/PUT /finance/journals/:id | POST /finance/journals/:id/post; POST /finance/journals/:id/reverse | Draft-only DELETE /finance/journals/:id |
 | Bag Purchase | GET/POST /bag-purchases; GET/PUT /bag-purchases/:id | Not verified | DELETE /bag-purchases/:id |
+
+Journal Entries and Petty Cash use the same Finance journal API; there is no
+separate petty-cash resource. List requests filter with
+`sourceType=journal-entry` or `sourceType=petty-cash`, and may include
+`branchId`. Create/update bodies use `journalType`, `date` (`YYYY-MM-DD`),
+`branchId`, optional `reference` and `description`, and `lines`. Each line
+contains `accountId`, `debit`, `credit`, and optional `branchId` and
+`narration`. Draft lines must have at least two rows and each row must contain
+exactly one non-zero debit or credit; the backend requires equal, positive
+debit/credit totals before posting. The backend accepts up to four decimal
+places.
+
+Petty Cash sends `journalType: "petty-cash"` and uses debit lines for expense
+accounts plus one balancing credit line for a selected Cash-type ledger
+account. The app loads authorized branches from `/mobile/bootstrap`, active
+chart accounts from `/finance/accounts`, and registered cash ledger mappings
+from `/finance/bank-accounts`. The bank-account endpoint also requires
+`bank-cash-accounts.read`; a cash record must be active and linked to an active
+Assets/Account ledger before it can be selected.
+
+Responses use `{success, data}` for Finance routes. Access requires
+`finance-transactions.read/create/edit/delete/post`; reversals require
+`finance-transactions.approve`. The mobile app only offers edit/delete for
+Draft entries, post for Draft entries, and reverse for Posted entries. Draft
+deletion removes its journal lines and header atomically; posted journals
+cannot be deleted.
+
+The current journal-list backend supports only `sourceType` and `branchId` and
+returns at most 500 records. Mobile search, status, and date-range filters are
+applied locally to those authorized results; do not send unsupported date,
+search, status, or pagination parameters.
 
 Purchase Order to Sales Order conversion uses the authenticated `POST
 /sales-orders` route and its source relationship, duplicate handling, and
@@ -300,19 +332,10 @@ payload semantics. The lookup is organization-scoped and does not depend on the
 selected branch. The separate status route is not used to infer or perform
 approval transitions.
 
-Cash & Bank Expenses are read from the organization-scoped
-`GET /cash-bank-expenses` envelope (`{success, data}`). There is no detail
-route; View and Edit refresh that list and resolve the record by its database
-`id`. `GET /branches` returns a raw array and the selected `branchId` is part
-of each create/update payload. `PUT /cash-bank-expenses/:id` overwrites the
-stored attachments array. Edit therefore submits the currently selected
-attachment objects, preserving files by default while allowing individual
-existing files to be removed, new files to be added, or all files to be
-removed. If the attachment array is missing or malformed, the client blocks
-update rather than risking file loss. Draft records can be edited, approved,
-or deleted; approved records are read-only in the client. No server pagination
-or detail endpoint is verified, so list reads remain complete and detail views
-resolve the selected database ID from that list.
+The standalone Cash & Bank expense screens have been removed from the mobile
+app. Profit & Loss still reads the organization-scoped
+`GET /cash-bank-expenses` envelope (`{success, data}`) to include approved
+entries in its report; it does not expose expense-entry actions in Operations.
 
 Mode values are deliberately spelled exactly as the server expects: tonage, lessing, tonagePercentage. Tonnage actual quantity = quantity × 1000 / (discount + 1000); lessing = quantity − discount. Pieces % creation/editing is blocked pending the missing calculation contract.
 

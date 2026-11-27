@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 
+import '../auth/lang_selection_controller.dart';
+
 import '../../helpers/secure_store.dart';
 import '../../helpers/flutter_toast.dart';
 import '../../helpers/shared_preferences.dart';
@@ -285,6 +287,9 @@ class LabourAttendanceController extends GetxController
   }
 
   Future<void> _handleExpiredSession() async {
+    if (Get.isRegistered<LangSelectionController>()) {
+      await Get.find<LangSelectionController>().clearOrganizationScope();
+    }
     await FlutterSecureStore().deleteAllData();
     for (final key in [
       SharedPrefsHelper.userId,

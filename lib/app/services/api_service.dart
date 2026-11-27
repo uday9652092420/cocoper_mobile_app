@@ -348,6 +348,7 @@ Error type: ${error.type.name}
     Map<String, String>? headers,
     bool requireAuthToken = true,
     bool showServerErrors = true,
+    bool showNoInternetDialog = true,
     String? diagnosticLabel,
   }) async {
     if (!await isInternet()) {
@@ -355,7 +356,9 @@ Error type: ${error.type.name}
         'Internet connection unavailable.',
       );
 
-      await _showNoInternetDialog();
+      if (showNoInternetDialog) {
+        await _showNoInternetDialog();
+      }
 
       return null;
     }

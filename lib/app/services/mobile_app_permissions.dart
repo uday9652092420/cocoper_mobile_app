@@ -35,6 +35,8 @@ class MobileAppPermissions {
   const MobileAppPermissions({
     required this.mobileAppLogin,
     required this.mobileAppLabourAttendance,
+    this.role = '',
+    this.isSuperAdmin = false,
     this.hasMobileAppLoginField = true,
     this.hasLabourAttendanceField = true,
     this.modulePermissions = const <String>{},
@@ -43,6 +45,8 @@ class MobileAppPermissions {
 
   final bool? mobileAppLogin;
   final bool? mobileAppLabourAttendance;
+  final String role;
+  final bool isSuperAdmin;
   final bool hasMobileAppLoginField;
   final bool hasLabourAttendanceField;
   final Set<String> modulePermissions;
@@ -103,6 +107,8 @@ class MobileAppPermissions {
           : login.modulePermissions,
       hasModulePermissions:
           bootstrap.hasModulePermissions || login.hasModulePermissions,
+      role: bootstrap.role.isNotEmpty ? bootstrap.role : login.role,
+      isSuperAdmin: bootstrap.isSuperAdmin || login.isSuperAdmin,
     );
     if (!permissions.canAccessMainApp && !permissions.canUseLabourAttendance) {
       return MobilePermissionReconciliation(
@@ -202,6 +208,10 @@ class MobileAppPermissions {
       mobileAppLogin: _parseBoolean(user['mobile_app_login']),
       mobileAppLabourAttendance:
           _parseBoolean(user['mobile_app_labour_attendance']),
+      role: user['role']?.toString().trim() ?? '',
+      isSuperAdmin: user['is_super_admin'] == true ||
+          response['is_super_admin'] == true ||
+          response['isSuperAdmin'] == true,
       hasMobileAppLoginField: hasLogin,
       hasLabourAttendanceField: hasAttendance,
       modulePermissions: effectivePermissions,
@@ -212,6 +222,24 @@ class MobileAppPermissions {
 
   bool hasPermission(String permission) =>
       modulePermissions.contains(permission);
+
+  bool get isFinanceElevated =>
+      isSuperAdmin || role.trim().toUpperCase() == 'OWNER';
+
+  bool hasFinancePermission(String action) =>
+      isFinanceElevated || hasPermission('finance-transactions.$action');
+
+  bool canEditFinanceJournal(String status) =>
+      status == 'Draft' && hasFinancePermission('edit');
+
+  bool canDeleteFinanceJournal(String status) =>
+      status == 'Draft' && hasFinancePermission('delete');
+
+  bool canPostFinanceJournal(String status) =>
+      status == 'Draft' && hasFinancePermission('post');
+
+  bool canReverseFinanceJournal(String status) =>
+      status == 'Posted' && hasFinancePermission('approve');
 
   static Map<String, Object?> _diagnoseField(
     Map<String, dynamic>? user,

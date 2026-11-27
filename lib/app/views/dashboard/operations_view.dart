@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 
 import '../../controllers/dashboard/dashboard_controller.dart';
 import '../../routes/app_routes.dart';
+import '../../services/mobile_app_permissions.dart';
 import '../../theme/app_theme.dart';
 
 const _kInk = AppColors.textDefaultLight;
@@ -79,17 +80,44 @@ class OperationsView extends GetView<DashboardController> {
       route: Routes.savedSupplierPayments,
     ),
     _TransactionModule(
-      title: 'Cash & Bank',
-      subtitle: 'Record cash/bank expenses',
-      icon: Icons.savings_outlined,
+      title: 'Journal Entries',
+      subtitle: 'Create and manage journal vouchers',
+      titleKey: 'finance_journal_entries',
+      subtitleKey: 'finance_journal_entries_description',
+      icon: Icons.account_balance_outlined,
+      color: Color(0xFF0E8F86),
+      tint: Color(0xFFE2F2F1),
+      route: Routes.financeJournals,
+      permission: 'finance-transactions.read',
+    ),
+    _TransactionModule(
+      title: 'Petty Cash',
+      subtitle: 'Record and post petty cash expenses',
+      titleKey: 'finance_petty_cash',
+      subtitleKey: 'finance_petty_cash_description',
+      icon: Icons.receipt_long_outlined,
       color: Color(0xFFD95C21),
       tint: Color(0xFFFBEBDD),
-      route: Routes.savedCashBankExpenses,
+      route: Routes.pettyCash,
+      permission: 'finance-transactions.read',
     ),
   ];
 
+  bool _hasPermission(String permission) {
+    final permissions = MobileAppPermissions.current;
+    if (permissions == null) return false;
+    final action = permission.split('.').last;
+    return permissions.hasFinancePermission(action);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final modules = _modules
+        .where(
+          (module) =>
+              module.permission == null || _hasPermission(module.permission!),
+        )
+        .toList(growable: false);
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Container(
@@ -147,9 +175,9 @@ class OperationsView extends GetView<DashboardController> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                for (int i = 0; i < _modules.length; i++) ...[
-                  _buildTile(_modules[i]),
-                  if (i != _modules.length - 1) const SizedBox(height: 10),
+                for (int i = 0; i < modules.length; i++) ...[
+                  _buildTile(modules[i]),
+                  if (i != modules.length - 1) const SizedBox(height: 10),
                 ],
               ],
             ),
@@ -199,7 +227,7 @@ class OperationsView extends GetView<DashboardController> {
           return;
         }
         Get.snackbar(
-          module.title,
+          module.localizedTitle,
           'This module is coming soon.',
           snackPosition: SnackPosition.BOTTOM,
           margin: const EdgeInsets.all(16),
@@ -236,7 +264,7 @@ class OperationsView extends GetView<DashboardController> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    module.title,
+                    module.localizedTitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -247,7 +275,7 @@ class OperationsView extends GetView<DashboardController> {
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    module.subtitle,
+                    module.localizedSubtitle,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontSize: 12, color: _kMuted),
@@ -271,17 +299,26 @@ class OperationsView extends GetView<DashboardController> {
 class _TransactionModule {
   final String title;
   final String subtitle;
+  final String? titleKey;
+  final String? subtitleKey;
   final IconData icon;
   final Color color;
   final Color tint;
   final String? route;
+  final String? permission;
 
   const _TransactionModule({
     required this.title,
     required this.subtitle,
+    this.titleKey,
+    this.subtitleKey,
     required this.icon,
     required this.color,
     required this.tint,
     this.route,
+    this.permission,
   });
+
+  String get localizedTitle => titleKey?.tr ?? title;
+  String get localizedSubtitle => subtitleKey?.tr ?? subtitle;
 }

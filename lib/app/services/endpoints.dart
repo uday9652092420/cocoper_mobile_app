@@ -36,6 +36,8 @@ class EndPoints {
   ///
   /// GET /mobile/bootstrap  (Authorization: Bearer <token>)
   static const String mobileBootstrap = 'mobile/bootstrap';
+  static const String resourceLanguages = 'resources/languages';
+  static const String resourceTranslations = 'resources/translations';
   static const String mobileLabourAttendance = 'mobile/labour-attendance';
   static const String mobileLabourAttendanceToday =
       'mobile/labour-attendance/today';
@@ -211,9 +213,18 @@ class EndPoints {
 
   static const String cashBankExpenses = 'cash-bank-expenses';
   static const String profitLossStockSnapshot = 'profit-loss/stock-snapshot';
-  static String cashBankExpense(String id) => '$cashBankExpenses/$id';
-  static String cashBankExpenseApproval(String id) =>
-      '${cashBankExpense(id)}/approve';
+
+  // ============================================================
+  // FINANCE JOURNALS
+  // ============================================================
+
+  static const String financeJournals = 'finance/journals';
+  static const String financeAccounts = 'finance/accounts';
+  static const String financeBankAccounts = 'finance/bank-accounts';
+  static String financeJournal(String id) => '$financeJournals/$id';
+  static String financeJournalPost(String id) => '${financeJournal(id)}/post';
+  static String financeJournalReverse(String id) =>
+      '${financeJournal(id)}/reverse';
 
   // ============================================================
   // BAG PURCHASE

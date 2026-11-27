@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import 'auth/lang_selection_controller.dart';
 import '../helpers/secure_store.dart';
 import '../helpers/shared_preferences.dart';
 import '../routes/app_routes.dart';
@@ -11,13 +14,12 @@ import '../services/mobile_app_permissions.dart';
 class SplashScreenController extends GetxController {
   bool _hasStarted = false;
 
-  Future<void> startTimer(BuildContext context) async {
+  Future<void> startSessionRestore() async {
     if (_hasStarted) {
       return;
     }
     _hasStarted = true;
 
-    await Future<void>.delayed(const Duration(seconds: 1));
     String? token;
     try {
       token = await FlutterSecureStore().getSingleValue(
@@ -119,6 +121,11 @@ class SplashScreenController extends GetxController {
               : Routes.dashboard;
       _log('session_restore navigation destination=$destination');
       Get.offAllNamed<void>(destination);
+      if (Get.isRegistered<LangSelectionController>()) {
+        unawaited(
+          Get.find<LangSelectionController>().onAuthenticatedSessionChanged(),
+        );
+      }
     } catch (error) {
       _log('session_restore error=${error.runtimeType}');
       await _navigateToLogin(
@@ -204,6 +211,9 @@ class SplashScreenController extends GetxController {
     bool clearStoredSession = false,
   }) async {
     MobileAppPermissions.clear();
+    if (Get.isRegistered<LangSelectionController>()) {
+      await Get.find<LangSelectionController>().clearOrganizationScope();
+    }
     if (clearStoredSession) {
       await FlutterSecureStore().deleteAllData();
       await _clearStoredIdentity();
